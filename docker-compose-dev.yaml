@@ -1,0 +1,101 @@
+services:
+  traefik:
+    image: traefik:v3.3.2
+    ports:
+      - 8080:80
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    volumes:
+      - ${DOCKER_SOCKED_PATH}:/var/run/docker.sock:ro
+  redis:
+    image: "redis:alpine"
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
+      - ${SYSTEM_DEPLOYMENT_PATH}/redis-data:/data
+  postgres:
+    image: postgres:16
+    ports:
+      - 5432:5437
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGPORT=5437
+  prefect_db:
+    image: postgres:15.2-alpine
+    restart: unless-stopped
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/prefect_db:/var/lib/postgresql/data
+    ports:
+      - 5437:5432
+    healthcheck:
+      test: ["CMD-SHELL", "PGUSER=postgres", "pg_isready"]
+      interval: 1s
+      timeout: 10s
+      retries: 5
+    environment:
+      POSTGRES_USER: ${PREFECT_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PREFECT_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${PREFECT_POSTGRES_DB}
+  prefect:
+    image: prefecthq/prefect:2.20.3-python3.10
+    depends_on:
+      - prefect_db
+    restart: unless-stopped
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_POSTGRES_USER}:${PREFECT_POSTGRES_PASSWORD}@prefect_db:5432/${PREFECT_POSTGRES_DB}
+      PREFECT_AGENT_QUERY_INTERVAL: 1
+      PREFECT_AGENT_PREFETCH_SECONDS: 1
+      PREFECT_WORKER_HEARTBEAT_SECONDS: 5
+      PREFECT_WORKER_QUERY_SECONDS: 1
+      PREFECT_WORKER_PREFETCH_SECONDS: 1
+    entrypoint: ["prefect", "server", "start", "--host", "0.0.0.0", "--log-level", "WARNING",]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/prefect:/root/.prefect
+    ports:
+      - 4200:4200
+  nginx:
+    image: nginx:1.27.3
+    ports:
+      - 8081:80
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/usr/share/nginx/html:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.nginx.rule=PathPrefix(`/docs`)"
+    - "traefik.http.routers.nginx.entrypoints=web"
+    - "traefik.http.middlewares.nginx-stripprefix.stripprefix.prefixes=/docs"
+    - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
+    depends_on:
+      - traefik
+  # backup:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./docker/backup/Dockerfile
+  #   command: ["/backup.sh"]
+  #   environment:
+  #     # - BACKUP_CRON=0 3 * * *
+  #     BACKUP_CRON: "* * * * *"
+  #     POSTGRES_HOST: postgres
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #     BACKUP_PATH: /backups
+  #     FOLDERS_TO_ZIP: /data/prefect
+  #     # - FOLDERS_TO_ZIP=/data/files,/data/images
+  #   volumes:
+  #     - ${SYSTEM_DEPLOYMENT_PATH}:/backups
+  #     - ${SYSTEM_DEPLOYMENT_PATH}:/data
+  #   depends_on:
+  #     - postgres
+  #   labels:
+  #     - traefik.enable=false

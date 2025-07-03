@@ -1,0 +1,174 @@
+services:
+  traefik:
+    image: traefik:v3.3.2
+    ports:
+      - 8080:80
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    volumes:
+      - ${DOCKER_SOCKED_PATH}:/var/run/docker.sock:ro
+  redis:
+    image: "redis:alpine"
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
+  postgres:
+    image: postgres:16
+    ports:
+      - 5432:${POSTGRES_PORT}
+    healthcheck:
+      test: ["CMD-SHELL", "PGUSER=${POSTGRES_USER}", "pg_isready"]
+      interval: 1s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGPORT=${POSTGRES_PORT}
+  prefect_db:
+    image: postgres:15.2-alpine
+    restart: unless-stopped
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/prefect_db:/var/lib/postgresql/data
+    # ports:
+    #   - ${POSTGRES_PORT}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "PGUSER=${PREFECT_POSTGRES_USER}", "pg_isready"]
+      interval: 1s
+      timeout: 10s
+      retries: 5
+    environment:
+      POSTGRES_USER: ${PREFECT_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PREFECT_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${PREFECT_POSTGRES_DB}
+    labels:
+      - traefik.enable=false
+  prefect:
+    image: prefecthq/prefect:2.20.3-python3.10
+    depends_on:
+      - prefect_db
+    restart: on-failure
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_POSTGRES_USER}:${PREFECT_POSTGRES_PASSWORD}@prefect_db:5432/${PREFECT_POSTGRES_DB}
+      PREFECT_AGENT_QUERY_INTERVAL: 1
+      PREFECT_AGENT_PREFETCH_SECONDS: 1
+      PREFECT_WORKER_HEARTBEAT_SECONDS: 5
+      PREFECT_WORKER_QUERY_SECONDS: 1
+      PREFECT_WORKER_PREFETCH_SECONDS: 1
+    entrypoint: ["prefect", "server", "start", "--host", "0.0.0.0", "--log-level", "WARNING",]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/prefect:/root/.prefect
+    # ports:
+    #   - 4200:4200
+    labels:
+      - traefik.enable=false
+  uvicorn:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command:
+      ["sh", "startup.bash"]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+    ports:
+      - 8000:8000
+    environment:
+      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
+      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
+      PREFECT_API_URL: http://prefect:4200/api
+      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_URL: ${POSTGRES_URL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DEBUG_MODE: ${DEBUG_MODE}
+      TOKEN_SECRET: ${TOKEN_SECRET}
+      REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
+    - "traefik.http.routers.uvicorn.entrypoints=web"
+    - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
+    - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
+  nginx:
+    image: nginx:1.27.3
+    volumes:
+    - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/usr/share/nginx/html:ro
+    - ${NGINX_CONFIG}:/etc/nginx/conf.d/default.conf
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.nginx.rule=PathPrefix(`/docs`)"
+    - "traefik.http.routers.nginx.entrypoints=web"
+    - "traefik.http.middlewares.nginx-stripprefix.stripprefix.prefixes=/docs"
+    - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
+    depends_on:
+      - traefik
+  system-agent:
+    deploy:
+      mode: replicated
+      replicas: ${SYSTEM_WORKER_REPLICAS}
+    build:
+      context: ./
+      dockerfile: ./docker/system-agent/Dockerfile
+      args:
+        SYSTEM_GIT_NAME: ${SYSTEM_GIT_NAME}
+        SYSTEM_GIT_EMAIL: ${SYSTEM_GIT_EMAIL}
+    restart: unless-stopped
+    command:
+      ["sh", "startup.bash"]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+    environment:
+      EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
+      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
+      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
+      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      PREFECT_API_URL: http://prefect:4200/api
+      PREFECT_WORK_POOL: default-agent-pool
+      PREFECT_WORK_QUEUE: system-queue
+      TOKEN_SECRET: ${TOKEN_SECRET}
+    depends_on:
+      - prefect
+    labels:
+      - traefik.enable=false
+  # python-agent:
+  #   deploy:
+  #     mode: replicated
+  #     replicas: ${PYTHON_WORKER_REPLICAS}
+  #   build:
+  #     context: ./
+  #     dockerfile: ./docker/python-agent/Dockerfile
+  #   restart: unless-stopped
+  #   command:
+  #     ["sh", "startup.bash"]
+  #   environment:
+  #     EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
+  #     EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
+  #     EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
+  #     PREFECT_API_URL: http://prefect:4200/api
+  #     PREFECT_WORK_POOL: default-agent-pool
+  #     PREFECT_WORK_QUEUE: itp-python-queue
+  #     RUNTIME_ENVIRONMENT: ${PYTHON_RUNTIME_ENVIRONMENT}
+  #     TESTING_EXECUTABLE: ${PYTHON_TESTING_EXECUTABLE}
+  #   depends_on:
+  #     - prefect
+  #   labels:
+  #   - traefik.enable=false

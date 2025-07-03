@@ -1,0 +1,42 @@
+from typing import Annotated
+from uuid import UUID
+from fastapi import Depends
+from fastapi import APIRouter
+from sqlalchemy.orm import Session
+from sqlalchemy import exc
+from ctutor_backend.api.exceptions import InternalServerException
+from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.api.crud import create_db
+from ctutor_backend.api.exceptions import NotFoundException
+from ctutor_backend.api.permissions import check_permissions
+from ctutor_backend.database import get_db
+from ctutor_backend.interface.permissions import Principal
+from ctutor_backend.interface.user_roles import UserRoleCreate, UserRoleGet, UserRoleList
+from ctutor_backend.model.models import UserRole
+
+user_roles_router = APIRouter()
+
+@user_roles_router.post("", response_model=UserRoleGet)
+async def create_user_role(permissions: Annotated[Principal, Depends(get_current_permissions)], entity: UserRoleCreate, db: Session = Depends(get_db)):
+    return await create_db(permissions, db, entity, UserRole, UserRoleGet)
+
+@user_roles_router.delete("/users/{user_id}/roles/{role_id}", response_model=list[UserRoleList])
+async def delete_user_role(permissions: Annotated[Principal, Depends(get_current_permissions)], user_id: UUID | str, role_id: UUID | str, db: Session = Depends(get_db)):
+
+    query = check_permissions(permissions,UserRole,"delete",db)
+    
+    entity = query.filter(UserRole.user_id == user_id, UserRole.role_id == role_id).first()
+    
+    if not entity:
+        raise NotFoundException(detail=f"{UserRole.__name__} not found")
+
+    try:
+        db.delete(entity)
+        db.commit()
+    except exc.SQLAlchemyError as e:
+        # TODO: proper error handling
+        raise InternalServerException(detail=e.args)
+    except Exception as e:
+        raise InternalServerException(detail=e.args)
+
+    return {"ok": True}

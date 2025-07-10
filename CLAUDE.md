@@ -69,6 +69,35 @@ cd frontend && npm test      # Run tests
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 
+## Development Principles
+
+### Test-Driven Development (TDD)
+We follow a strict TDD approach:
+1. Write the test first
+2. Run the test and see it fail
+3. Write minimal code to make the test pass
+4. Refactor while keeping tests green
+
+### Core Principles
+- **SOLID**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
+- **KISS**: Keep It Simple, Stupid - avoid unnecessary complexity
+- **YAGNI**: You Aren't Gonna Need It - don't add functionality until it's needed
+- **SRP**: Single Responsibility Principle - each class/function should have one reason to change
+
+### Code Style
+- **Use speaking names**: Variables, functions, and classes should clearly express their purpose
+- **Let code speak for itself**: Write code as well-written prose that needs no explanation
+- **Avoid redundant comments**: Don't comment what the code already says
+- **Comment only when required for clarity**: Complex algorithms, workarounds, or non-obvious decisions
+- **Document sparingly**: Function headers and classes only when purpose is not obvious, mainly for public APIs
+
+Example of good code:
+```python
+def calculate_student_final_grade(assignments: List[Assignment], exam_score: float) -> float:
+    assignment_average = sum(a.score for a in assignments) / len(assignments)
+    return assignment_average * 0.4 + exam_score * 0.6
+```
+
 ## Testing
 - Backend tests in `/src/ctutor_backend/api/tests.py`
 - Frontend uses Jest/React Testing Library

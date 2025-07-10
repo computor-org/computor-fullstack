@@ -90,6 +90,8 @@ We follow a strict TDD approach:
 - **Avoid redundant comments**: Don't comment what the code already says
 - **Comment only when required for clarity**: Complex algorithms, workarounds, or non-obvious decisions
 - **Document sparingly**: Function headers and classes only when purpose is not obvious, mainly for public APIs
+- **Code ordering**: High-level and public API elements appear at the top, lower-level helper functions below
+- **Follow PEP standards**: Strictly adhere to current PEP 8 and other applicable Python Enhancement Proposals
 
 Example of good code:
 ```python
@@ -108,7 +110,6 @@ def calculate_student_final_grade(assignments: List[Assignment], exam_score: flo
 **Important**: Each subdirectory in `/plugins/` is its own Git repository. When working with plugins:
 1. Navigate to the specific plugin directory (e.g., `cd plugins/computor-sso`)
 2. Make changes and commit/push within that repository
-3. **Always return to the project base folder afterwards** (`cd ../..` or absolute path)
 
 Example:
 ```bash
@@ -116,7 +117,6 @@ cd plugins/computor-sso
 git add .
 git commit -m "Update SSO plugin"
 git push
-cd ../..  # Return to project base
 ```
 
 ## Notes

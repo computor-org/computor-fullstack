@@ -74,8 +74,24 @@ cd frontend && npm test      # Run tests
 - Frontend uses Jest/React Testing Library
 - No specific test runner configuration found - use default pytest/jest settings
 
+## Plugins
+
+**Important**: Each subdirectory in `/plugins/` is its own Git repository. When working with plugins:
+1. Navigate to the specific plugin directory (e.g., `cd plugins/computor-sso`)
+2. Make changes and commit/push within that repository
+3. **Always return to the project base folder afterwards** (`cd ../..` or absolute path)
+
+Example:
+```bash
+cd plugins/computor-sso
+git add .
+git commit -m "Update SSO plugin"
+git push
+cd ../..  # Return to project base
+```
+
 ## Notes
 - The web UI is in early development stages
-- Plugin system exists at `/plugins/`
+- Plugin system exists at `/plugins/` (see above for Git workflow)
 - VSCode extension available in separate repository
 - System designed for academic programming course management

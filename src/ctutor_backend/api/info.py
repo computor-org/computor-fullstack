@@ -9,7 +9,7 @@ from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.redis_cache import get_redis_client
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.organizations import OrganizationProperties
-from ctutor_backend.model.sqlalchemy_models.organization import Organization
+from ctutor_backend.model.organization import Organization
 
 info_router = APIRouter()
 

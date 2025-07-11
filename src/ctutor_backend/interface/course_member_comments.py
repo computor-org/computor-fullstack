@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberList
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model.sqlalchemy_models.course import CourseMemberComment
+from ctutor_backend.model.course import CourseMemberComment
 
 class CourseMemberCommentCreate(BaseModel):
     id: Optional[str] = None

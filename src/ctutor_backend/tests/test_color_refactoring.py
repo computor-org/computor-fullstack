@@ -135,7 +135,7 @@ def test_model_import():
     print("\n🗃️ Testing SQLAlchemy model...")
     
     try:
-        from ctutor_backend.model.sqlalchemy_models.course import CourseContentType
+        from ctutor_backend.model.course import CourseContentType
         
         # Check that the color column is a String type
         color_column = CourseContentType.__table__.columns.get('color')

@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.deployments import GitLabConfig
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
-from ctutor_backend.model.sqlalchemy_models.course import CourseSubmissionGroup
+from ctutor_backend.model.course import CourseSubmissionGroup
 
 class SubmissionGroupProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None

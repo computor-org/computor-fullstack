@@ -19,7 +19,7 @@ def test_import_models():
     
     try:
         # Test importing from the new structure
-        from ctutor_backend.model.sqlalchemy_models import (
+        from ctutor_backend.model import (
             User, Account, Profile, StudentProfile, Session,
             Organization, CourseContentKind, CourseRole, CourseFamily,
             Course, CourseContentType, CourseExecutionBackend, CourseGroup,
@@ -55,7 +55,7 @@ def test_database_connection():
         session = Session()
         
         # Test basic queries
-        from ctutor_backend.model.sqlalchemy_models import User, Course, Organization
+        from ctutor_backend.model import User, Course, Organization
         
         # Count records
         user_count = session.query(User).count()
@@ -92,7 +92,7 @@ def test_model_relationships():
         Session = sessionmaker(bind=engine)
         session = Session()
         
-        from ctutor_backend.model.sqlalchemy_models import User, Course, Organization, CourseFamily
+        from ctutor_backend.model import User, Course, Organization, CourseFamily
         
         # Test relationship queries
         users_with_profiles = session.query(User).filter(User.given_name.isnot(None)).first()

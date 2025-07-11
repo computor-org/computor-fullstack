@@ -8,7 +8,7 @@ from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.permissions import check_course_permissions
 from ctutor_backend.api.exceptions import NotFoundException
-from ctutor_backend.model.sqlalchemy_models.course import Course
+from ctutor_backend.model.course import Course
 
 lecturer_router = APIRouter()
 

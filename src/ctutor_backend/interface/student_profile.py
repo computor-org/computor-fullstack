@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model.sqlalchemy_models.auth import StudentProfile
+from ctutor_backend.model.auth import StudentProfile
 
 class StudentProfileCreate(BaseModel):
     id: Optional[str] = None

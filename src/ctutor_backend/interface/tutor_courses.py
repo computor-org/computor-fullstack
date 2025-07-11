@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
 from sqlalchemy_utils import Ltree
 
-from ctutor_backend.model.sqlalchemy_models.course import Course
+from ctutor_backend.model.course import Course
 
 class CourseTutorRepository(BaseModel):
     provider_url: Optional[str] = None

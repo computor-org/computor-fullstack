@@ -19,11 +19,11 @@ env_path = Path(__file__).parent.parent.parent.parent / ".env.dev"
 load_dotenv(env_path)
 
 from database import get_db
-from model.sqlalchemy_models.role import Role, UserRole
-from model.sqlalchemy_models.course import CourseRole, CourseContentKind
-from model.sqlalchemy_models.execution import ExecutionBackend
+from model.role import Role, UserRole
+from model.course import CourseRole, CourseContentKind
+from model.execution import ExecutionBackend
 from interface.tokens import encrypt_api_key
-from model.sqlalchemy_models.auth import User
+from model.auth import User
 
 
 def initialize_system_roles(db: Session):

@@ -178,10 +178,14 @@ def create_admin_user(db: Session):
     """Create the default admin user."""
     print("👤 Creating admin user...")
     
+    # Get credentials from environment variables
+    admin_username = os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')
+    admin_password = os.environ.get('EXECUTION_BACKEND_API_PASSWORD', 'admin')
+    
     # Check if admin user already exists
-    existing_user = db.query(User).filter(User.username == 'admin').first()
+    existing_user = db.query(User).filter(User.username == admin_username).first()
     if existing_user:
-        print("   ⚠️  Admin user already exists")
+        print(f"   ⚠️  Admin user already exists: {admin_username}")
         return
     
     # Create admin user
@@ -189,8 +193,8 @@ def create_admin_user(db: Session):
         given_name='System',
         family_name='Administrator',
         email='admin@system.local',
-        username='admin',
-        password=encrypt_api_key('admin'),
+        username=admin_username,
+        password=encrypt_api_key(admin_password),
         user_type='user'
     )
     
@@ -207,7 +211,7 @@ def create_admin_user(db: Session):
     db.add(admin_role)
     db.commit()
     
-    print("   ✅ Created admin user (username: admin, password: admin)")
+    print(f"   ✅ Created admin user (username: {admin_username}, password: {admin_password})")
 
 
 def main():
@@ -231,7 +235,7 @@ def main():
         print("   • Course roles: _student, _tutor, _lecturer, _maintainer, _owner")
         print("   • Content kinds: assignment, lecture, exercise, exam, unit")
         print("   • Execution backends: prefect")
-        print("   • Admin user: username 'admin', password 'admin'")
+        print(f"   • Admin user: username '{os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')}', password '{os.environ.get('EXECUTION_BACKEND_API_PASSWORD', 'admin')}'")
         print("\n🎯 You can now start the application!")
         
     except Exception as e:

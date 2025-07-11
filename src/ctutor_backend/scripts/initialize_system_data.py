@@ -10,20 +10,20 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+# Add parent directories to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # ctutor_backend
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))  # src
 
 # Load environment variables
-env_path = Path(__file__).parent.parent.parent / ".env.dev"
+env_path = Path(__file__).parent.parent.parent.parent / ".env.dev"
 load_dotenv(env_path)
 
-from ctutor_backend.database import get_db
-from ctutor_backend.model.sqlalchemy_models.role import Role
-from ctutor_backend.model.sqlalchemy_models.course import CourseRole, CourseContentKind
-from ctutor_backend.model.sqlalchemy_models.execution import ExecutionBackend
-from ctutor_backend.interface.tokens import encrypt_api_key
-from ctutor_backend.model.sqlalchemy_models.auth import User
-from ctutor_backend.model.sqlalchemy_models.role import UserRole
+from database import get_db
+from model.sqlalchemy_models.role import Role, UserRole
+from model.sqlalchemy_models.course import CourseRole, CourseContentKind
+from model.sqlalchemy_models.execution import ExecutionBackend
+from interface.tokens import encrypt_api_key
+from model.sqlalchemy_models.auth import User
 
 
 def initialize_system_roles(db: Session):
@@ -121,31 +121,7 @@ def initialize_course_content_kinds(db: Session):
             'id': 'assignment',
             'title': 'Assignment',
             'description': 'Programming assignments for students',
-            'has_ascendants': False,
-            'has_descendants': True,
-            'submittable': True
-        },
-        {
-            'id': 'lecture',
-            'title': 'Lecture',
-            'description': 'Lecture materials and slides',
-            'has_ascendants': False,
-            'has_descendants': True,
-            'submittable': False
-        },
-        {
-            'id': 'exercise',
-            'title': 'Exercise',
-            'description': 'Practice exercises',
-            'has_ascendants': False,
-            'has_descendants': True,
-            'submittable': True
-        },
-        {
-            'id': 'exam',
-            'title': 'Exam',
-            'description': 'Examinations and tests',
-            'has_ascendants': False,
+            'has_ascendants': True,
             'has_descendants': False,
             'submittable': True
         },
@@ -153,7 +129,7 @@ def initialize_course_content_kinds(db: Session):
             'id': 'unit',
             'title': 'Unit',
             'description': 'Learning units and modules',
-            'has_ascendants': False,
+            'has_ascendants': True,
             'has_descendants': True,
             'submittable': False
         }
@@ -177,9 +153,7 @@ def initialize_execution_backends(db: Session):
     
     backends = [
         {
-            'id': 'prefect_builtin',
-            'title': 'Prefect Built-in',
-            'description': 'Default Prefect-based execution backend',
+            'slug': 'prefect_builtin',
             'type': 'prefect_builtin',
             'properties': {
                 'url': 'http://prefect:4200/api',
@@ -189,13 +163,13 @@ def initialize_execution_backends(db: Session):
     ]
     
     for backend_data in backends:
-        existing_backend = db.query(ExecutionBackend).filter(ExecutionBackend.id == backend_data['id']).first()
+        existing_backend = db.query(ExecutionBackend).filter(ExecutionBackend.slug == backend_data['slug']).first()
         if not existing_backend:
             backend = ExecutionBackend(**backend_data)
             db.add(backend)
-            print(f"   ✅ Created execution backend: {backend_data['id']}")
+            print(f"   ✅ Created execution backend: {backend_data['slug']}")
         else:
-            print(f"   ⚠️  Execution backend already exists: {backend_data['id']}")
+            print(f"   ⚠️  Execution backend already exists: {backend_data['slug']}")
     
     db.commit()
 

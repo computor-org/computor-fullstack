@@ -35,6 +35,7 @@ def upgrade() -> None:
     sa.Column('id', sa.String(length=255), nullable=False),
     sa.Column('title', sa.String(length=255), nullable=True),
     sa.Column('description', sa.String(length=4096), nullable=True),
+    sa.Column('builtin', sa.Boolean(), server_default=sa.text('false'), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('group',

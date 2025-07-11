@@ -1,4 +1,3 @@
-from typing import Text
 from sqlalchemy import (
     BigInteger, Boolean, Column, DateTime, Float, 
     ForeignKey, Index, Integer, String, text
@@ -23,7 +22,7 @@ class Result(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     submit = Column(Boolean, nullable=False)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
     course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='SET NULL', onupdate='RESTRICT'), index=True)
@@ -32,7 +31,7 @@ class Result(Base):
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
     test_system_id = Column(String(255), nullable=False)
     result = Column(Float(53), nullable=False)
-    result_json = Column(JSONB(astext_type=Text()))
+    result_json = Column(JSONB)
     version_identifier = Column(String(2048), nullable=False)
     status = Column(Integer, nullable=False)
 

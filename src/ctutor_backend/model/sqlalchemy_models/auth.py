@@ -1,4 +1,3 @@
-from typing import Text
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Enum, ForeignKey, Index, String, text, Integer
@@ -25,7 +24,7 @@ class User(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     archived_at = Column(DateTime(True))
     given_name = Column(String(255))
     family_name = Column(String(255))
@@ -65,7 +64,7 @@ class Account(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     provider = Column(String(255), nullable=False)
     type = Column(String(63), nullable=False)
     provider_account_id = Column(String(255), nullable=False)
@@ -83,7 +82,7 @@ class Profile(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     avatar_color = Column(Integer)
     avatar_image = Column(String(2048))
     nickname = Column(String(255), unique=True)
@@ -103,7 +102,7 @@ class StudentProfile(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     student_id = Column(String(255), unique=True)
     student_email = Column(String(320), unique=True)
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False, unique=True)
@@ -120,7 +119,7 @@ class Session(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     session_id = Column(String(1024), nullable=False)
     logout_time = Column(DateTime(True))

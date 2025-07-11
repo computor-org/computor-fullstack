@@ -18,8 +18,9 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 import sys
-sys.path.append('../')
-from ctutor_backend.model.sqlalchemy_models import Base
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from model.sqlalchemy_models import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

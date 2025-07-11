@@ -1,4 +1,4 @@
-from typing import Text, List
+from typing import List, TYPE_CHECKING
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Enum, Float, ForeignKey, ForeignKeyConstraint, Index, 
@@ -9,6 +9,9 @@ from sqlalchemy.orm import relationship, column_property, Mapped
 from sqlalchemy_utils import LtreeType
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .result import Result
 
 
 class CourseContentKind(Base):
@@ -48,7 +51,7 @@ class CourseFamily(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
     path = Column(LtreeType, nullable=False)
@@ -73,7 +76,7 @@ class Course(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
     path = Column(LtreeType, nullable=False)
@@ -109,7 +112,7 @@ class CourseContentType(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
     slug = Column(String(255), nullable=False)
@@ -120,7 +123,7 @@ class CourseContentType(Base):
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     # Relationships
-    course_contents = relationship("CourseContent", back_populates="course_content_type", uselist=True, lazy="select")
+    course_contents = relationship("CourseContent", back_populates="course_content_type", foreign_keys="CourseContent.course_content_type_id", uselist=True, lazy="select")
     course_content_kind = relationship('CourseContentKind', back_populates='course_content_types')
     course = relationship("Course", back_populates="course_content_types", lazy="select")
     created_by_user = relationship('User', foreign_keys=[created_by])
@@ -138,7 +141,7 @@ class CourseExecutionBackend(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
 
     # Relationships
     course = relationship('Course', back_populates='course_execution_backends')
@@ -158,7 +161,7 @@ class CourseGroup(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -167,7 +170,7 @@ class CourseGroup(Base):
     course = relationship('Course', back_populates='course_groups')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
-    course_members = relationship('CourseMember', back_populates='course_group')
+    course_members = relationship('CourseMember', back_populates='course_group', foreign_keys='CourseMember.course_group_id')
 
 
 class CourseContent(Base):
@@ -185,7 +188,7 @@ class CourseContent(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     archived_at = Column(DateTime(True))
     title = Column(String(255))
     description = Column(String(4096))
@@ -238,7 +241,7 @@ class CourseMember(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_group_id = Column(ForeignKey('course_group.id', ondelete='RESTRICT', onupdate='RESTRICT'))
@@ -270,7 +273,7 @@ class CourseSubmissionGroup(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     status = Column(String(2048))
     grading = Column(Float(53))
     max_group_size = Column(Integer, nullable=False)
@@ -301,7 +304,7 @@ class CourseSubmissionGroupMember(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     grading = Column(Float(53))
     course_id = Column(ForeignKey('course.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
     course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)

@@ -1,4 +1,3 @@
-from typing import Text
 from sqlalchemy import (
     BigInteger, Column, DateTime, ForeignKey, 
     Index, String, text, Integer
@@ -12,9 +11,9 @@ from .base import Base
 class Message(Base):
     __tablename__ = 'codeability_message'
     __table_args__ = (
-        Index('codeability_message_course_id_archived_at_key', 'course_id', 'archived_at'),
-        Index('codeability_message_parent_id_archived_at_key', 'parent_id', 'archived_at'),
-        Index('codeability_message_transmitter_course_member_id_archived_at_key', 'transmitter_course_member_id', 'archived_at'),
+        Index('msg_course_archived_idx', 'course_id', 'archived_at'),
+        Index('msg_parent_archived_idx', 'parent_id', 'archived_at'),
+        Index('msg_transmitter_archived_idx', 'transmitter_course_member_id', 'archived_at'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -23,7 +22,7 @@ class Message(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     archived_at = Column(DateTime(True))
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     transmitter_course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -44,7 +43,7 @@ class Message(Base):
 class MessageRead(Base):
     __tablename__ = 'codeability_message_read'
     __table_args__ = (
-        Index('codeability_message_read_key', 'codeability_message_id', 'course_member_id', unique=True),
+        Index('msg_read_unique_idx', 'codeability_message_id', 'course_member_id', unique=True),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -53,7 +52,7 @@ class MessageRead(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     codeability_message_id = Column(ForeignKey('codeability_message.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 

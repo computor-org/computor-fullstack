@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from ctutor_backend.model import Base
+from model import Base
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

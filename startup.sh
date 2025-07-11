@@ -10,7 +10,7 @@ set +a
 
 ENVIRONMENT=${1:-dev}
 
-DOCKERFILE="docker-compose-${ENVIRONMENT}.yaml"
+DOCKERCFILE="docker-compose-${ENVIRONMENT}.yaml"
 
 destination="${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
 

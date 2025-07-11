@@ -9,7 +9,7 @@ from ctutor_backend.interface.courses import CourseInterface, CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.base import EntityInterface
 from ctutor_backend.interface.tokens import decrypt_api_key
-from ctutor_backend.model.course import CourseContent, CourseFamily
+from ctutor_backend.model.course import Course, CourseContent, CourseFamily
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.generator.git_helper import clone_or_pull_and_checkout
 from ctutor_backend.settings import settings

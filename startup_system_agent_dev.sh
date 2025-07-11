@@ -3,9 +3,9 @@
 # Stop on error
 set -e
 
-# Export env vars from .env.dev
+# Export env vars from .env
 set -a
-source .env.dev
+source .env
 set +a
 
 echo "Starting prefect system agent for development..."

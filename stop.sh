@@ -3,12 +3,14 @@
 # Stop on error
 set -e
 
-# Export env vars from .env.dev
+# Export env vars from .env
 set -a
-source .env.dev
+source .env
 set +a
 
-DOCKERCFILE="docker-compose-dev.yaml"
+ENVIRONMENT=${1:-dev}
+
+DOCKERFILE="docker-compose-${ENVIRONMENT}.yaml"
 
 echo "[Stopping ${SYSTEM_TITLE} Server]"
 

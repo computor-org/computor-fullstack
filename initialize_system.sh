@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -a
-source .env.dev
+source .env
 set +a
 
 echo "Initializing system data..."

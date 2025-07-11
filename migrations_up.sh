@@ -3,7 +3,7 @@
 set -e
 
 set -a
-source .env.dev
+source .env
 set +a
 
 export PGPASSWORD=${POSTGRES_PASSWORD}

@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # ctutor_backend
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))  # src
 
 # Load environment variables
-env_path = Path(__file__).parent.parent.parent.parent / ".env.dev"
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(env_path)
 
 from database import get_db

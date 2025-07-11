@@ -1,10 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberInterface, CourseMemberList
-from ctutor_backend.interface.courses import CourseInterface
+from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberList
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model.models import  CourseMemberComment
+from ctutor_backend.model.sqlalchemy_models.course import CourseMemberComment
 
 class CourseMemberCommentCreate(BaseModel):
     id: Optional[str] = None

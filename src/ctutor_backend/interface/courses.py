@@ -1,11 +1,10 @@
 from pydantic import BaseModel, validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.course_families import CourseFamilyGet, CourseFamilyInterface
+from ctutor_backend.interface.course_families import CourseFamilyGet
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model import Course
-from ctutor_backend.model.models import CourseFamily
+from ctutor_backend.model.sqlalchemy_models.course import Course
 from sqlalchemy_utils import Ltree
 
 class CourseProperties(BaseModel):
@@ -78,7 +77,6 @@ class CourseQuery(ListQuery):
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     version_identifier: Optional[str] = None
-    # properties: Optional[CourseProperties] = None
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
 

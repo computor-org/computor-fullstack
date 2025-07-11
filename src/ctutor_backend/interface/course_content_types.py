@@ -1,13 +1,10 @@
-import json
 from enum import Enum
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.course_content_kind import CourseContentKindGet
-from ctutor_backend.interface.courses import CourseInterface
-from ctutor_backend.model import CourseContentType
-from ctutor_backend.model.models import Course
+from ctutor_backend.model.sqlalchemy_models.course import CourseContentType
 
 class CTutorUIColor(str, Enum):
     RED = 'red'
@@ -97,9 +94,7 @@ def course_content_type_search(db: Session, query, params: Optional[CourseConten
         query = query.filter(CourseContentType.course_id == params.course_id)
     if params.course_content_kind_id != None:
         query = query.filter(CourseContentType.course_content_kind_id == params.course_content_kind_id)
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(CourseContentType.properties == properties_dict)
+
     return query
 
 class CourseContentTypeInterface(EntityInterface):

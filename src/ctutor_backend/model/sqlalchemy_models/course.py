@@ -93,7 +93,7 @@ class Course(Base):
     course_content_types = relationship("CourseContentType", back_populates="course", uselist=True, lazy="select")
     course_groups = relationship("CourseGroup", back_populates="course", uselist=True, lazy="select")
     course_execution_backends = relationship("CourseExecutionBackend", back_populates="course", uselist=True)
-    course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", uselist=True)
+    course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
     course_submission_groups = relationship("CourseSubmissionGroup", back_populates="course", uselist=True)
     messages = relationship("Message", back_populates="course", uselist=True)
 
@@ -203,8 +203,8 @@ class CourseContent(Base):
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
 
     # Relationships
-    course_content_type = relationship("CourseContentType", back_populates="course_contents", lazy="select")
-    course = relationship('Course', foreign_keys=[course_id])
+    course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")
+    course = relationship('Course', foreign_keys=[course_id], back_populates='course_contents')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     execution_backend = relationship('ExecutionBackend', back_populates='course_contents')
@@ -248,10 +248,10 @@ class CourseMember(Base):
     course_role_id = Column(ForeignKey('course_role.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     # Relationships
-    course_group = relationship('CourseGroup', back_populates='course_members')
-    course = relationship("Course", back_populates="course_members", lazy="select")
+    course_group = relationship('CourseGroup', foreign_keys=[course_group_id], back_populates='course_members')
+    course = relationship("Course", foreign_keys=[course_id], back_populates="course_members", lazy="select")
     course_role = relationship('CourseRole', back_populates='course_members')
-    user = relationship("User", back_populates="course_members", uselist=False, lazy="select")
+    user = relationship("User", foreign_keys=[user_id], back_populates="course_members", uselist=False, lazy="select")
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     comments_written = relationship("CourseMemberComment", foreign_keys="CourseMemberComment.transmitter_id", 

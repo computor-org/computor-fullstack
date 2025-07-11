@@ -1,12 +1,9 @@
-import json
 from pydantic import BaseModel, validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
-from ctutor_backend.interface.organizations import OrganizationGet, OrganizationInterface
-from ctutor_backend.model import CourseFamily
-from ctutor_backend.model.models import Organization
+from ctutor_backend.model.sqlalchemy_models.course import CourseFamily
 from sqlalchemy_utils import Ltree
 
 class CourseFamilyProperties(BaseModel):

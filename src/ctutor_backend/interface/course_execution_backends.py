@@ -1,9 +1,7 @@
-import json
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.courses import CourseInterface
-from ctutor_backend.model.models import Course, CourseExecutionBackend
+from ctutor_backend.model.sqlalchemy_models.course import CourseExecutionBackend
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 
 class CourseExecutionBackendCreate(BaseModel):
@@ -33,9 +31,7 @@ def course_execution_backend_search(db: Session, query, params: Optional[CourseE
         query = query.filter(CourseExecutionBackend.execution_backend_id == params.execution_backend_id)
     if params.course_id != None:
         query = query.filter(CourseExecutionBackend.course_id == params.course_id)
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(CourseExecutionBackend.properties == properties_dict)
+
     return query
 
 class CourseExecutionBackendInterface(EntityInterface):

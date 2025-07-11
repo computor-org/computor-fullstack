@@ -1,16 +1,15 @@
 from datetime import datetime
 from pydantic import BaseModel, validator, ConfigDict
-from typing import Any, Literal, Optional
-from sqlalchemy import and_, func, text
+from typing import Literal, Optional
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList, CTutorUIColor
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.results import ResultStatus
-from ctutor_backend.model import CourseContent
-from ctutor_backend.model.models import  CourseMember
+from ctutor_backend.model.sqlalchemy_models.course import CourseContent
+from ctutor_backend.model.sqlalchemy_models.course import CourseMember
 from sqlalchemy_utils import Ltree
-
 
 class SubmissionGroupStudentList(BaseModel):
     id: Optional[str] = None

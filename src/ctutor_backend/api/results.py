@@ -7,8 +7,7 @@ from ctutor_backend.api.permissions import check_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.results import ResultInterface, ResultStatus
-from ctutor_backend.model import Result
-from sqlalchemy.orm import Session
+n
 from ctutor_backend.utils import get_prefect_client
 
 # TODO: if result status is missing, ResultStatus.NOT_AVAILABLE should be returned

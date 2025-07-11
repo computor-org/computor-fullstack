@@ -5,10 +5,9 @@ from faker import Faker
 from sqlalchemy import select
 from sqlalchemy_utils import Ltree
 from ctutor_backend.database import get_db
-from ctutor_backend.model import User, Account, StudentProfile
-from ctutor_backend.model import Organization, CourseFamily, Course
-from ctutor_backend.model import CourseGroup, CourseMember
-from ctutor_backend.model.models import CourseRole
+from ctutor_backend.model.sqlalchemy_models.auth import Usernt, StudentProfile
+nization, CourseFamily, Course
+from ctutor_backend.model.sqlalchemy_models.course import CourseGroupnd.model.sqlalchemy_models.course import CourseRole
 
 fake = Faker()
 Faker.seed(0)

@@ -3,11 +3,11 @@ from pydantic import BaseModel, validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet
-from ctutor_backend.interface.courses import CourseInterface
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model import CourseContent
-from ctutor_backend.model.models import Course, CourseContentKind, CourseContentType, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember, User
+from ctutor_backend.model.sqlalchemy_models.course import CourseContent
+from ctutor_backend.model.sqlalchemy_models.course import CourseContentKind, CourseContentType, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.sqlalchemy_models.auth import User
 from sqlalchemy_utils import Ltree
 
 
@@ -141,10 +141,6 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
         query = query.filter(CourseContent.max_submissions == params.max_submissions)
     if params.execution_backend_id != None:
         query = query.filter(CourseContent.execution_backend_id == params.execution_backend_id)
-
-    # if params.properties != None:
-    #     properties_dict = params.properties.model_dump(exclude_unset=True)
-    #     query = query.filter(CourseContent.properties == properties_dict)
 
     if params.archived != None and params.archived != False:
         query = query.filter(CourseContent.archived_at != None)

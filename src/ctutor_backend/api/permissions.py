@@ -11,9 +11,9 @@ from ctutor_backend.interface.permissions import Principal, allowed_course_role_
 from ctutor_backend.interface.roles_claims import RoleClaimInterface
 from ctutor_backend.interface.user_roles import UserRoleInterface
 from ctutor_backend.interface.users import UserInterface
-from ctutor_backend.model import Account, Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseFamily, CourseMemberComment
-from ctutor_backend.model import CourseGroup, CourseMember, ExecutionBackend, Organization, Result, User
-from ctutor_backend.model.models import Role, RoleClaim, UserRole
+nt, Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseFamily, CourseMemberComment
+from ctutor_backend.model.sqlalchemy_models.course import CourseGroup, CourseMembernBackend, Organization, Result, User
+from ctutor_backend.model.sqlalchemy_models.role import Role, RoleClaim, UserRole
 
 def check_admin(permissions: Principal):
     if permissions.is_admin == True:

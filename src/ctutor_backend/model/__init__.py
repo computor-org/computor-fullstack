@@ -1,1 +1,1 @@
-from .models import *
+from .sqlalchemy_models import *

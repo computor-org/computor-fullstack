@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model import CourseContentKind
+from ctutor_backend.model.sqlalchemy_models.course import CourseContentKind
     
 class CourseContentKindCreate(BaseModel):
     title: Optional[str] = None

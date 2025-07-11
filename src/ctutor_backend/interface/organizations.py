@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
-from ctutor_backend.model import Organization
+from ctutor_backend.model.sqlalchemy_models.organization import Organization
 from sqlalchemy_utils import Ltree
 
 class OrganizationType(str,Enum):
@@ -159,9 +159,6 @@ def organization_search(db: Session, query, params: Optional[OrganizationQuery])
     if params.country != None:
         query = query.filter(Organization.country == params.country)
 
-    # if params.properties != None:
-    #     properties_dict = params.properties.model_dump(exclude_unset=True)
-    #     query = query.filter(Organization.properties == properties_dict)
     return query
 
 class OrganizationInterface(EntityInterface):

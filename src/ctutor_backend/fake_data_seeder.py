@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from model.sqlalchemy_models import *
+from sqlalchemy_utils import Ltree
 
 # Fake data generators
 from faker import Faker
@@ -120,7 +121,7 @@ def create_organizations(session, users):
         title="Example University",
         description="A leading institution for computing education",
         organization_type='organization',
-        path='university',
+        path=Ltree('university'),
         email='admin@university.edu',
         telephone='+1-555-123-4567',
         url='https://university.edu',
@@ -139,7 +140,7 @@ def create_organizations(session, users):
             title=f"Department of {dept_name}",
             description=f"The {dept_name} department",
             organization_type='organization',
-            path=f"university.{dept_name.lower().replace(' ', '_')}",
+            path=Ltree(f"university.{dept_name.lower().replace(' ', '_')}"),
             email=f'{dept_name.lower().replace(" ", ".")}@university.edu',
             created_by=random.choice(users).id
         )
@@ -202,7 +203,7 @@ def create_course_families(session, organizations, users):
         family = CourseFamily(
             title=family_data['title'],
             description=f"Course family for {family_data['title']}",
-            path=family_data['path'],
+            path=Ltree(family_data['path']),
             organization_id=cs_org.id,
             created_by=random.choice(users).id
         )
@@ -228,13 +229,14 @@ def create_courses(session, course_families, organizations, users, execution_bac
             course = Course(
                 title=f"{family.title} {year}",
                 description=f"{family.title} course for {semester} {year}",
-                path=f"{family.path}.{year}_{semester}",
+                path=Ltree(f"{family.path}.{year}_{semester}"),
                 course_family_id=family.id,
                 organization_id=cs_org.id,
                 version_identifier=f"v{year}.{i+1}",
                 created_by=random.choice(users).id
             )
             session.add(course)
+            session.flush()  # Flush to get course ID
             courses.append(course)
             
             # Add execution backends to course

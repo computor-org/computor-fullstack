@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session, aliased
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.users import UserList
-from ctutor_backend.model import CourseMember
-from ctutor_backend.model.models import CourseContent, CourseContentKind, CourseContentType, CourseSubmissionGroup, CourseSubmissionGroupMember, User
+from ctutor_backend.model.sqlalchemy_models import CourseMember
+from ctutor_backend.model.sqlalchemy_models import CourseContent, CourseContentKind, CourseContentType, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.sqlalchemy_models import User
 
 
 class CourseMemberGitLabConfig(GitLabConfigGet):

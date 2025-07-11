@@ -3,9 +3,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
-from ctutor_backend.model import Course
+from ctutor_backend.model.sqlalchemy_models.course import Course, CourseMember
 from sqlalchemy_utils import Ltree
-from ctutor_backend.model.models import CourseMember
 
 class CourseStudentRepository(BaseModel):
     provider_url: Optional[str] = None

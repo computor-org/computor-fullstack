@@ -14,7 +14,7 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet, CourseContentInterface
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
-from ctutor_backend.model.models import CourseContent
+from ctutor_backend.model.sqlalchemy_models.course import CourseContent
 
 course_content_router = CrudRouter(CourseContentInterface)
 

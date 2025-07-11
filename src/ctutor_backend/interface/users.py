@@ -1,13 +1,12 @@
 from datetime import datetime
 from enum import Enum
-import json
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from sqlalchemy.orm import Session
 import unidecode
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.student_profile import StudentProfileGet
-from ctutor_backend.model import User
+from ctutor_backend.model.sqlalchemy_models.auth import User
 
 class UserTypeEnum(str, Enum):
     user = "user"
@@ -83,10 +82,6 @@ def user_search(db: Session, query, params: Optional[UserQuery]):
         query = query.filter(User.user_type == params.user_type)
     if params.username != None:
         query = query.filter(User.username == params.username)
-
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(User.properties == properties_dict)
         
     if params.archived != None and params.archived != False:
         query = query.filter(User.archived_at != None)

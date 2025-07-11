@@ -12,7 +12,7 @@ from ctutor_backend.interface.organizations import OrganizationInterface, Organi
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.interface.tokens import encrypt_api_key
-from ctutor_backend.model import Organization
+nization
 
 organization_router = CrudRouter(OrganizationInterface)
 

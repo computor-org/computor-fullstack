@@ -1,11 +1,8 @@
-import json
-from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model import User
-from ctutor_backend.model.models import StudentProfile
+from ctutor_backend.model.sqlalchemy_models.auth import StudentProfile
 
 class StudentProfileCreate(BaseModel):
     id: Optional[str] = None
@@ -50,10 +47,6 @@ def student_profile_search(db: Session, query, params: Optional[StudentProfileQu
         query = query.filter(StudentProfile.student_email == params.student_email)
     if params.user_id != None:
         query = query.filter(StudentProfile.user_id == params.user_id)
-
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(StudentProfile.properties == properties_dict)
     
     return query
 

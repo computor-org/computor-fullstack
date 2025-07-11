@@ -5,7 +5,8 @@ from ctutor_backend.api.filesystem import mirror_db_to_filesystem
 from ctutor_backend.api.permissions import claims_organization_manager, claims_user_manager, db_apply_roles
 from ctutor_backend.interface.roles import RoleInterface
 from ctutor_backend.interface.tokens import encrypt_api_key
-from ctutor_backend.model.models import User, UserRole
+from ctutor_backend.model.sqlalchemy_models.auth import User
+from ctutor_backend.model.sqlalchemy_models.role import UserRole
 from ctutor_backend.redis import get_redis_client
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +21,7 @@ from ctutor_backend.interface.deployments import ExecutionBackendConfig
 from ctutor_backend.interface.execution_backends import ExecutionBackendInterface
 from ctutor_backend.interface.submission_group_members import SubmissionGroupMemberInterface
 from ctutor_backend.interface.submission_groups import SubmissionGroupInterface
-from ctutor_backend.model import ExecutionBackend
+nBackend
 from ctutor_backend.interface.users import UserInterface
 from ctutor_backend.interface.course_families import CourseFamilyInterface
 from ctutor_backend.interface.course_groups import CourseGroupInterface

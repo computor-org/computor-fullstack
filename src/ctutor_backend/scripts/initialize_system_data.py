@@ -211,7 +211,7 @@ def create_admin_user(db: Session):
     db.add(admin_role)
     db.commit()
     
-    print(f"   ✅ Created admin user (username: {admin_username}, password: {admin_password})")
+    print(f"   ✅ Created admin user (username: {admin_username}, password: ****)")
 
 
 def main():

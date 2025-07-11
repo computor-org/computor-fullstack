@@ -30,7 +30,7 @@ from ctutor_backend.interface.course_contents import CourseContentCreate, Course
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberGitLabConfig, CourseMemberProperties
 from ctutor_backend.settings import settings
-from ctutor_backend.utils import read_file
+from ctutor_backend.helpers import read_file
 
 GITLAB_CI_FILENAME = ".gitlab-ci.yml"
 DOCKER_FILENAME = "Dockerfile"

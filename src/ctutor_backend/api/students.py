@@ -18,7 +18,7 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
 from ctutor_backend.model.sqlalchemy_models.course import CourseContent, CourseMember, User
-from ctutor_backend.redis import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 
 student_router = APIRouter()

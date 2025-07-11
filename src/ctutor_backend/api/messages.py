@@ -5,7 +5,7 @@ from gitlab.v4.objects import ProjectMergeRequest
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from aiocache import Cache
 from ctutor_backend.interface.auth import GLPAuthConfig
-from ctutor_backend.redis import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client
 
 def list_submission_mergerequests(gitlab: Gitlab, project_path: str):
 

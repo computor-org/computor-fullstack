@@ -7,7 +7,7 @@ from ctutor_backend.interface.roles import RoleInterface
 from ctutor_backend.interface.tokens import encrypt_api_key
 from ctutor_backend.model.sqlalchemy_models.auth import User
 from ctutor_backend.model.sqlalchemy_models.role import UserRole
-from ctutor_backend.redis import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter

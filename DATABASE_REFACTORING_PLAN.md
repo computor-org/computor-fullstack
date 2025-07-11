@@ -1,196 +1,242 @@
-# Database Refactoring Plan: PostgreSQL to SQLAlchemy-Only
+# Database Migration Analysis and SQLAlchemy Model Gaps
 
 ## Overview
-This document outlines the migration from mixed PostgreSQL migration files + SQLAlchemy models to a pure SQLAlchemy-only approach using Alembic for migrations.
+This document provides a comprehensive analysis of the PostgreSQL migration files (V1.000-V1.018) and identifies gaps between the database schema and the current SQLAlchemy models.
 
-## Current State Analysis
+## Migration File Analysis
 
-### PostgreSQL Migrations (db/migrations/)
-- **V1.000**: Extensions and utility functions (uuid-ossp, ltree, pgcrypto, etc.)
-- **V1.001**: Interface tables (abstract table structures)
-- **V1.002**: Authentication tables (user, profile, student_profile, account, session)
-- **V1.003**: Organizations
-- **V1.004**: Course families
-- **V1.005**: Courses
-- **V1.006**: Course groups
-- **V1.007**: Course roles
-- **V1.008**: Course members
-- **V1.009**: Execution backends
-- **V1.010**: Course execution backends
-- **V1.011**: Course content kinds
-- **V1.012**: Course content types
-- **V1.013**: Course contents
-- **V1.014**: Course submission groups
-- **V1.015**: Course submission group members
-- **V1.016**: Results
-- **V1.017**: User roles
-- **V1.018**: Messages
+### V1.000 - Base Extensions and Functions
+**Extensions:**
+- `uuid-ossp` - UUID generation
+- `pgcrypto` - Cryptographic functions
+- `ltree` - Hierarchical tree-like structures
+- `citext` - Case-insensitive text
 
-### SQLAlchemy Models (models.py)
-- Contains most core entities but missing some tables
-- Some models have relationship issues
-- Missing trigger implementations
-- Missing some constraints and indexes
+**Custom Types:**
+- `ctutor_color` enum: red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose
 
-### Alembic Migrations
-- Only 4 migrations, mainly incremental changes
-- Uses mix of SQLAlchemy models and raw SQL
-- Not configured to use models metadata
+**PostgreSQL Functions:**
+- `ctutor_valid_label(TEXT)` - Validates labels with pattern `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+- `ctutor_update_timestamps()` - Trigger function for managing created_at/updated_at
+- `ctutor_prevent_builtin_deletion()` - Prevents deletion of builtin entities
 
-## Issues Identified
+### V1.001 - Interface Tables (Schema Pattern)
+Creates an `interfaces` schema with inheritance tables:
+- `interfaces.string_id` - For string-based primary keys
+- `interfaces.resource` - Base resource pattern (id, version, timestamps, created_by, updated_by, properties)
+- `interfaces.archivable` - Adds archived_at timestamp
+- `interfaces.title_description` - Adds title and description fields
+- `interfaces.slugged` - Extends title_description with slug field
+- `interfaces.number` - Adds number field
+- `interfaces.contact` - Contact information fields
+- `interfaces.avatar` - Avatar color and image
+- `interfaces.address` - Address fields
 
-### 1. Missing Tables in SQLAlchemy Models
-- `interfaces.*` tables (abstract interfaces)
-- `group` table (referenced in relationships)
-- `role` table (referenced in relationships)
-- Proper trigger implementations
-- Some utility functions
+**Key Finding:** These are template tables for PostgreSQL table inheritance, not actual data tables.
 
-### 2. Model Inconsistencies
-- Inheritance structure from PostgreSQL not properly represented
-- Missing check constraints
-- Incomplete indexes
-- Some foreign key relationships need fixing
+### V1.002 - Authentication Tables
+**Tables:**
+- `user` - Inherits from interfaces.number, resource, archivable
+  - Special features: auth_token encryption trigger, conditional constraints for token users
+  - Unique indexes on username, email, number (when not archived)
+- `profile` - User profile with avatar support
+- `student_profile` - Student-specific information
+- `account` - External authentication providers
+- `session` - User sessions with IP tracking
 
-### 3. Configuration Issues
-- Alembic `env.py` not configured to use models metadata
-- Missing proper database URL configuration
-- No autogenerate support
+**Missing in SQLAlchemy:**
+- `auth_token` field in User model (exists in DB as encrypted field)
+- `db` user_type enum value (SQLAlchemy only has 'user' and 'token')
+- Password encryption trigger logic
+- Conditional unique indexes based on archived_at
 
-## Migration Strategy
+### V1.003 - Organizations
+**Tables:**
+- `organization` - Hierarchical organization structure using ltree
+  - Complex inheritance from multiple interface tables
+  - Self-referential foreign key using ltree paths
+  - Computed column `parent_path` for hierarchy navigation
+  - Triggers for path validation and cascade updates
 
-### Phase 1: Prepare SQLAlchemy Models
-1. **Add missing tables to models.py**:
-   - `Group` table (already exists but needs verification)
-   - `Role` table (already exists but needs verification)
-   - Interface tables (if needed for inheritance)
+**Missing in SQLAlchemy:**
+- `parent_path` computed column (commented out in model)
+- Self-referential relationship for parent/child organizations
+- Trigger logic for path validation and cascade operations
 
-2. **Fix model relationships**:
-   - Ensure all foreign keys are properly defined
-   - Fix relationship back-references
-   - Add missing constraints
+### V1.004 - Course Families
+**Tables:**
+- `course_family` - Groups related courses within an organization
+  - Uses ltree for hierarchical paths
+  - Unique constraint on (organization_id, path)
 
-3. **Add database functions and triggers**:
-   - PostgreSQL functions as migration scripts
-   - Trigger implementations
+### V1.005 - Courses
+**Tables:**
+- `course` - Individual courses within families
+  - Trigger to auto-set organization_id from course_family
+  - Hierarchical path structure
 
-### Phase 2: Configure Alembic
-1. **Update alembic/env.py**:
-   - Import models metadata
-   - Configure autogenerate
-   - Set up proper database connection
+### V1.006 - Course Groups
+**Tables:**
+- `course_group` - Groups within courses (e.g., lab sections)
+  - Unique constraints on (course_id, title) and (course_id, id)
 
-2. **Generate initial migration**:
-   - Create baseline migration from current schema
-   - Ensure all tables, indexes, and constraints are captured
+### V1.007 - Course Roles
+**Tables:**
+- `course_role` - Predefined roles: _owner, _maintainer, _study_assistant, _student
+  - Uses string_id inheritance pattern
 
-### Phase 3: Testing and Validation
-1. **Test migration process**:
-   - Run migrations on test database
-   - Verify schema matches expected structure
-   - Test data integrity
+### V1.008 - Course Members
+**Tables:**
+- `course_member` - User membership in courses
+  - Constraint: students must have a course_group_id
+  - Composite foreign key to course_group
 
-2. **Update documentation**:
-   - Remove references to PostgreSQL migrations
-   - Update development setup instructions
+### V1.009 - Execution Backends
+**Tables:**
+- `execution_backend` - Test execution systems
+  - Slug validation constraint
 
-## Missing Tables for Future Implementation
+### V1.010 - Course Execution Backends
+**Tables:**
+- `course_execution_backend` - Links courses to execution backends
+  - Composite primary key (course_id, execution_backend_id)
 
-Based on analysis, the following tables are referenced but not fully implemented:
+**Missing in SQLAlchemy:**
+- This is a many-to-many relationship table with additional fields
 
-1. **Message-related tables** (V1.018 partially implemented)
-   - Full message system schema
-   - Message threading/replies
-   - Message attachments
+### V1.011 - Course Content Kinds
+**Tables:**
+- `course_content_kind` - Types of content (assignment, unit, folder, quiz)
+  - Flags for hierarchy and submission capability
 
-2. **Advanced role/permission tables**
-   - Role inheritance
-   - Permission granularity
-   - Context-specific permissions
+### V1.012 - Course Content Types
+**Tables:**
+- `course_content_type` - Course-specific content type configurations
+  - Links to course_content_kind
+  - Includes color customization
 
-3. **Audit/logging tables**
-   - Change tracking
-   - User activity logs
-   - System event logs
+### V1.013 - Course Contents
+**Tables:**
+- `course_content` - Actual course content items
+  - Hierarchical structure with ltree paths
+  - Trigger to enforce max_group_size based on submittable content
+  - Position field for ordering
 
-4. **File/asset management**
-   - File storage metadata
-   - Asset versioning
-   - Upload tracking
+**Missing in SQLAlchemy:**
+- Trigger logic for max_group_size validation
 
-5. **Notification system**
-   - Notification preferences
-   - Delivery tracking
-   - Notification templates
+### V1.014 - Submission Groups
+**Tables:**
+- `course_submission_group` - Groups for collaborative submissions
+  - Triggers to validate submittable content
+  - Auto-set course_id from course_content
 
-6. **Advanced course features**
-   - Course templates
-   - Course copying/cloning
-   - Course analytics
+### V1.015 - Submission Group Members
+**Tables:**
+- `course_submission_group_member` - Members of submission groups
+  - Multiple unique constraints to prevent duplicates
+  - Triggers to auto-set fields from related tables
 
-## Implementation Steps
+### V1.016 - Results
+**Tables:**
+- `result` - Test/submission results
+  - Complex unique constraints for versioning
+  - Trigger to set course_content_type_id
 
-### Step 1: Fix Current Models
-```python
-# Add missing check constraints
-# Fix relationship definitions
-# Add proper indexes
-# Implement proper inheritance
-```
+**Missing in SQLAlchemy:**
+- Unique constraint on (course_member_id, course_content_id, version_identifier)
 
-### Step 2: Configure Alembic
-```python
-# Update env.py to use models metadata
-# Set up autogenerate
-# Configure database connection
-```
+### V1.017 - User Roles and Groups
+**Tables:**
+- `role` - System-wide roles with builtin flag
+- `user_role` - User-role assignments
+- `role_claim` - Claims/permissions for roles
+- `group` - User groups (fixed/dynamic types)
+- `user_group` - User-group memberships
+- `group_claim` - Claims for groups
 
-### Step 3: Generate Migration
-```bash
-# Create initial migration from models
-alembic revision --autogenerate -m "Initial SQLAlchemy migration"
-```
+**Missing in SQLAlchemy:**
+- `role_claim` table
+- `group_claim` table
+- Validation triggers for group types
+- `ctutor_valid_slug()` function usage
 
-### Step 4: Test Migration
-```bash
-# Test on clean database
-# Verify schema correctness
-# Test data migration if needed
-```
+### V1.018 - Messages and Indexes
+**Tables:**
+- `codeability_message` - Course messaging system
+- `codeability_message_read` - Read receipts for messages
 
-## Benefits of This Approach
+**Missing in SQLAlchemy:**
+- Both message tables are completely missing
+- All the performance indexes created in this migration
 
-1. **Single source of truth**: All schema in SQLAlchemy models
-2. **Better maintainability**: Model changes automatically generate migrations
-3. **Improved development experience**: ORM benefits, IDE support
-4. **Consistency**: Unified approach across the application
-5. **Version control**: Better tracking of schema changes
+## Critical Gaps in SQLAlchemy Models
 
-## Risks and Mitigation
+### 1. Missing Tables
+- `role_claim` - Permission claims for roles
+- `group_claim` - Permission claims for groups  
+- `codeability_message` - Messaging system
+- `codeability_message_read` - Message read tracking
 
-1. **Data loss risk**: 
-   - Mitigation: Thorough testing on copies of production data
-   - Backup strategy before migration
+### 2. Missing Fields
+- `User.auth_token` - Encrypted authentication token
+- `User.db` enum value for user_type
+- `Organization.parent_path` - Computed column for hierarchy
+- Trigger update timestamps on many tables
 
-2. **Schema mismatch**: 
-   - Mitigation: Careful comparison of generated vs. existing schema
-   - Manual verification of constraints and indexes
+### 3. Missing PostgreSQL Features
+- Table inheritance from interfaces schema
+- Conditional unique indexes (e.g., unique when not archived)
+- Computed columns
+- Trigger functions for:
+  - Password/token encryption
+  - Timestamp management
+  - Cascade updates for hierarchical data
+  - Field validation
+  - Auto-population of related fields
 
-3. **Performance impact**: 
-   - Mitigation: Review generated migrations for efficiency
-   - Test with realistic data volumes
+### 4. Missing Constraints
+- Check constraints using custom validation functions
+- Conditional constraints based on other fields
+- Complex foreign key relationships with ltree paths
 
-## Timeline
+### 5. Missing Indexes
+- GIST indexes for ltree path searches
+- Numerous performance indexes from V1.018
+- Conditional unique indexes
 
-- **Phase 1**: Model updates and fixes (2-3 days)
-- **Phase 2**: Alembic configuration (1 day)
-- **Phase 3**: Testing and validation (2-3 days)
-- **Total**: 5-7 days
+## Recommendations
 
-## Next Steps
+### High Priority
+1. Add missing tables (messages, claims)
+2. Implement conditional unique constraints in SQLAlchemy
+3. Add missing fields and enum values
+4. Implement computed columns where needed
 
-1. Start with fixing the most critical model issues
-2. Add missing tables and constraints
-3. Configure Alembic for autogenerate
-4. Generate and test initial migration
-5. Update documentation and development processes
+### Medium Priority
+1. Add all missing indexes for performance
+2. Implement validation at the model level to match DB constraints
+3. Document trigger behaviors in model docstrings
+
+### Low Priority
+1. Consider using SQLAlchemy events to replicate trigger logic
+2. Evaluate if table inheritance pattern should be reflected in models
+3. Add model-level path validation for ltree fields
+
+## Special Considerations
+
+### PostgreSQL-Specific Features
+- **ltree**: Used extensively for hierarchical data (organizations, courses, content)
+- **Table Inheritance**: Interface pattern not directly supported by SQLAlchemy
+- **Computed Columns**: Need special handling in SQLAlchemy
+- **Conditional Constraints**: Require custom validators or hybrid properties
+
+### Security Features
+- Password/token encryption at database level
+- Row-level security through archived_at pattern
+- Audit trail via created_by/updated_by fields
+
+### Performance Optimizations
+- GIST indexes for hierarchical queries
+- Partial indexes for active records
+- Composite indexes for common query patterns

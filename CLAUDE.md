@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Computor is a full-stack university programming course management platform with:
-- **Backend**: Python/FastAPI with PostgreSQL, Redis, and Prefect for workflow orchestration
+- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Prefect for workflow orchestration
 - **Frontend**: React 19 with TypeScript (in early development)
 - **Infrastructure**: Docker-based deployment with Traefik/Nginx
+- **Database**: Pure SQLAlchemy/Alembic approach with comprehensive model validation
 
 ## Development Commands
 
@@ -24,9 +25,10 @@ bash startup_fastapi_dev.sh  # FastAPI only
 bash startup_system_agent_dev.sh  # System agent
 
 # Database operations
-bash migrations_up.sh        # SQL migrations
-bash alembic_up.sh          # Alembic migrations
+bash alembic_up.sh          # Alembic migrations (primary method)
 bash seeder.sh              # Seed test data
+alembic revision --autogenerate -m "description"  # Generate new migration
+alembic upgrade head        # Apply all pending migrations
 
 # Build and install CLI
 pip install -e src
@@ -45,11 +47,13 @@ cd frontend && npm test      # Run tests
 
 ### Backend Structure (`/src/ctutor_backend/`)
 - **api/**: FastAPI endpoints organized by resource (courses, users, submissions, etc.)
-- **model/**: SQLAlchemy ORM models for database entities
+- **model/**: SQLAlchemy ORM models for database entities (single source of truth)
 - **interface/**: Pydantic schemas for API request/response validation
 - **flows/**: Prefect workflow definitions for async operations
 - **generator/**: Code generation utilities for student repositories
 - **cli/**: Command-line interface tools
+- **utils/**: Shared utilities (color validation, etc.)
+- **alembic/**: Database migrations using Alembic with SQLAlchemy models
 
 ### Key Concepts
 1. **Hierarchical Organization**: Organizations → Course Families → Courses
@@ -59,19 +63,24 @@ cd frontend && npm test      # Run tests
 5. **Task Management**: Uses Prefect for orchestrating long running tasks and complex workflows
 
 ### Database
-- PostgreSQL 16 for main data storage
-- Redis for caching and session management
-- **Migration Strategy**: Transitioning from PostgreSQL migrations to SQLAlchemy/Alembic-only approach
-  - Legacy migrations in `/db/migrations/` (V1.000-V1.018) - being phased out
-  - New migrations use Alembic with SQLAlchemy models as single source of truth
-  - Models defined in `/src/ctutor_backend/model/`
+- **PostgreSQL 16** for main data storage with comprehensive schema
+- **Redis** for caching and session management (using aiocache 0.12.3)
+- **Migration Strategy**: Pure SQLAlchemy/Alembic approach (✅ **Completed**)
+  - SQLAlchemy models are the single source of truth
+  - All migrations generated from model changes using Alembic
+  - Models organized in `/src/ctutor_backend/model/sqlalchemy_models/`
+  - Comprehensive test coverage for model integration
+- **Enhanced Features**:
+  - Flexible color validation system (supports HTML/CSS colors)
+  - Hierarchical paths using PostgreSQL ltree extension
+  - UUID primary keys with proper relationships
 
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docker/docker-compose.dev.yml`: Development environment setup
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
-- `/DATABASE_REFACTORING_PLAN.md`: Database migration strategy documentation
+- `/src/ctutor_backend/alembic/`: Database migration files and configuration
 
 ## Development Principles
 
@@ -105,9 +114,19 @@ def calculate_student_final_grade(assignments: List[Assignment], exam_score: flo
 ```
 
 ## Testing
-- Backend tests in `/src/ctutor_backend/api/tests.py`
-- Frontend uses Jest/React Testing Library
-- No specific test runner configuration found - use default pytest/jest settings
+- **Backend Tests**:
+  - API tests in `/src/ctutor_backend/api/tests.py`
+  - Model integration tests: `test_model_integration.py`
+  - API endpoint tests: `test_api_endpoints.py`
+  - Color validation tests: `test_color_refactoring.py`
+- **Frontend**: Jest/React Testing Library
+- **Test Commands**:
+  ```bash
+  python test_model_integration.py     # SQLAlchemy model tests
+  python test_api_endpoints.py         # API integration tests
+  python test_color_refactoring.py     # Color validation tests
+  pytest                               # Run all pytest tests
+  ```
 
 ## Plugins
 
@@ -123,14 +142,29 @@ git commit -m "Update SSO plugin"
 git push
 ```
 
-## Current Development Focus
+## Recent Enhancements
 
-### Database Refactoring (In Progress)
-The project is currently transitioning from PostgreSQL migration files to a pure SQLAlchemy/Alembic approach:
-- **Goal**: Single source of truth using SQLAlchemy models
+### ✅ Database Refactoring (Completed)
+Successfully migrated from PostgreSQL migration files to pure SQLAlchemy/Alembic approach:
+- **Achieved**: Single source of truth using SQLAlchemy models
 - **Benefits**: Better maintainability, ORM benefits, automatic migration generation
-- **Status**: See `/DATABASE_REFACTORING_PLAN.md` for detailed migration plan
-- **Impact**: Future database changes should be made in SQLAlchemy models, not SQL files
+- **Current State**: All models refactored, comprehensive test coverage, all imports resolved
+- **Best Practice**: Future database changes should be made in SQLAlchemy models only
+
+### ✅ Color System Enhancement (Completed)
+Upgraded color handling from rigid ENUMs to flexible validation:
+- **Enhanced**: Support for HTML/CSS colors (hex, rgb, hsl, named colors)
+- **Validation**: Comprehensive color validation with clear error messages
+- **Compatibility**: Maintains backward compatibility with existing data
+- **Usage Examples**:
+  ```python
+  # All of these are now valid color formats:
+  color = "#FF5733"              # Hex
+  color = "rgb(255, 87, 51)"     # RGB
+  color = "hsl(9, 100%, 60%)"    # HSL
+  color = "tomato"               # Named color
+  color = "emerald"              # Tailwind color
+  ```
 
 ## Notes
 - The web UI is in early development stages

@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from model.sqlalchemy_models import *
+from model import *
 from sqlalchemy_utils import Ltree
 
 # Fake data generators

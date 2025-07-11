@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
-from ctutor_backend.model.sqlalchemy_models.course import CourseRole
+from ctutor_backend.model.course import CourseRole
 
 class CourseRoleGet(BaseModel):
     id: str

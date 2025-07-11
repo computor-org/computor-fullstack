@@ -5,9 +5,9 @@ from ctutor_backend.api.filesystem import mirror_db_to_filesystem
 from ctutor_backend.api.permissions import claims_organization_manager, claims_user_manager, db_apply_roles
 from ctutor_backend.interface.roles import RoleInterface
 from ctutor_backend.interface.tokens import encrypt_api_key
-from ctutor_backend.model.sqlalchemy_models.auth import User
-from ctutor_backend.model.sqlalchemy_models.execution import ExecutionBackend
-from ctutor_backend.model.sqlalchemy_models.role import UserRole
+from ctutor_backend.model.auth import User
+from ctutor_backend.model.execution import ExecutionBackend
+from ctutor_backend.model.role import UserRole
 from ctutor_backend.redis_cache import get_redis_client
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware

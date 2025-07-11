@@ -10,7 +10,7 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.tokens import encrypt_api_key
 from ctutor_backend.interface.users import UserGet
-from ctutor_backend.model.sqlalchemy_models.auth import User
+from ctutor_backend.model.auth import User
 
 user_router = APIRouter()
 

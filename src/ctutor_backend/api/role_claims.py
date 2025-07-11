@@ -7,7 +7,7 @@ from ctutor_backend.api.permissions import check_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.roles_claims import RoleClaimList, RoleClaimQuery, role_claim_search
-from ctutor_backend.model.sqlalchemy_models.role import RoleClaim
+from ctutor_backend.model.role import RoleClaim
 
 role_claim_router = APIRouter()
 

@@ -7,8 +7,8 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeGet, 
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.results import ResultStatus
-from ctutor_backend.model.sqlalchemy_models.course import CourseContent
-from ctutor_backend.model.sqlalchemy_models.course import CourseMember
+from ctutor_backend.model.course import CourseContent
+from ctutor_backend.model.course import CourseMember
 from sqlalchemy_utils import Ltree
 
 class SubmissionGroupStudentList(BaseModel):

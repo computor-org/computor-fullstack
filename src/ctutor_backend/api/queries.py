@@ -3,10 +3,10 @@ from uuid import UUID
 from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 from ctutor_backend.api.exceptions import NotFoundException
-from ctutor_backend.model.sqlalchemy_models.course import CourseSubmissionGroupMember
-from ctutor_backend.model.sqlalchemy_models.result import Result
-from ctutor_backend.model.sqlalchemy_models.auth import User
-from ctutor_backend.model.sqlalchemy_models.course import CourseContent, CourseContentKind, CourseMember, CourseSubmissionGroup
+from ctutor_backend.model.course import CourseSubmissionGroupMember
+from ctutor_backend.model.result import Result
+from ctutor_backend.model.auth import User
+from ctutor_backend.model.course import CourseContent, CourseContentKind, CourseMember, CourseSubmissionGroup
 
 def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session, submission: Optional[bool] = None):
 

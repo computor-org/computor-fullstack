@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
-from ctutor_backend.model.sqlalchemy_models.organization import Organization
+from ctutor_backend.model.organization import Organization
 from sqlalchemy_utils import Ltree
 
 class OrganizationType(str,Enum):

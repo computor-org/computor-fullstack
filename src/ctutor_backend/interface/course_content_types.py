@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.course_content_kind import CourseContentKindGet
-from ctutor_backend.model.sqlalchemy_models.course import CourseContentType
+from ctutor_backend.model.course import CourseContentType
 from ctutor_backend.utils.color_validation import is_valid_color, validate_color
 
 class CourseContentTypeCreate(BaseModel):

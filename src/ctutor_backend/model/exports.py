@@ -4,10 +4,10 @@ import random
 from faker import Faker
 from datetime import timedelta
 from ctutor_backend.database import get_db
-from ctutor_backend.model.sqlalchemy_models.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
-from ctutor_backend.model.sqlalchemy_models.auth import User
-from ctutor_backend.model.sqlalchemy_models.course import CourseSubmissionGroup, CourseSubmissionGroupMember
-from ctutor_backend.model.sqlalchemy_models.result import Result
+from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
+from ctutor_backend.model.auth import User
+from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.result import Result
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 

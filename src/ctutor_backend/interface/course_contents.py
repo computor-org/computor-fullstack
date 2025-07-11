@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model.sqlalchemy_models.course import CourseContent
-from ctutor_backend.model.sqlalchemy_models.course import CourseContentKind, CourseContentType, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
-from ctutor_backend.model.sqlalchemy_models.auth import User
+from ctutor_backend.model.course import CourseContent
+from ctutor_backend.model.course import CourseContentKind, CourseContentType, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.auth import User
 from sqlalchemy_utils import Ltree
 
 

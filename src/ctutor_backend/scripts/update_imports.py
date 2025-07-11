@@ -95,7 +95,7 @@ def update_file_imports(file_path):
         # Also handle model.__init__ imports
         content = re.sub(
             r'from\s+ctutor_backend\.model\s+import\s+\*',
-            'from ctutor_backend.model.sqlalchemy_models import *',
+            'from ctutor_backend.model import *',
             content
         )
         

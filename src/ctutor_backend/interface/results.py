@@ -5,9 +5,9 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model.sqlalchemy_models import CourseContentType, CourseSubmissionGroupMember
-from ctutor_backend.model.sqlalchemy_models.course import CourseContent
-from ctutor_backend.model.sqlalchemy_models.result import Result
+from ctutor_backend.model import CourseContentType, CourseSubmissionGroupMember
+from ctutor_backend.model.course import CourseContent
+from ctutor_backend.model.result import Result
 
 class ResultStatus(int,Enum):
     COMPLETED = 0

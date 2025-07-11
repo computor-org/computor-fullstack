@@ -12,7 +12,7 @@ from ctutor_backend.api.permissions import check_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.user_roles import UserRoleCreate, UserRoleGet, UserRoleList
-from ctutor_backend.model.sqlalchemy_models.role import UserRole
+from ctutor_backend.model.role import UserRole
 
 user_roles_router = APIRouter()
 

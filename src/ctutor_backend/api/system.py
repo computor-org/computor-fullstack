@@ -22,9 +22,9 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeCreat
 from ctutor_backend.interface.student_profile import StudentProfileCreate
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserCreate, UserGet, UserTypeEnum
-from ctutor_backend.model.sqlalchemy_models.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
-from ctutor_backend.model.sqlalchemy_models.organization import Organization
-from ctutor_backend.model.sqlalchemy_models.auth import User, StudentProfile
+from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
+from ctutor_backend.model.organization import Organization
+from ctutor_backend.model.auth import User, StudentProfile
 from ctutor_backend.helpers import get_prefect_client
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache

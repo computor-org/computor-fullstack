@@ -7,7 +7,7 @@ from ctutor_backend.api.crud import create_db, list_db
 from ctutor_backend.api.permissions import check_course_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
-from ctutor_backend.model.sqlalchemy_models.course import CourseExecutionBackend
+from ctutor_backend.model.course import CourseExecutionBackend
 from ctutor_backend.interface.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendGet, CourseExecutionBackendInterface, CourseExecutionBackendList, CourseExecutionBackendQuery
 
 course_execution_backend_router = APIRouter()

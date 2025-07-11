@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import unidecode
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.student_profile import StudentProfileGet
-from ctutor_backend.model.sqlalchemy_models.auth import User
+from ctutor_backend.model.auth import User
 
 class UserTypeEnum(str, Enum):
     user = "user"

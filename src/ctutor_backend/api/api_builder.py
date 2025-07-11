@@ -8,7 +8,7 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.base import EntityInterface
 # from ctutor_backend.api.cache import cache_route
-from ctutor_backend.redis import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from fastapi import FastAPI, BackgroundTasks
 from fastapi import Response

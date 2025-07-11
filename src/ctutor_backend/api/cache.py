@@ -2,7 +2,7 @@ import json
 import hashlib
 from functools import wraps
 from ctutor_backend.interface.base import EntityInterface
-from ctutor_backend.redis import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client
 
 def cache_route(interface: EntityInterface, ttl: int):
     def decorator(func):

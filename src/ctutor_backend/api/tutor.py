@@ -24,7 +24,7 @@ from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorLi
 from ctutor_backend.model.sqlalchemy_models.course import CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember, Result, User
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery
 from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery, CourseContentStudentUpdate, ResultStudentList, SubmissionGroupStudentList
-from ctutor_backend.redis import get_redis_client
+from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 
 _tutor_cache = SimpleMemoryCache()

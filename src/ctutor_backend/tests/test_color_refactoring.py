@@ -7,10 +7,10 @@ import os
 import sys
 from typing import Dict, Any
 
-# Add current directory to path
-sys.path.insert(0, os.path.dirname(__file__))
 # Add parent directory to path for ctutor_backend imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(__file__))  # tests directory
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # ctutor_backend directory
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))  # src directory
 
 def test_color_validation():
     """Test the color validation functions."""

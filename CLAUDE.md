@@ -52,11 +52,11 @@ cd frontend && npm test      # Run tests
 - **cli/**: Command-line interface tools
 
 ### Key Concepts
-1. **Hierarchical Organization**: Organizations → Course Categories → Courses
+1. **Hierarchical Organization**: Organizations → Course Families → Courses
 2. **GitLab Integration**: Deep integration for repository management and CI/CD
 3. **Role-Based Access**: Students, Tutors, Lecturers with different permissions
 4. **Automated Testing**: Framework for testing student submissions (Python/MATLAB)
-5. **Task Management**: Uses Prefect for orchestrating complex workflows
+5. **Task Management**: Uses Prefect for orchestrating long running tasks and complex workflows
 
 ### Database
 - PostgreSQL 16 for main data storage

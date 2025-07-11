@@ -1,9 +1,8 @@
-import json
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model import ExecutionBackend
+from ctutor_backend.model.sqlalchemy_models.execution import ExecutionBackend
 
 class ExecutionBackendCreate(BaseModel):
     type: str
@@ -40,9 +39,7 @@ def execution_backend_search(db: Session, query, params: Optional[ExecutionBacke
         query = query.filter(ExecutionBackend.type == params.type)
     if params.slug != None:
         query = query.filter(ExecutionBackend.slug == params.slug)
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(ExecutionBackend.properties == properties_dict)
+
     return query
 
 class ExecutionBackendInterface(EntityInterface):

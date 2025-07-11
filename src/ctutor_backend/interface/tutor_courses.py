@@ -2,13 +2,13 @@ from pydantic import BaseModel, validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
-from ctutor_backend.model import Course
 from sqlalchemy_utils import Ltree
+
+from ctutor_backend.model.sqlalchemy_models.course import Course
 
 class CourseTutorRepository(BaseModel):
     provider_url: Optional[str] = None
     full_path_reference: Optional[str] = None
-
 
 class CourseTutorGet(BaseModel):
     id: str

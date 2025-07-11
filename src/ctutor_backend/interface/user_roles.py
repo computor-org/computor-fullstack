@@ -1,8 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.users import UserInterface
-from ctutor_backend.model.models import UserRole
+from ctutor_backend.model.sqlalchemy_models.role import UserRole
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 
 class UserRoleCreate(BaseModel):

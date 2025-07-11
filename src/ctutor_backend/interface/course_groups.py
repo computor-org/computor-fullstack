@@ -1,11 +1,8 @@
-import json
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.interface.courses import CourseInterface
-from ctutor_backend.model import CourseGroup
-from ctutor_backend.model.models import Course
+from ctutor_backend.model.sqlalchemy_models.course import CourseGroup
 
 class CourseGroupCreate(BaseModel):
     title: Optional[str | None] = None
@@ -43,9 +40,6 @@ def course_group_search(db: Session, query, params: Optional[CourseGroupQuery]):
         query = query.filter(CourseGroup.title == params.title)
     if params.course_id != None:
         query = query.filter(CourseGroup.course_id == params.course_id)
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(CourseGroup.properties == properties_dict)
 
     return query.order_by(CourseGroup.title)
 

@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.deployments import GitLabConfig
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
-from ctutor_backend.model.models import CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.sqlalchemy_models.course import CourseSubmissionGroupMember
 
 class SubmissionGroupMemberProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None
@@ -72,10 +72,6 @@ def submission_group_member_search(db: Session, query, params: Optional[Submissi
         query = query.filter(CourseSubmissionGroupMember.grading == params.grading)
     if params.status != None:
         query = query.filter(CourseSubmissionGroupMember.status == params.status)
-
-    # if params.properties != None:
-    #     properties_dict = params.properties.model_dump(exclude_unset=True)
-    #     query = query.filter(CourseSubmissionGroupMember.properties == properties_dict)
 
 class SubmissionGroupMemberInterface(EntityInterface):
     create = SubmissionGroupMemberCreate

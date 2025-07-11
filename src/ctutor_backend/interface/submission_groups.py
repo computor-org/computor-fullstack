@@ -1,10 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.courses import CourseInterface
 from ctutor_backend.interface.deployments import GitLabConfig
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
-from ctutor_backend.model.models import Course, CourseSubmissionGroup
+from ctutor_backend.model.sqlalchemy_models.course import CourseSubmissionGroup
 
 class SubmissionGroupProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None
@@ -65,10 +64,6 @@ def submission_group_search(db: Session, query, params: Optional[SubmissionGroup
         query = query.filter(CourseSubmissionGroup.course_content_id == params.course_content_id)
     if params.status != None:
         query = query.filter(CourseSubmissionGroup.status == params.status)
-         
-    # if params.properties != None:
-    #     properties_dict = params.properties.model_dump(exclude_unset=True)
-    #     query = query.filter(CourseSubmissionGroup.properties == properties_dict)
         
     return query
 

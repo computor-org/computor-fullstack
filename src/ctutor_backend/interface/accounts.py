@@ -1,9 +1,8 @@
-import json
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.model import Account
+from ctutor_backend.model.sqlalchemy_models.auth import Account
 
 class AccountCreate(BaseModel):
     provider: str
@@ -51,9 +50,7 @@ def account_search(db: Session, query, params: Optional[AccountQuery]):
         query = query.filter(Account.provider_account_id == params.provider_account_id)
     if params.user_id != None:
         query = query.filter(Account.user_id == params.user_id)
-    # if params.properties != None:
-    #     properties_dict = json.loads(params.properties)
-    #     query = query.filter(Account.properties == properties_dict)
+
     return query
 
 class AccountInterface(EntityInterface):

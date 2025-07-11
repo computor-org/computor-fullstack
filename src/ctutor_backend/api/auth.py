@@ -16,10 +16,10 @@ from ctutor_backend.gitlab_utils import gitlab_current_user
 from ctutor_backend.interface.auth import GLPAuthConfig
 from ctutor_backend.interface.permissions import Principal, build_claim_actions
 from ctutor_backend.interface.tokens import decrypt_api_key
-from ctutor_backend.model import Account, User
+nt, User
 from ctutor_backend.api.exceptions import NotFoundException, UnauthorizedException
 from fastapi.security.utils import get_authorization_scheme_param
-from ctutor_backend.model.models import UserRole
+from ctutor_backend.model.sqlalchemy_models.role import UserRole
 from ctutor_backend.redis import get_redis_client
 
 _expiry_time_authenticated = 1800

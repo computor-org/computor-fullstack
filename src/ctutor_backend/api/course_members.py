@@ -23,8 +23,11 @@ from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
 # from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserGet
-from ctutor_backend.model.models import Course, CourseContent, CourseContentType, CourseMember, CourseMemberComment, CourseRole
-from ctutor_backend.model.models import CourseSubmissionGroup, CourseSubmissionGroupMember, Organization, Result, User
+from ctutor_backend.model.sqlalchemy_models.course import Course, CourseContent, CourseContentType, CourseMember, CourseMemberComment, CourseRole
+from ctutor_backend.model.sqlalchemy_models.course import CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.sqlalchemy_models.organization import Organization
+from ctutor_backend.model.sqlalchemy_models.result import Result
+from ctutor_backend.model.sqlalchemy_models.auth import User
 from sqlalchemy import func
 
 from ctutor_backend.settings import settings

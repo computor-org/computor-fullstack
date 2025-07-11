@@ -1,4 +1,3 @@
-from typing import Text
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Enum, ForeignKey, String, text
@@ -21,7 +20,7 @@ class Group(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
     slug = Column(String(255), nullable=False)
@@ -43,7 +42,7 @@ class GroupClaim(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
 
     group = relationship('Group', back_populates='group_claims')
 

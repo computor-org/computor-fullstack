@@ -1,4 +1,3 @@
-from typing import Text
 from sqlalchemy import (
     BigInteger, CheckConstraint, Column, DateTime, 
     Enum, ForeignKey, Index, String, text, Computed
@@ -25,7 +24,7 @@ class Organization(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
     number = Column(String(255))
     title = Column(String(255))
     description = Column(String(4096))

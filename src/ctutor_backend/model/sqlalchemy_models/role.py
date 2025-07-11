@@ -1,4 +1,3 @@
-from typing import Text
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     ForeignKey, String, text
@@ -37,7 +36,7 @@ class RoleClaim(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(UUID)
     updated_by = Column(UUID)
-    properties = Column(JSONB(astext_type=Text()))
+    properties = Column(JSONB)
 
     role = relationship('Role', back_populates='role_claims')
 

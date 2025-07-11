@@ -116,9 +116,7 @@ class CourseContentType(Base):
     title = Column(String(255))
     description = Column(String(4096))
     slug = Column(String(255), nullable=False)
-    color = Column(Enum('red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 
-                       'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 
-                       'rose', name='ctutor_color'))
+    color = Column(String(255))
     course_content_kind_id = Column(ForeignKey('course_content_kind.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 

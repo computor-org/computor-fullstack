@@ -1,40 +1,33 @@
-from enum import Enum
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.course_content_kind import CourseContentKindGet
 from ctutor_backend.model.sqlalchemy_models.course import CourseContentType
-
-class CTutorUIColor(str, Enum):
-    RED = 'red'
-    ORANGE = 'orange'
-    AMBER = 'amber'
-    YELLOW = 'yellow'
-    LIME = 'lime'
-    GREEN = 'green'
-    EMERALD = 'emerald'
-    TEAL = 'teal'
-    CYAN = 'cyan'
-    SKY = 'sky'
-    BLUE = 'blue'
-    INDIGO = 'indigo'
-    VIOLET = 'violet'
-    PURPLE = 'purple'
-    FUCHSIA = 'fuchsia'
-    PINK = 'pink'
-    ROSE = 'rose'
+from ctutor_backend.utils.color_validation import is_valid_color, validate_color
 
 class CourseContentTypeCreate(BaseModel):
     slug: str
     title: Optional[str | None] = None
     description: Optional[str | None] = None
-    color: Optional[CTutorUIColor] = CTutorUIColor.GREEN
+    color: Optional[str] = 'green'
     properties: Optional[dict] = None
     course_id: str
     course_content_kind_id: str
 
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)
+    
+    @field_validator('color')
+    @classmethod
+    def validate_color_field(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        
+        normalized_color = validate_color(v)
+        if normalized_color is None:
+            raise ValueError(f'Invalid color format: {v}. Must be a valid HTML/CSS color (hex, rgb, hsl, or named color)')
+        
+        return normalized_color
 
 class CourseContentTypeGet(BaseEntityGet):
     id: str 
@@ -48,7 +41,7 @@ class CourseContentTypeGet(BaseEntityGet):
 
     course_content_kind: Optional[CourseContentKindGet] = None
 
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)
 
 class CourseContentTypeList(BaseModel):
     id: str
@@ -58,7 +51,7 @@ class CourseContentTypeList(BaseModel):
     course_id: str
     course_content_kind_id: str
 
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)
 
 class CourseContentTypeUpdate(BaseModel):
     slug: Optional[str] = None
@@ -67,7 +60,19 @@ class CourseContentTypeUpdate(BaseModel):
     description: Optional[str] = None
     properties: Optional[dict] = None
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)
+    
+    @field_validator('color')
+    @classmethod
+    def validate_color_field(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        
+        normalized_color = validate_color(v)
+        if normalized_color is None:
+            raise ValueError(f'Invalid color format: {v}. Must be a valid HTML/CSS color (hex, rgb, hsl, or named color)')
+        
+        return normalized_color
 
 class CourseContentTypeQuery(ListQuery):
     id: Optional[str] = None
@@ -79,7 +84,7 @@ class CourseContentTypeQuery(ListQuery):
     properties: Optional[str] = None
     course_content_kind_id: Optional[str] = None
 
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True)
 
 def course_content_type_search(db: Session, query, params: Optional[CourseContentTypeQuery]):
     if params.id != None:

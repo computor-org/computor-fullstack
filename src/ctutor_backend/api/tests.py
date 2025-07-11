@@ -24,7 +24,11 @@ from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.results import ResultCreate, ResultGet, ResultInterface, ResultStatus, ResultUpdate
 from ctutor_backend.interface.tests import Submission, TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
-ntent, CourseContentType, CourseExecutionBackend, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember, ExecutionBackend, Result, Course, CourseFamily, Organization, User
+from ctutor_backend.model.sqlalchemy_models.auth import User
+from ctutor_backend.model.sqlalchemy_models.course import Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseFamily
+from ctutor_backend.model.sqlalchemy_models.organization import Organization
+from ctutor_backend.model.sqlalchemy_models.result import Result
+from ctutor_backend.model.sqlalchemy_models.execution import ExecutionBackend
 from prefect.client.orchestration import PrefectClient
 from sqlalchemy_utils import Ltree
 from ctutor_backend.settings import settings

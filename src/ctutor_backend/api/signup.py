@@ -9,7 +9,9 @@ from ctutor_backend.interface.course_members import CourseMemberProperties
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.tokens import decrypt_api_key
-nt, Course, CourseMember, Organization, StudentProfile, User
+from ctutor_backend.model.sqlalchemy_models.auth import Account, User, StudentProfile
+from ctutor_backend.model.sqlalchemy_models.course import Course, CourseMember
+from ctutor_backend.model.sqlalchemy_models.organization import Organization
 from gitlab.v4.objects import Project
 
 

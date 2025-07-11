@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
+from ctutor_backend.interface.organizations import OrganizationGet
 from ctutor_backend.model.sqlalchemy_models.course import CourseFamily
 from sqlalchemy_utils import Ltree
 

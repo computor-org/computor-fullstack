@@ -13,7 +13,7 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.course_execution_backends import CourseExecutionBackendGet, CourseExecutionBackendUpdate
 from ctutor_backend.api.api_builder import CrudRouter
-nBackend
+from ctutor_backend.model.sqlalchemy_models.course import CourseExecutionBackend
 from ctutor_backend.interface.courses import CourseGet, CourseInterface
 
 course_router = CrudRouter(CourseInterface)

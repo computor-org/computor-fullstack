@@ -10,6 +10,8 @@ from sqlalchemy.orm import sessionmaker
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(__file__))
+# Add parent directory to path for ctutor_backend imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 def test_import_models():
     """Test that all models can be imported properly."""
@@ -17,7 +19,7 @@ def test_import_models():
     
     try:
         # Test importing from the new structure
-        from model.sqlalchemy_models import (
+        from ctutor_backend.model.sqlalchemy_models import (
             User, Account, Profile, StudentProfile, Session,
             Organization, CourseContentKind, CourseRole, CourseFamily,
             Course, CourseContentType, CourseExecutionBackend, CourseGroup,
@@ -53,7 +55,7 @@ def test_database_connection():
         session = Session()
         
         # Test basic queries
-        from model.sqlalchemy_models import User, Course, Organization
+        from ctutor_backend.model.sqlalchemy_models import User, Course, Organization
         
         # Count records
         user_count = session.query(User).count()
@@ -90,7 +92,7 @@ def test_model_relationships():
         Session = sessionmaker(bind=engine)
         session = Session()
         
-        from model.sqlalchemy_models import User, Course, Organization, CourseFamily
+        from ctutor_backend.model.sqlalchemy_models import User, Course, Organization, CourseFamily
         
         # Test relationship queries
         users_with_profiles = session.query(User).filter(User.given_name.isnot(None)).first()
@@ -121,10 +123,10 @@ def test_api_imports():
     
     try:
         # Test a few key API modules that use models
-        import api.user
-        import api.permissions
-        import interface.courses
-        import interface.course_members
+        import ctutor_backend.api.user
+        import ctutor_backend.api.permissions
+        import ctutor_backend.interface.courses
+        import ctutor_backend.interface.course_members
         
         print("✅ API modules imported successfully")
         return True

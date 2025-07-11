@@ -26,7 +26,8 @@ bash startup_system_agent_dev.sh  # System agent
 
 # Database operations
 bash alembic_up.sh          # Alembic migrations (primary method)
-bash seeder.sh              # Seed test data
+bash initialize_system.sh   # Initialize system data (roles, admin user)
+bash seeder.sh              # Seed development test data
 alembic revision --autogenerate -m "description"  # Generate new migration
 alembic upgrade head        # Apply all pending migrations
 

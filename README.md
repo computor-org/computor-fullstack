@@ -40,25 +40,25 @@ sudo systemctl disable postgresql
 
 Start the migration with
 ```bash
-bash migrations_up.sh
+bash migrations.sh
 ```
 
 
 Start
 ```bash
-bash alembic_up.sh
+bash migrations.sh
 ```
 to migrate the schema to the current version.
 
 Start the server with
 ```
-bash startup_fastapi_dev.sh
+bash api.sh
 ```
 Check if the server is running API docs on http://0.0.0.0:8000/docs .
 
 Start the system agent with
 ```
-bash startup_system_agent_dev.sh
+bash system_agent.sh
 ```
 
 Install the CLI with

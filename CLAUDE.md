@@ -61,13 +61,17 @@ cd frontend && npm test      # Run tests
 ### Database
 - PostgreSQL 16 for main data storage
 - Redis for caching and session management
-- Migrations in `/db/migrations/` (V1.000-V1.018)
+- **Migration Strategy**: Transitioning from PostgreSQL migrations to SQLAlchemy/Alembic-only approach
+  - Legacy migrations in `/db/migrations/` (V1.000-V1.018) - being phased out
+  - New migrations use Alembic with SQLAlchemy models as single source of truth
+  - Models defined in `/src/ctutor_backend/model/`
 
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docker/docker-compose.dev.yml`: Development environment setup
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
+- `/DATABASE_REFACTORING_PLAN.md`: Database migration strategy documentation
 
 ## Development Principles
 
@@ -118,6 +122,15 @@ git add .
 git commit -m "Update SSO plugin"
 git push
 ```
+
+## Current Development Focus
+
+### Database Refactoring (In Progress)
+The project is currently transitioning from PostgreSQL migration files to a pure SQLAlchemy/Alembic approach:
+- **Goal**: Single source of truth using SQLAlchemy models
+- **Benefits**: Better maintainability, ORM benefits, automatic migration generation
+- **Status**: See `/DATABASE_REFACTORING_PLAN.md` for detailed migration plan
+- **Impact**: Future database changes should be made in SQLAlchemy models, not SQL files
 
 ## Notes
 - The web UI is in early development stages

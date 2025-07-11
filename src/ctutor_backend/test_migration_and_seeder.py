@@ -76,12 +76,10 @@ def main():
         skip_next = False
         
         for line in lines:
-            if 'sa.Enum(' in line and ('ctutor_group_type' in line or 'ctutor_color' in line or 'user_type' in line or 'organization_type' in line):
+            if 'sa.Enum(' in line and ('ctutor_group_type' in line or 'user_type' in line or 'organization_type' in line):
                 # Replace enum creation with existing enum reference
                 if 'ctutor_group_type' in line:
                     line = line.replace("sa.Enum('fixed', 'dynamic', name='ctutor_group_type')", "postgresql.ENUM(name='ctutor_group_type', create_type=False)")
-                elif 'ctutor_color' in line:
-                    line = line.replace("sa.Enum('red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose', name='ctutor_color')", "postgresql.ENUM(name='ctutor_color', create_type=False)")
                 elif 'user_type' in line:
                     line = line.replace("sa.Enum('user', 'token', name='user_type')", "postgresql.ENUM(name='user_type', create_type=False)")
                 elif 'organization_type' in line:

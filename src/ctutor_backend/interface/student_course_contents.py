@@ -3,7 +3,7 @@ from pydantic import BaseModel, validator, ConfigDict
 from typing import Literal, Optional
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList, CTutorUIColor
+from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.results import ResultStatus
@@ -73,7 +73,7 @@ class CourseContentStudentList(BaseModel):
     max_test_runs: Optional[int] = None
 
     directory: str
-    color: CTutorUIColor
+    color: str
 
     result: Optional[ResultStudentList] = None
 

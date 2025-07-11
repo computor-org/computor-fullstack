@@ -32,7 +32,7 @@ from ctutor_backend.model.sqlalchemy_models.execution import ExecutionBackend
 from prefect.client.orchestration import PrefectClient
 from sqlalchemy_utils import Ltree
 from ctutor_backend.settings import settings
-from ctutor_backend.utils import get_prefect_client
+from ctutor_backend.helpers import get_prefect_client
 
 def handle_merge_request(submission: Submission, branch: str, title: str) -> bool:
 

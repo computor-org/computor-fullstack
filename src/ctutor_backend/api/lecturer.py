@@ -8,7 +8,11 @@ from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.permissions import check_course_permissions
 from ctutor_backend.api.exceptions import NotFoundException
-nse_model=CourseGet)
+from ctutor_backend.model.sqlalchemy_models.course import Course
+
+lecturer_router = APIRouter()
+
+@lecturer_router.get("/courses/{course_id}", response_model=CourseGet)
 async def lecturer_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
     course = check_course_permissions(permissions,Course,"_maintainer",db).filter(Course.id == course_id).first()

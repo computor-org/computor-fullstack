@@ -42,7 +42,7 @@ def upgrade() -> None:
         AS $function$
         BEGIN
             -- Check if the value matches the slug pattern
-            RETURN value ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$';
+            RETURN value ~ '^[a-z0-9]+([_-][a-z0-9]+)*$';
         END;
         $function$;
     """)

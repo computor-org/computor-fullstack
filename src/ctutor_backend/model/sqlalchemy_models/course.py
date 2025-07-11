@@ -30,10 +30,15 @@ class CourseContentKind(Base):
 
 class CourseRole(Base):
     __tablename__ = 'course_role'
+    __table_args__ = (
+        CheckConstraint("(NOT builtin) OR ((id)::text ~ '^_'::text)"),
+        CheckConstraint('(builtin AND ctutor_valid_slug(SUBSTRING(id FROM 2))) OR ((NOT builtin) AND ctutor_valid_slug((id)::text))')
+    )
 
     id = Column(String(255), primary_key=True)
     title = Column(String(255))
     description = Column(String(4096))
+    builtin = Column(Boolean, nullable=False, server_default=text("false"))
 
     # Relationships
     course_members = relationship('CourseMember', back_populates='course_role')

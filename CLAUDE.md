@@ -54,6 +54,8 @@ cd frontend && npm test      # Run tests
 - **cli/**: Command-line interface tools
 - **utils/**: Shared utilities (color validation, etc.)
 - **alembic/**: Database migrations using Alembic with SQLAlchemy models
+- **tests/**: Test files for comprehensive testing coverage
+- **scripts/**: Development and maintenance utility scripts
 
 ### Key Concepts
 1. **Hierarchical Organization**: Organizations → Course Families → Courses
@@ -77,10 +79,13 @@ cd frontend && npm test      # Run tests
 
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
+- `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
 - `/docker/docker-compose.dev.yml`: Development environment setup
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration
+- `/src/ctutor_backend/tests/`: Test files for comprehensive testing
+- `/src/ctutor_backend/scripts/`: Development and maintenance scripts
 
 ## Development Principles
 
@@ -114,18 +119,21 @@ def calculate_student_final_grade(assignments: List[Assignment], exam_score: flo
 ```
 
 ## Testing
-- **Backend Tests**:
+- **Backend Tests** (in `/src/ctutor_backend/tests/`):
   - API tests in `/src/ctutor_backend/api/tests.py`
-  - Model integration tests: `test_model_integration.py`
-  - API endpoint tests: `test_api_endpoints.py`
-  - Color validation tests: `test_color_refactoring.py`
+  - Model integration tests: `tests/test_model_integration.py`
+  - API endpoint tests: `tests/test_api_endpoints.py`
+  - Color validation tests: `tests/test_color_refactoring.py`
+  - Migration tests: `tests/test_migration_and_seeder.py`
 - **Frontend**: Jest/React Testing Library
 - **Test Commands**:
   ```bash
-  python test_model_integration.py     # SQLAlchemy model tests
-  python test_api_endpoints.py         # API integration tests
-  python test_color_refactoring.py     # Color validation tests
-  pytest                               # Run all pytest tests
+  # Run from /src/ctutor_backend/ directory
+  python tests/test_model_integration.py     # SQLAlchemy model tests
+  python tests/test_api_endpoints.py         # API integration tests
+  python tests/test_color_refactoring.py     # Color validation tests
+  python tests/test_migration_and_seeder.py  # Migration tests
+  pytest                                      # Run all pytest tests
   ```
 
 ## Plugins

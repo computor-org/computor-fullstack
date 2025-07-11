@@ -8,10 +8,10 @@ import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# Add current directory to path
-sys.path.insert(0, os.path.dirname(__file__))
 # Add parent directory to path for ctutor_backend imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.dirname(__file__))  # tests directory
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # ctutor_backend directory
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))  # src directory
 
 def test_import_models():
     """Test that all models can be imported properly."""

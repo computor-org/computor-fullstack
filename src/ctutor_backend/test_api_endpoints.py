@@ -21,8 +21,8 @@ def test_api_imports():
     try:
         # Test core API modules
         import api.user
-        import api.course
-        import api.organization
+        import api.courses
+        import api.organizations
         import api.permissions
         
         print("✅ Core API modules imported successfully")

@@ -154,7 +154,7 @@ def initialize_execution_backends(db: Session):
     backends = [
         {
             'slug': 'prefect_builtin',
-            'type': 'prefect_builtin',
+            'type': 'prefect',
             'properties': {
                 'url': 'http://prefect:4200/api',
                 'deployment': 'test-assignment/system'
@@ -230,7 +230,7 @@ def main():
         print("   • System roles: _admin, _user_manager, _organization_manager")
         print("   • Course roles: _student, _tutor, _lecturer, _maintainer, _owner")
         print("   • Content kinds: assignment, lecture, exercise, exam, unit")
-        print("   • Execution backends: prefect_builtin")
+        print("   • Execution backends: prefect")
         print("   • Admin user: username 'admin', password 'admin'")
         print("\n🎯 You can now start the application!")
         

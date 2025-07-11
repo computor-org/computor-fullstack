@@ -400,7 +400,7 @@ async def create_test(test_create: TestCreate, background_tasks: BackgroundTasks
   execution_backend = db.query(ExecutionBackend) \
     .filter(ExecutionBackend.id == execution_backend_id).first()
 
-  if execution_backend.type == "prefect_builtin":
+  if execution_backend.type == "prefect":
     test_system_id = await prefect_test_job(job, execution_backend.properties) # TODO: why not using course_execution_backend.properties?
   else:
     raise BadRequestException("execution_backend type not supported!")

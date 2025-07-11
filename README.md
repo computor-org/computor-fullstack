@@ -100,7 +100,7 @@ API url: http://localhost:8000
 Username: admin
 Password: admin
 ```
-These are the defaults in the template `.env.dev`
+These are the defaults in the template `.env`
 
 Create the course with
 

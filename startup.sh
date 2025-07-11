@@ -3,16 +3,14 @@
 # Stop on error
 set -e
 
-# Export env vars from .env.dev
+# Export env vars from .env
 set -a
-source .env.dev
+source .env
 set +a
 
 ENVIRONMENT=${1:-dev}
 
 DOCKERFILE="docker-compose-${ENVIRONMENT}.yaml"
-
-DOCKERCFILE="docker-compose-dev.yaml"
 
 destination="${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
 

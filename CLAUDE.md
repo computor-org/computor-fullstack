@@ -20,14 +20,14 @@ source .venv/bin/activate
 pip install -r src/requirements.txt
 
 # Start development services
-bash startup_dev.sh          # All Docker services
-bash startup_fastapi_dev.sh  # FastAPI only
-bash startup_system_agent_dev.sh  # System agent
+bash startup.sh             # All Docker services (dev/prod)
+bash api.sh                 # FastAPI only
+bash system_agent.sh        # System agent
 
 # Database operations
-bash alembic_up.sh          # Alembic migrations (primary method)
+bash migrations.sh          # Alembic migrations
 bash initialize_system.sh   # Initialize system data (roles, admin user)
-bash seeder.sh              # Seed development test data
+cd src && python seeder.py  # Seed development test data
 alembic revision --autogenerate -m "description"  # Generate new migration
 alembic upgrade head        # Apply all pending migrations
 
@@ -37,7 +37,7 @@ pip install -e src
 
 ### Frontend
 ```bash
-bash startup_frontend_dev.sh  # Start dev server
+bash frontend.sh            # Start dev server
 # Or directly:
 cd frontend && npm start     # Development
 cd frontend && npm build     # Production build

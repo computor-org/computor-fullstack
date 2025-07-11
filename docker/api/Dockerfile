@@ -7,9 +7,7 @@ USER uvicorn
 WORKDIR /home/uvicorn
 
 ADD src /home/uvicorn/src
-ADD db /home/uvicorn/db
-ADD docker/api/migrations_up.sh /home/uvicorn/migrations_up.sh
-ADD docker/api/alembic_up.sh /home/uvicorn/alembic_up.sh
+ADD migrations.sh /home/uvicorn/migrations.sh
 
 RUN pip install --no-cache-dir --upgrade -r src/requirements.txt
 

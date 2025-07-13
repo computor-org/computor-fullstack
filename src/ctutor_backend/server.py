@@ -20,6 +20,9 @@ from ctutor_backend.interface.deployments import DeploymentFactory
 from ctutor_backend.interface.accounts import AccountInterface
 from ctutor_backend.interface.deployments import ExecutionBackendConfig
 from ctutor_backend.interface.execution_backends import ExecutionBackendInterface
+from ctutor_backend.interface.groups import GroupInterface
+from ctutor_backend.interface.profiles import ProfileInterface
+from ctutor_backend.interface.sessions import SessionInterface
 from ctutor_backend.interface.submission_group_members import SubmissionGroupMemberInterface
 from ctutor_backend.interface.submission_groups import SubmissionGroupInterface
 from ctutor_backend.interface.users import UserInterface
@@ -142,6 +145,9 @@ app.add_middleware(
 
 CrudRouter(UserInterface).register_routes(app)
 CrudRouter(AccountInterface).register_routes(app)
+CrudRouter(GroupInterface).register_routes(app)
+CrudRouter(ProfileInterface).register_routes(app)
+CrudRouter(SessionInterface).register_routes(app)
 course_router.register_routes(app)
 organization_router.register_routes(app)
 CrudRouter(CourseFamilyInterface).register_routes(app)

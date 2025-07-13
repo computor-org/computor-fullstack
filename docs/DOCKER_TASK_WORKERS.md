@@ -47,36 +47,34 @@ services:
     ports: ["8000:8000"]
     command: ["uvicorn", "server:app", "--reload"]
     
-  # High Priority Task Worker
+  # High Priority Task Worker (reuses API image)
   task-worker-high:
-    build: ./docker/task-worker/Dockerfile
-    environment:
-      TASK_QUEUES: high_priority
+    build: ./docker/api/Dockerfile
+    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=high_priority"]
       
-  # Default/Low Priority Task Worker  
+  # Default/Low Priority Task Worker (reuses API image)
   task-worker-default:
-    build: ./docker/task-worker/Dockerfile
-    environment:
-      TASK_QUEUES: default,low_priority
+    build: ./docker/api/Dockerfile
+    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=default,low_priority"]
 ```
 
 ### Production Environment (docker-compose-prod.yaml)
 
 ```yaml
 services:
-  # High Priority Task Workers (1 replica)
+  # High Priority Task Workers (1 replica, reuses API image)
   task-worker-high:
+    build: ./docker/api/Dockerfile
     deploy:
       replicas: ${TASK_WORKER_HIGH_REPLICAS:-1}
-    environment:
-      TASK_QUEUES: high_priority
+    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=high_priority"]
       
-  # Default Priority Task Workers (2 replicas)
+  # Default Priority Task Workers (2 replicas, reuses API image)
   task-worker-default:
+    build: ./docker/api/Dockerfile
     deploy:
       replicas: ${TASK_WORKER_DEFAULT_REPLICAS:-2}
-    environment:
-      TASK_QUEUES: default,low_priority
+    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=default,low_priority"]
 ```
 
 ## Environment Variables
@@ -152,19 +150,20 @@ This ensures high-priority tasks always have dedicated processing capacity.
 
 ### Base Image
 - **prefecthq/prefect:2.20.3-python3.10**: Provides Python 3.10 + async support
+- **Reuses API Dockerfile**: Same image as FastAPI backend for consistency
 
-### Task Worker Dockerfile Features
-- **Non-root user**: Security with `taskworker` user
-- **Health checks**: Redis connectivity monitoring
-- **Startup script**: Automatic service discovery and initialization
+### Task Worker Features
+- **Shared Image**: Uses same `/docker/api/Dockerfile` as the FastAPI backend
+- **Command Override**: Changes only the startup command to run workers
+- **Non-root user**: Security with existing `uvicorn` user  
 - **Volume mounts**: Source code and storage directories
+- **Dependency waiting**: Docker Compose `depends_on` handles service ordering
 
 ### Startup Process
 
-1. **Wait for Redis**: Ensures queue backend is available
-2. **Wait for API**: Ensures FastAPI backend is ready
-3. **Import tasks**: Registers all available task types
-4. **Start worker**: Begins processing queued tasks
+1. **Docker Compose**: Ensures Redis and database are ready via `depends_on`
+2. **Import tasks**: Automatic task registration when CLI module loads
+3. **Start worker**: Begins processing queued tasks immediately
 
 ## Usage Commands
 

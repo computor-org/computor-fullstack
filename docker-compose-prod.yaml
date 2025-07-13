@@ -157,12 +157,12 @@ services:
       replicas: ${TASK_WORKER_HIGH_REPLICAS:-1}
     build:
       context: ./
-      dockerfile: ./docker/task-worker/Dockerfile
+      dockerfile: ./docker/api/Dockerfile
     restart: unless-stopped
+    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=high_priority"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     environment:
-      TASK_QUEUES: high_priority
       EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
       EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
       EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
@@ -194,12 +194,12 @@ services:
       replicas: ${TASK_WORKER_DEFAULT_REPLICAS:-2}
     build:
       context: ./
-      dockerfile: ./docker/task-worker/Dockerfile
+      dockerfile: ./docker/api/Dockerfile
     restart: unless-stopped
+    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=default,low_priority"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     environment:
-      TASK_QUEUES: default,low_priority
       EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
       EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
       EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}

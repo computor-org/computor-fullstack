@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.group import UserGroup
 
 class UserGroupCreate(BaseModel):
@@ -34,11 +34,10 @@ class UserGroupGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
-class UserGroupList(BaseModel):
+class UserGroupList(BaseEntityList):
     user_id: str = Field(description="User ID")
     group_id: str = Field(description="Group ID")
     transient: Optional[bool] = Field(None, description="Whether this is transient membership")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     
     @property
     def membership_type(self) -> str:

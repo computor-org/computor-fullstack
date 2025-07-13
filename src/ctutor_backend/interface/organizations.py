@@ -1,8 +1,9 @@
 from enum import Enum
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field, EmailStr
 from typing import Optional
+from datetime import datetime
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.model.organization import Organization
 from sqlalchemy_utils import Ltree
@@ -131,14 +132,13 @@ class OrganizationGet(BaseEntityGet):
     
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
-class OrganizationList(BaseModel):
+class OrganizationList(BaseEntityList):
     id: str = Field(description="Organization unique identifier")
     path: str = Field(description="Hierarchical path")
     title: Optional[str] = Field(None, description="Organization title")
     organization_type: OrganizationType = Field(description="Type of organization")
     user_id: Optional[str] = Field(None, description="Associated user ID")
     email: Optional[EmailStr] = Field(None, description="Contact email")
-    created_at: Optional[str] = Field(None, description="Creation timestamp")
     
     @field_validator('path', mode='before')
     @classmethod

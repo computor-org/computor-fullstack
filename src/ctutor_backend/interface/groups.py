@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.group import Group
 
 class GroupType(str, Enum):
@@ -45,12 +45,11 @@ class GroupGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
-class GroupList(BaseModel):
+class GroupList(BaseEntityList):
     id: str = Field(description="Group unique identifier")
     name: str = Field(description="Group name")
     description: Optional[str] = Field(None, description="Group description")
     group_type: GroupType = Field(description="Type of group")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     
     @property

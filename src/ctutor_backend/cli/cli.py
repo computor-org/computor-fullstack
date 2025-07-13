@@ -8,6 +8,7 @@ from .release import release, release_deployment
 from .auth import change_profile, login
 from .test import run_test
 from .admin import admin
+from .worker import worker
 
 @click.group()
 def cli():
@@ -22,6 +23,7 @@ cli.add_command(run_test,"test")
 cli.add_command(release_deployment,"apply")
 cli.add_command(admin,"admin")
 cli.add_command(template,"templates")
+cli.add_command(worker,"worker")
 # cli.add_command(experiment_1,"exp")
 
 if __name__ == '__main__':

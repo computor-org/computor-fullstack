@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -10,7 +10,8 @@ class UserGroupCreate(BaseModel):
     group_id: str = Field(description="Group ID")
     transient: Optional[bool] = Field(False, description="Whether this is a transient membership")
     
-    @validator('user_id', 'group_id')
+    @field_validator('user_id', 'group_id')
+    @classmethod
     def validate_ids(cls, v):
         if not v or not v.strip():
             raise ValueError('ID cannot be empty')

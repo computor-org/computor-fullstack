@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session as DBSession
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -12,13 +12,15 @@ class SessionCreate(BaseModel):
     ip_address: str = Field(description="IP address of the session")
     properties: Optional[dict] = Field(None, description="Additional session properties")
     
-    @validator('session_id')
+    @field_validator('session_id')
+    @classmethod
     def validate_session_id(cls, v):
         if not v.strip():
             raise ValueError('Session ID cannot be empty or only whitespace')
         return v.strip()
     
-    @validator('ip_address')
+    @field_validator('ip_address')
+    @classmethod
     def validate_ip_address(cls, v):
         try:
             # This validates both IPv4 and IPv6 addresses

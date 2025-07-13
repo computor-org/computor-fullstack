@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
@@ -23,7 +23,8 @@ class CourseStudentGet(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 
@@ -40,7 +41,8 @@ class CourseStudentList(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 

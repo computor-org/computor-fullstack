@@ -1,5 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, validator, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, field_validator, Field, EmailStr
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -45,7 +45,8 @@ class OrganizationCreate(BaseModel):
     region: Optional[str] = Field(None, max_length=255, description="State/region")
     country: Optional[str] = Field(None, max_length=255, description="Country")
     
-    @validator('path')
+    @field_validator('path')
+    @classmethod
     def validate_path(cls, v):
         if not v:
             raise ValueError('Path cannot be empty')
@@ -54,25 +55,30 @@ class OrganizationCreate(BaseModel):
             raise ValueError('Path must be valid ltree format (alphanumeric, underscores, hyphens, dots)')
         return v
     
-    @validator('title')
-    def validate_title_for_type(cls, v, values):
-        org_type = values.get('organization_type')
-        if org_type == OrganizationType.user and v is not None:
-            raise ValueError('User organizations cannot have a title')
-        elif org_type != OrganizationType.user and not v:
-            raise ValueError('Non-user organizations must have a title')
+    @field_validator('title')
+    @classmethod
+    def validate_title_for_type(cls, v, info):
+        if info.data and 'organization_type' in info.data:
+            org_type = info.data['organization_type']
+            if org_type == OrganizationType.user and v is not None:
+                raise ValueError('User organizations cannot have a title')
+            elif org_type != OrganizationType.user and not v:
+                raise ValueError('Non-user organizations must have a title')
         return v
     
-    @validator('user_id')
-    def validate_user_id_for_type(cls, v, values):
-        org_type = values.get('organization_type')
-        if org_type == OrganizationType.user and not v:
-            raise ValueError('User organizations must have a user_id')
-        elif org_type != OrganizationType.user and v is not None:
-            raise ValueError('Non-user organizations cannot have a user_id')
+    @field_validator('user_id')
+    @classmethod
+    def validate_user_id_for_type(cls, v, info):
+        if info.data and 'organization_type' in info.data:
+            org_type = info.data['organization_type']
+            if org_type == OrganizationType.user and not v:
+                raise ValueError('User organizations must have a user_id')
+            elif org_type != OrganizationType.user and v is not None:
+                raise ValueError('Non-user organizations cannot have a user_id')
         return v
     
-    @validator('url')
+    @field_validator('url')
+    @classmethod
     def validate_url(cls, v):
         if v and not (v.startswith('http://') or v.startswith('https://')):
             raise ValueError('URL must start with http:// or https://')
@@ -99,7 +105,8 @@ class OrganizationGet(BaseEntityGet):
     region: Optional[str] = Field(None, description="State/region")
     country: Optional[str] = Field(None, description="Country")
     
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
     
@@ -134,7 +141,8 @@ class OrganizationList(BaseModel):
     email: Optional[EmailStr] = Field(None, description="Contact email")
     created_at: Optional[str] = Field(None, description="Creation timestamp")
     
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
     

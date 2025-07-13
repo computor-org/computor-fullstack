@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet
@@ -60,7 +60,8 @@ class CourseContentGet(BaseEntityGet):
 
     course_content_type: Optional[CourseContentTypeGet] = None
 
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 
@@ -80,7 +81,8 @@ class CourseContentList(BaseModel):
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
     
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 

@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -11,14 +11,16 @@ class GroupClaimCreate(BaseModel):
     claim_value: str = Field(min_length=1, max_length=255, description="Value of the claim")
     properties: Optional[dict] = Field(None, description="Additional claim properties")
     
-    @validator('claim_type')
+    @field_validator('claim_type')
+    @classmethod
     def validate_claim_type(cls, v):
         if not v.strip():
             raise ValueError('Claim type cannot be empty or only whitespace')
         # Normalize claim type to lowercase
         return v.strip().lower()
     
-    @validator('claim_value')
+    @field_validator('claim_value')
+    @classmethod
     def validate_claim_value(cls, v):
         if not v.strip():
             raise ValueError('Claim value cannot be empty or only whitespace')

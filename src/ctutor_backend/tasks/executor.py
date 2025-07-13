@@ -1,56 +1,47 @@
 """
-Task executor implementation using Redis Queue (RQ).
+Task executor implementation using Celery.
 """
 
 import os
-import asyncio
 from datetime import datetime
 from typing import Any, Dict, Optional
-from redis import Redis
-from rq import Queue, Worker
-from rq.job import Job
-from rq.exceptions import NoSuchJobError
+from celery import states
+from celery.result import AsyncResult
 
+from .celery_app import app, get_celery_app
 from .base import BaseTask, TaskStatus, TaskResult, TaskInfo, TaskSubmission
 from .registry import task_registry
 
 
 class TaskExecutor:
     """
-    Task executor using Redis Queue for managing long-running operations.
+    Task executor using Celery for managing long-running operations.
     """
     
-    def __init__(self, redis_url: Optional[str] = None, redis_password: Optional[str] = None):
+    def __init__(self):
         """
-        Initialize task executor.
-        
-        Args:
-            redis_url: Redis connection URL
-            redis_password: Redis password
+        Initialize task executor with Celery app.
         """
-        self.redis_url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379")
-        self.redis_password = redis_password or os.environ.get("REDIS_PASSWORD")
+        self.app = get_celery_app()
         
-        # Initialize Redis connection
-        self.redis_client = Redis.from_url(
-            self.redis_url,
-            password=self.redis_password,
-            decode_responses=True
-        )
-        
-        # Initialize task queues
-        self.default_queue = Queue('default', connection=self.redis_client)
-        self.high_priority_queue = Queue('high_priority', connection=self.redis_client)
-        self.low_priority_queue = Queue('low_priority', connection=self.redis_client)
+        # Status mapping from Celery to our TaskStatus
+        self._status_mapping = {
+            states.PENDING: TaskStatus.QUEUED,
+            states.STARTED: TaskStatus.STARTED,
+            states.SUCCESS: TaskStatus.FINISHED,
+            states.FAILURE: TaskStatus.FAILED,
+            states.RETRY: TaskStatus.QUEUED,
+            states.REVOKED: TaskStatus.CANCELLED
+        }
     
-    def _get_queue_by_priority(self, priority: int) -> Queue:
-        """Get queue based on task priority."""
+    def _get_queue_name_by_priority(self, priority: int) -> str:
+        """Get queue name based on task priority."""
         if priority > 5:
-            return self.high_priority_queue
+            return 'high_priority'
         elif priority < 0:
-            return self.low_priority_queue
+            return 'low_priority'
         else:
-            return self.default_queue
+            return 'default'
     
     async def submit_task(self, submission: TaskSubmission) -> str:
         """
@@ -68,22 +59,37 @@ class TaskExecutor:
         """
         # Validate task exists
         task_class = task_registry.get_task(submission.task_name)
-        task_instance = task_class()
         
-        # Select appropriate queue
-        queue = self._get_queue_by_priority(submission.priority)
+        # Get queue name based on priority
+        queue_name = self._get_queue_name_by_priority(submission.priority)
         
-        # Submit job to queue
-        job = queue.enqueue(
-            self._execute_task_wrapper,
-            submission.task_name,
-            submission.parameters,
-            job_timeout=task_instance.timeout,
-            retry_limit=task_instance.retry_limit,
-            delay=submission.delay
-        )
+        # Get the Celery task function
+        celery_task = self.app.tasks.get(f'ctutor_backend.tasks.{submission.task_name}')
+        if not celery_task:
+            # Register the task dynamically if not found
+            celery_task = self._register_celery_task(submission.task_name, task_class)
         
-        return job.id
+        # Submit task to Celery
+        options = {
+            'queue': queue_name,
+            'priority': submission.priority,
+        }
+        
+        if submission.delay:
+            # Schedule for later execution
+            result = celery_task.apply_async(
+                kwargs=submission.parameters,
+                countdown=submission.delay,
+                **options
+            )
+        else:
+            # Execute immediately
+            result = celery_task.apply_async(
+                kwargs=submission.parameters,
+                **options
+            )
+        
+        return result.id
     
     async def get_task_status(self, task_id: str) -> TaskInfo:
         """
@@ -96,33 +102,35 @@ class TaskExecutor:
             Task information
             
         Raises:
-            NoSuchJobError: If task ID doesn't exist
+            Exception: If task ID doesn't exist
         """
-        try:
-            job = Job.fetch(task_id, connection=self.redis_client)
-            
-            status_mapping = {
-                'queued': TaskStatus.QUEUED,
-                'started': TaskStatus.STARTED,
-                'finished': TaskStatus.FINISHED,
-                'failed': TaskStatus.FAILED,
-                'deferred': TaskStatus.DEFERRED,
-                'cancelled': TaskStatus.CANCELLED
-            }
-            
-            return TaskInfo(
-                task_id=task_id,
-                task_name=job.func_name.split('.')[-1] if job.func_name else "unknown",
-                status=status_mapping.get(job.status, TaskStatus.QUEUED),
-                created_at=job.created_at or datetime.utcnow(),
-                started_at=job.started_at,
-                finished_at=job.ended_at,
-                progress=job.meta.get('progress'),
-                error=str(job.exc_info) if job.exc_info else None
-            )
-            
-        except NoSuchJobError:
-            raise NoSuchJobError(f"Task with ID {task_id} not found")
+        result = AsyncResult(task_id, app=self.app)
+        
+        # Get task status
+        status = self._status_mapping.get(result.status, TaskStatus.QUEUED)
+        
+        # Get task information
+        task_info = TaskInfo(
+            task_id=task_id,
+            task_name=result.name or "unknown",
+            status=status,
+            created_at=datetime.utcnow(),  # Celery doesn't store creation time by default
+            started_at=None,
+            finished_at=None,
+            progress=None,
+            error=str(result.traceback) if result.failed() else None
+        )
+        
+        # Get additional info if available
+        if hasattr(result, 'info') and result.info:
+            if isinstance(result.info, dict):
+                task_info.progress = result.info.get('progress')
+                if 'started_at' in result.info:
+                    task_info.started_at = datetime.fromisoformat(result.info['started_at'])
+                if 'finished_at' in result.info:
+                    task_info.finished_at = datetime.fromisoformat(result.info['finished_at'])
+        
+        return task_info
     
     async def get_task_result(self, task_id: str) -> TaskResult:
         """
@@ -135,26 +143,21 @@ class TaskExecutor:
             Task result
             
         Raises:
-            NoSuchJobError: If task ID doesn't exist
+            Exception: If task ID doesn't exist
         """
         task_info = await self.get_task_status(task_id)
+        result = AsyncResult(task_id, app=self.app)
         
-        try:
-            job = Job.fetch(task_id, connection=self.redis_client)
-            
-            return TaskResult(
-                task_id=task_id,
-                status=task_info.status,
-                result=job.result,
-                error=task_info.error,
-                created_at=task_info.created_at,
-                started_at=task_info.started_at,
-                finished_at=task_info.finished_at,
-                progress=task_info.progress
-            )
-            
-        except NoSuchJobError:
-            raise NoSuchJobError(f"Task with ID {task_id} not found")
+        return TaskResult(
+            task_id=task_id,
+            status=task_info.status,
+            result=result.result if result.ready() else None,
+            error=task_info.error,
+            created_at=task_info.created_at,
+            started_at=task_info.started_at,
+            finished_at=task_info.finished_at,
+            progress=task_info.progress
+        )
     
     async def cancel_task(self, task_id: str) -> bool:
         """
@@ -167,50 +170,152 @@ class TaskExecutor:
             True if task was cancelled, False otherwise
         """
         try:
-            job = Job.fetch(task_id, connection=self.redis_client)
-            job.cancel()
+            self.app.control.revoke(task_id, terminate=True)
             return True
-        except NoSuchJobError:
+        except Exception:
             return False
     
-    def start_worker(self, queues: Optional[list] = None, burst: bool = False):
+    def start_worker(self, queues: Optional[list] = None, burst: bool = False) -> None:
         """
-        Start a worker process for executing tasks.
+        Start a Celery worker to process tasks.
         
         Args:
-            queues: List of queue names to process (defaults to all)
-            burst: If True, worker will exit after processing all jobs
+            queues: List of queue names to process. If None, processes all queues.
+            burst: If True, worker exits after processing all available jobs.
         """
-        if queues is None:
-            queues = [self.high_priority_queue, self.default_queue, self.low_priority_queue]
+        import subprocess
+        import sys
         
-        worker = Worker(queues, connection=self.redis_client)
-        worker.work(burst=burst)
-    
-    @staticmethod
-    def _execute_task_wrapper(task_name: str, parameters: Dict[str, Any]) -> Any:
-        """
-        Wrapper function for executing tasks in RQ worker.
+        # Build celery worker command
+        cmd = [sys.executable, '-m', 'celery', '-A', 'ctutor_backend.tasks.celery_app', 'worker']
         
-        This function runs in the worker process and handles task execution.
-        """
-        # Get task implementation
-        task_class = task_registry.get_task(task_name)
-        task_instance = task_class()
+        # Add queue specification
+        if queues:
+            cmd.extend(['--queues', ','.join(queues)])
+        else:
+            cmd.extend(['--queues', 'high_priority,default,low_priority'])
         
-        # Execute task (note: RQ doesn't directly support async, so we need to handle it)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Add burst mode if requested
+        if burst:
+            cmd.append('--purge')  # Clear any existing messages before starting
+            cmd.extend(['--max-tasks-per-child', '1'])
         
+        # Add logging configuration
+        cmd.extend(['--loglevel', 'info'])
+        
+        # Start the worker process
         try:
-            result = loop.run_until_complete(task_instance.execute(**parameters))
-            loop.run_until_complete(task_instance.on_success(result, **parameters))
-            return result
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"Failed to start Celery worker: {e}")
+    
+    def get_worker_status(self) -> Dict[str, Any]:
+        """
+        Get status information about Celery workers and queues.
+        
+        Returns:
+            Dictionary containing worker and queue status information
+        """
+        try:
+            # Get Celery inspection interface
+            inspect = self.app.control.inspect()
+            
+            # Get active workers
+            active_workers = inspect.active() or {}
+            
+            # Get queue lengths
+            queue_lengths = {}
+            try:
+                from kombu import Connection
+                with Connection(self.app.conf.broker_url) as conn:
+                    for queue_name in ['high_priority', 'default', 'low_priority']:
+                        try:
+                            queue = conn.SimpleQueue(queue_name)
+                            queue_lengths[queue_name] = queue.qsize()
+                            queue.close()
+                        except Exception:
+                            queue_lengths[queue_name] = 'unknown'
+            except Exception:
+                queue_lengths = {'high_priority': 'unknown', 'default': 'unknown', 'low_priority': 'unknown'}
+            
+            return {
+                'workers': {
+                    'active_count': len(active_workers),
+                    'workers': active_workers
+                },
+                'queues': queue_lengths,
+                'broker_url': self.app.conf.broker_url,
+                'status': 'connected' if active_workers or True else 'disconnected'  # Basic connection test
+            }
+            
         except Exception as e:
-            loop.run_until_complete(task_instance.on_failure(e, **parameters))
-            raise
-        finally:
-            loop.close()
+            return {
+                'workers': {'active_count': 0, 'workers': {}},
+                'queues': {'high_priority': 'error', 'default': 'error', 'low_priority': 'error'},
+                'broker_url': self.app.conf.broker_url,
+                'status': 'error',
+                'error': str(e)
+            }
+
+    def _register_celery_task(self, task_name: str, task_class: type) -> Any:
+        """
+        Register a task class with Celery.
+        
+        Args:
+            task_name: Name of the task
+            task_class: Task class to register
+            
+        Returns:
+            Celery task function
+        """
+        @self.app.task(bind=True, name=f'ctutor_backend.tasks.{task_name}')
+        def celery_task_wrapper(celery_task, **kwargs):
+            # Create task instance
+            task_instance = task_class()
+            
+            # Update task state to STARTED
+            celery_task.update_state(
+                state=states.STARTED,
+                meta={'started_at': datetime.utcnow().isoformat()}
+            )
+            
+            try:
+                # Execute task
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    result = loop.run_until_complete(task_instance.execute(**kwargs))
+                    loop.run_until_complete(task_instance.on_success(result, **kwargs))
+                    
+                    # Update final state
+                    celery_task.update_state(
+                        state=states.SUCCESS,
+                        meta={
+                            'started_at': datetime.utcnow().isoformat(),
+                            'finished_at': datetime.utcnow().isoformat()
+                        }
+                    )
+                    
+                    return result
+                finally:
+                    loop.close()
+                    
+            except Exception as e:
+                # Handle failure
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                try:
+                    loop.run_until_complete(task_instance.on_failure(e, **kwargs))
+                finally:
+                    loop.close()
+                
+                raise e
+        
+        return celery_task_wrapper
 
 
 # Global task executor instance

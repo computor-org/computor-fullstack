@@ -4,9 +4,9 @@ Base classes and interfaces for task execution framework.
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class TaskStatus(str, Enum):
@@ -30,8 +30,7 @@ class TaskResult(BaseModel):
     finished_at: Optional[datetime] = None
     progress: Optional[Dict[str, Any]] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class BaseTask(ABC):
@@ -113,5 +112,4 @@ class TaskInfo(BaseModel):
     progress: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)

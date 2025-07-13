@@ -13,7 +13,7 @@ setup(
     packages=find_packages(),
     entry_points={
         "console_scripts": [
-            "computor=ctutor_backend.cli:cli",
+            "ctutor=ctutor_backend.cli.cli:cli",
         ],
     }
 )

@@ -3,8 +3,8 @@ FastAPI endpoints for task management.
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from rq.exceptions import NoSuchJobError
-from typing import Dict, List
+from typing import Dict, List, Any
+from celery.exceptions import NotRegistered
 
 from ctutor_backend.tasks import (
     get_task_executor, 
@@ -72,7 +72,7 @@ async def get_task_status(task_id: str):
         task_info = await task_executor.get_task_status(task_id)
         return task_info
     
-    except NoSuchJobError:
+    except (NotRegistered, KeyError):
         raise HTTPException(
             status_code=404,
             detail=f"Task with ID {task_id} not found"
@@ -103,7 +103,7 @@ async def get_task_result(task_id: str):
         task_result = await task_executor.get_task_result(task_id)
         return task_result
     
-    except NoSuchJobError:
+    except (NotRegistered, KeyError):
         raise HTTPException(
             status_code=404,
             detail=f"Task with ID {task_id} not found"
@@ -168,4 +168,24 @@ async def list_task_types():
         raise HTTPException(
             status_code=500,
             detail=f"Failed to list task types: {str(e)}"
+        )
+
+
+@tasks_router.get("/workers/status", response_model=Dict[str, Any])
+async def get_worker_status():
+    """
+    Get Celery worker and queue status information.
+    
+    Returns:
+        Dictionary containing worker status, queue information, and connection details
+    """
+    try:
+        task_executor = get_task_executor()
+        status_info = task_executor.get_worker_status()
+        return status_info
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get worker status: {str(e)}"
         )

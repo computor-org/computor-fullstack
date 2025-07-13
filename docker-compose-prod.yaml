@@ -150,8 +150,8 @@ services:
     labels:
       - traefik.enable=false
 
-  # Task Worker Service - High Priority Queue
-  task-worker-high:
+  # Celery Worker Service - High Priority Queue
+  celery-worker-high:
     deploy:
       mode: replicated
       replicas: ${TASK_WORKER_HIGH_REPLICAS:-1}
@@ -159,7 +159,10 @@ services:
       context: ./
       dockerfile: ./docker/api/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=high_priority"]
+    # Option 1: Direct Celery command
+    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "worker", "--queues=high_priority", "--loglevel=info", "--concurrency=2"]
+    # Option 2: Using CLI (uncomment to use)
+    # command: ["ctutor", "worker", "start", "--queues=high_priority"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     environment:
@@ -187,8 +190,8 @@ services:
     labels:
       - traefik.enable=false
 
-  # Task Worker Service - Default Priority Queue  
-  task-worker-default:
+  # Celery Worker Service - Default and Low Priority Queues
+  celery-worker-default:
     deploy:
       mode: replicated
       replicas: ${TASK_WORKER_DEFAULT_REPLICAS:-2}
@@ -196,7 +199,10 @@ services:
       context: ./
       dockerfile: ./docker/api/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "ctutor_backend.cli.cli", "worker", "start", "--queues=default,low_priority"]
+    # Option 1: Direct Celery command
+    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "worker", "--queues=default,low_priority", "--loglevel=info", "--concurrency=3"]
+    # Option 2: Using CLI (uncomment to use)
+    # command: ["ctutor", "worker", "start", "--queues=default,low_priority"]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     environment:
@@ -223,6 +229,33 @@ services:
         condition: service_started
     labels:
       - traefik.enable=false
+
+  # Flower - Celery Monitoring UI
+  flower:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
+      FLOWER_URL_PREFIX: flower
+      DEBUG_MODE: ${DEBUG_MODE}
+      TOKEN_SECRET: ${TOKEN_SECRET}
+    depends_on:
+      redis:
+        condition: service_started
+      uvicorn:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
+      - "traefik.http.routers.flower.entrypoints=web"
+      - "traefik.http.services.flower.loadbalancer.server.port=5555"
 
   # python-agent:
   #   deploy:

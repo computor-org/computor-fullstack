@@ -1,4 +1,5 @@
 import { Student, Course, Assignment, Submission } from '../types';
+import { User } from '../types/navigation';
 
 export const mockStudents: Student[] = [
   {
@@ -123,3 +124,22 @@ export const chartData = [
   { name: 'May', students: 165, courses: 12, submissions: 580 },
   { name: 'Jun', students: 178, courses: 12, submissions: 610 },
 ];
+
+export const mockUser: User = {
+  id: '1',
+  name: 'Dr. John Smith',
+  email: 'john.smith@university.edu',
+  role: 'lecturer',
+  permissions: [
+    'view_students',
+    'view_course_students',
+    'create_assignments',
+    'view_grades',
+    'manage_course',
+    'admin_access',
+    'manage_users',
+    'system_settings',
+    'view_audit',
+  ],
+  courses: ['1', '2', '3'],
+};

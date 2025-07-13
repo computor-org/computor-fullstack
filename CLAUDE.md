@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Computor is a full-stack university programming course management platform with:
 - **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Prefect for workflow orchestration
-- **Frontend**: React 19 with TypeScript (in early development)
+- **Frontend**: React 19 + TypeScript with Material-UI, TanStack Table, Recharts, and modern tooling
 - **Infrastructure**: Docker-based deployment with Traefik/Nginx
 - **Database**: Pure SQLAlchemy/Alembic approach with comprehensive model validation
 
@@ -39,9 +39,19 @@ pip install -e src
 ```bash
 bash frontend.sh            # Start dev server
 # Or directly:
-cd frontend && npm start     # Development
+cd frontend && npm start     # Development server
 cd frontend && npm build     # Production build
 cd frontend && npm test      # Run tests
+cd frontend && npm install   # Install dependencies
+
+# Frontend stack:
+# - React 19 + TypeScript
+# - Material-UI for UI components
+# - TanStack Table for advanced data tables
+# - Recharts for data visualization  
+# - React Hook Form + Zod for forms
+# - TanStack Query for API calls
+# - Redux Toolkit for state management
 ```
 
 ## Architecture
@@ -57,6 +67,35 @@ cd frontend && npm test      # Run tests
 - **alembic/**: Database migrations using Alembic with SQLAlchemy models
 - **tests/**: Test files for comprehensive testing coverage
 - **scripts/**: Development and maintenance utility scripts
+
+### Frontend Structure (`/frontend/`)
+- **src/components/**: Reusable UI components (tables, forms, sidebar, navigation)
+  - Advanced data tables with TanStack Table (filtering, sorting, pagination)
+  - Professional form components with React Hook Form + Zod validation
+  - Configurable sidebar system with context-aware navigation
+- **src/pages/**: Main application pages and views (Dashboard, Students, Courses)
+- **src/hooks/**: Custom React hooks for data fetching and logic
+- **src/store/**: Redux store configuration and slices (state management)
+- **src/api/**: API client and TanStack Query configuration (future FastAPI integration)
+- **src/types/**: TypeScript type definitions for entities and interfaces
+- **src/utils/**: Frontend utility functions, helpers, and mock data
+- **src/styles/**: Material-UI theme configuration and global styles
+
+### Frontend Features (✅ **Implemented**)
+- **Dashboard**: Metrics cards and data visualization with Recharts
+- **Students Management**: Advanced CRUD operations with professional table interface
+- **Courses Overview**: Card-based layout with enrollment progress indicators  
+- **Navigation System**: Top navigation bar with active state management
+- **Form Validation**: Real-time validation with TypeScript integration
+- **Responsive Design**: Professional UI/UX with Material-UI components
+- **Hot Reload Development**: Modern development environment with proper TypeScript configuration
+
+### Next: Configurable Sidebar System (🚧 **In Progress**)
+- **GitLab-style Sidebar**: Collapsible navigation with hierarchical menu structure
+- **Context-Aware Navigation**: Dynamic sidebar content based on selected course/context
+- **Permission-Based Menus**: Role-specific menu visibility (Admin/Lecturer/Student)
+- **Submenu Support**: Nested navigation with expandable sections
+- **State Management**: Persistent sidebar state and configuration
 
 ### Key Concepts
 1. **Hierarchical Organization**: Organizations → Course Families → Courses

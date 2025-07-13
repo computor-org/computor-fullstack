@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { 
   Box, 
@@ -9,18 +9,23 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  Button,
+  CircularProgress,
+  Divider,
 } from '@mui/material';
-import { Settings, AccountCircle } from '@mui/icons-material';
+import { Settings, Login, Logout } from '@mui/icons-material';
 import Dashboard from './pages/Dashboard';
 import StudentsPage from './pages/StudentsPage';
 import CoursesPage from './pages/CoursesPage';
 import Sidebar from './components/Sidebar';
+import LoginModal from './components/LoginModal';
 import { SidebarProvider, useSidebar } from './hooks/useSidebar';
-import { mockUser } from './utils/mockData';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 
-function TopBar() {
+function AuthenticatedTopBarMenu() {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const { switchContext, config } = useSidebar();
+  const { switchContext } = useSidebar();
+  const { state: authState, logout } = useAuth();
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -30,79 +35,146 @@ function TopBar() {
     setAnchorEl(null);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    handleClose();
+  };
+
   const switchToGlobal = () => {
-    switchContext({
-      type: 'global',
-      userPermissions: mockUser.permissions,
-    });
+    if (authState.user) {
+      switchContext({
+        type: 'global',
+        userPermissions: authState.user.permissions,
+      });
+    }
     handleClose();
   };
 
   const switchToCourse = () => {
-    switchContext({
-      type: 'course',
-      courseId: '1',
-      courseName: 'Introduction to Programming',
-      userPermissions: mockUser.permissions,
-    });
+    if (authState.user) {
+      switchContext({
+        type: 'course',
+        courseId: '1',
+        courseName: 'Introduction to Programming',
+        userPermissions: authState.user.permissions,
+      });
+    }
     handleClose();
   };
 
   const switchToAdmin = () => {
-    switchContext({
-      type: 'admin',
-      userPermissions: mockUser.permissions,
-    });
+    if (authState.user) {
+      switchContext({
+        type: 'admin',
+        userPermissions: authState.user.permissions,
+      });
+    }
     handleClose();
   };
 
+  if (!authState.user) return null;
+
   return (
-    <AppBar 
-      position="fixed" 
-      sx={{ 
-        zIndex: (theme) => theme.zIndex.drawer + 1,
-        backgroundColor: 'white',
-        color: 'text.primary',
-        boxShadow: 1,
-      }}
-    >
-      <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 600 }}>
-          Computor
-        </Typography>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <IconButton size="small" color="inherit">
-            <Settings />
-          </IconButton>
-          
-          <IconButton
-            size="large"
-            onClick={handleMenu}
-            color="inherit"
-          >
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-              {mockUser.name.charAt(0)}
-            </Avatar>
-          </IconButton>
-          
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={handleClose}
-          >
-            <MenuItem onClick={switchToGlobal}>Global View</MenuItem>
-            <MenuItem onClick={switchToCourse}>Course: Intro Programming</MenuItem>
-            <MenuItem onClick={switchToAdmin}>Administration</MenuItem>
-          </Menu>
-        </Box>
-      </Toolbar>
-    </AppBar>
+    <>
+      <IconButton size="small" color="inherit">
+        <Settings />
+      </IconButton>
+      
+      <IconButton
+        size="large"
+        onClick={handleMenu}
+        color="inherit"
+      >
+        <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+          {authState.user.givenName.charAt(0)}
+        </Avatar>
+      </IconButton>
+      
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleClose}
+      >
+        <MenuItem disabled>
+          <Box>
+            <Typography variant="subtitle2">
+              {authState.user.givenName} {authState.user.familyName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {authState.user.email}
+            </Typography>
+          </Box>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={switchToGlobal}>Global View</MenuItem>
+        <MenuItem onClick={switchToCourse}>Course: Intro Programming</MenuItem>
+        {authState.user.permissions.includes('admin_access') && (
+          <MenuItem onClick={switchToAdmin}>Administration</MenuItem>
+        )}
+        <Divider />
+        <MenuItem onClick={handleLogout}>
+          <Logout fontSize="small" sx={{ mr: 1 }} />
+          Sign Out
+        </MenuItem>
+      </Menu>
+    </>
   );
 }
 
-function AppContent() {
+function TopBar() {
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const { state: authState } = useAuth();
+
+  const handleLogin = () => {
+    setLoginModalOpen(true);
+  };
+
+  return (
+    <>
+      <AppBar 
+        position="fixed" 
+        sx={{ 
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          backgroundColor: 'white',
+          color: 'text.primary',
+          boxShadow: 1,
+        }}
+      >
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, color: 'primary.main', fontWeight: 600 }}>
+            Computor
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {authState.isLoading ? (
+              <CircularProgress size={24} />
+            ) : authState.isAuthenticated && authState.user ? (
+              <AuthenticatedTopBarMenu />
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={<Login />}
+                onClick={handleLogin}
+                size="small"
+              >
+                Sign In
+              </Button>
+            )}
+          </Box>
+        </Toolbar>
+      </AppBar>
+      
+      <LoginModal
+        open={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+      />
+    </>
+  );
+}
+
+function AuthenticatedAppContent() {
   const { config, updateConfig, currentNavigation, contextInfo } = useSidebar();
+  const { state: authState } = useAuth();
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -138,12 +210,70 @@ function AppContent() {
   );
 }
 
+function AppContent() {
+  const { state: authState } = useAuth();
+
+  if (authState.isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress size={40} />
+      </Box>
+    );
+  }
+
+  if (!authState.isAuthenticated) {
+    return (
+      <Box sx={{ minHeight: '100vh' }}>
+        <TopBar />
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: 'calc(100vh - 64px)',
+            p: 3,
+            textAlign: 'center',
+          }}
+        >
+          <Typography variant="h4" gutterBottom>
+            Welcome to Computor
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            University Programming Course Management Platform
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Please sign in to access your courses and materials.
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // User is authenticated, this will be handled by AuthenticatedSidebarProvider
+  return null;
+}
+
+function AuthenticatedSidebarProvider() {
+  const { state: authState } = useAuth();
+  
+  if (!authState.isAuthenticated || !authState.user) {
+    return <AppContent />;
+  }
+
+  return (
+    <SidebarProvider user={authState.user}>
+      <AuthenticatedAppContent />
+    </SidebarProvider>
+  );
+}
+
 function App() {
   return (
     <Router>
-      <SidebarProvider user={mockUser}>
-        <AppContent />
-      </SidebarProvider>
+      <AuthProvider>
+        <AuthenticatedSidebarProvider />
+      </AuthProvider>
     </Router>
   );
 }

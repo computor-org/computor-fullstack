@@ -127,7 +127,8 @@ export const chartData = [
 
 export const mockUser: User = {
   id: '1',
-  name: 'Dr. John Smith',
+  givenName: 'John',
+  familyName: 'Smith',
   email: 'john.smith@university.edu',
   role: 'lecturer',
   permissions: [

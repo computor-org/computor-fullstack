@@ -30,9 +30,11 @@ export type UserRole = 'student' | 'tutor' | 'lecturer' | 'admin' | 'owner';
 
 export interface User {
   id: string;
-  name: string;
   email: string;
+  givenName: string;
+  familyName: string;
   role: UserRole;
   permissions: string[];
   courses?: string[];
+  avatar?: string;
 }

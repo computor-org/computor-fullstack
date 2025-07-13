@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -14,7 +14,8 @@ class ProfileCreate(BaseModel):
     url: Optional[str] = Field(None, max_length=2048, description="User website URL")
     properties: Optional[dict] = Field(None, description="Additional profile properties")
     
-    @validator('nickname')
+    @field_validator('nickname')
+    @classmethod
     def validate_nickname(cls, v):
         if v is not None:
             v = v.strip()
@@ -25,13 +26,15 @@ class ProfileCreate(BaseModel):
                 raise ValueError('Nickname can only contain alphanumeric characters, underscores, and hyphens')
         return v
     
-    @validator('url', 'avatar_image')
+    @field_validator('url', 'avatar_image')
+    @classmethod
     def validate_urls(cls, v):
         if v and not (v.startswith('http://') or v.startswith('https://')):
             raise ValueError('URL must start with http:// or https://')
         return v
     
-    @validator('bio')
+    @field_validator('bio')
+    @classmethod
     def validate_bio(cls, v):
         if v is not None:
             v = v.strip()
@@ -91,7 +94,8 @@ class ProfileUpdate(BaseModel):
     url: Optional[str] = Field(None, max_length=2048, description="User website URL")
     properties: Optional[dict] = Field(None, description="Additional properties")
     
-    @validator('nickname')
+    @field_validator('nickname')
+    @classmethod
     def validate_nickname(cls, v):
         if v is not None:
             v = v.strip()
@@ -101,7 +105,8 @@ class ProfileUpdate(BaseModel):
                 raise ValueError('Nickname can only contain alphanumeric characters, underscores, and hyphens')
         return v
     
-    @validator('url', 'avatar_image')
+    @field_validator('url', 'avatar_image')
+    @classmethod
     def validate_urls(cls, v):
         if v and not (v.startswith('http://') or v.startswith('https://')):
             raise ValueError('URL must start with http:// or https://')

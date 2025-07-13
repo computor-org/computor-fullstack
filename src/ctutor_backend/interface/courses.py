@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_families import CourseFamilyGet
@@ -42,7 +42,8 @@ class CourseGet(BaseEntityGet,CourseCreate):
 
     course_family: Optional[CourseFamilyGet] = None
 
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
     
@@ -57,7 +58,8 @@ class CourseList(BaseModel):
     path: str
     properties: Optional[CoursePropertiesGet] = None
 
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 

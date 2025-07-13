@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -19,13 +19,15 @@ class AccountCreate(BaseModel):
     user_id: str = Field(description="Associated user ID")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
     
-    @validator('provider')
+    @field_validator('provider')
+    @classmethod
     def validate_provider(cls, v):
         if not v.strip():
             raise ValueError('Provider cannot be empty')
         return v.strip().lower()
     
-    @validator('provider_account_id')
+    @field_validator('provider_account_id')
+    @classmethod
     def validate_provider_account_id(cls, v):
         if not v.strip():
             raise ValueError('Provider account ID cannot be empty')
@@ -69,13 +71,15 @@ class AccountUpdate(BaseModel):
     provider_account_id: Optional[str] = Field(None, min_length=1, max_length=255, description="Account ID from the provider")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
     
-    @validator('provider')
+    @field_validator('provider')
+    @classmethod
     def validate_provider(cls, v):
         if v is not None and not v.strip():
             raise ValueError('Provider cannot be empty')
         return v.strip().lower() if v else v
     
-    @validator('provider_account_id')
+    @field_validator('provider_account_id')
+    @classmethod
     def validate_provider_account_id(cls, v):
         if v is not None and not v.strip():
             raise ValueError('Provider account ID cannot be empty')

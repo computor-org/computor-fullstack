@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, validator, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, field_validator, EmailStr
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from text_unidecode import unidecode
@@ -22,14 +22,16 @@ class UserCreate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
     
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def validate_username(cls, v):
         if v is not None:
             if not v.replace('_', '').replace('-', '').replace('.', '').isalnum():
                 raise ValueError('Username can only contain alphanumeric characters, underscores, hyphens, and dots')
         return v
     
-    @validator('given_name', 'family_name')
+    @field_validator('given_name', 'family_name')
+    @classmethod
     def validate_names(cls, v):
         if v is not None and not v.strip():
             raise ValueError('Name cannot be empty or only whitespace')
@@ -98,14 +100,16 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
     
-    @validator('username')
+    @field_validator('username')
+    @classmethod
     def validate_username(cls, v):
         if v is not None:
             if not v.replace('_', '').replace('-', '').replace('.', '').isalnum():
                 raise ValueError('Username can only contain alphanumeric characters, underscores, hyphens, and dots')
         return v
     
-    @validator('given_name', 'family_name')
+    @field_validator('given_name', 'family_name')
+    @classmethod
     def validate_names(cls, v):
         if v is not None and not v.strip():
             raise ValueError('Name cannot be empty or only whitespace')

@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Literal, Optional
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
@@ -51,7 +51,8 @@ class CourseContentStudentGet(BaseEntityGet):
     result_count: int
     max_test_runs: Optional[int] = None
 
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 
@@ -79,7 +80,8 @@ class CourseContentStudentList(BaseModel):
 
     submission:  Optional[SubmissionGroupStudentList] = None
     
-    @validator('path', pre=True)
+    @field_validator('path', mode='before')
+    @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
 

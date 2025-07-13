@@ -4,7 +4,7 @@ from enum import Enum
 from pydantic_yaml import to_yaml_str
 from typing import Any, List, Optional
 from ctutor_backend.interface.users import UserGet
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class DeploymentFactory:
 
@@ -389,7 +389,8 @@ class CodeAbilityMetaProperty(CodeAbilityBase):
   maxSubmissions: Optional[int] = None
   maxGroupSize: Optional[int] = None
 
-  @validator('maxTestRuns','maxSubmissions','maxGroupSize','executionBackend', pre=True)
+  @field_validator('maxTestRuns', 'maxSubmissions', 'maxGroupSize', 'executionBackend', mode='before')
+  @classmethod
   def empty_list_to_none(cls, value):
       if isinstance(value, list) and len(value) == 0:
           return None
@@ -415,7 +416,8 @@ class CodeAbilityReleaseMeta(CodeAbilityBase):
   keywords: Optional[List[str]] = Field(default=[])
   properties: Optional[CodeAbilityMetaProperty] = Field(default=CodeAbilityMetaProperty())
 
-  @validator('description', pre=True)
+  @field_validator('description', mode='before')
+  @classmethod
   def empty_list_to_none(cls, value):
       if isinstance(value, list) and len(value) == 0:
           return None

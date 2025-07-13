@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -16,7 +16,8 @@ class GroupCreate(BaseModel):
     group_type: GroupType = Field(description="Type of group (fixed or dynamic)")
     properties: Optional[dict] = Field(None, description="Additional group properties")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if not v.strip():
             raise ValueError('Group name cannot be empty or only whitespace')
@@ -70,7 +71,8 @@ class GroupUpdate(BaseModel):
     group_type: Optional[GroupType] = Field(None, description="Type of group")
     properties: Optional[dict] = Field(None, description="Additional properties")
     
-    @validator('name')
+    @field_validator('name')
+    @classmethod
     def validate_name(cls, v):
         if v is not None and not v.strip():
             raise ValueError('Group name cannot be empty or only whitespace')

@@ -50,7 +50,7 @@ class CourseMemberList(BaseModel):
 
 class CourseMemberUpdate(BaseModel):
     properties: Optional[CourseMemberProperties] = None
-    course_group_id: Optional[str | None] = None # not done
+    course_group_id: Optional[str] = None
     course_role_id: Optional[str] = None
     
 class CourseMemberQuery(ListQuery):

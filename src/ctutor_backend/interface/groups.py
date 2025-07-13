@@ -31,17 +31,11 @@ class GroupGet(BaseEntityGet):
     description: Optional[str] = Field(None, description="Group description")
     group_type: GroupType = Field(description="Type of group")
     properties: Optional[dict] = Field(None, description="Additional properties")
-    archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     
     @property
     def display_name(self) -> str:
         """Get display name for the group"""
         return self.name
-    
-    @property
-    def is_archived(self) -> bool:
-        """Check if the group is archived"""
-        return self.archived_at is not None
     
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
@@ -50,17 +44,11 @@ class GroupList(BaseEntityList):
     name: str = Field(description="Group name")
     description: Optional[str] = Field(None, description="Group description")
     group_type: GroupType = Field(description="Type of group")
-    archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     
     @property
     def display_name(self) -> str:
         """Get display name for lists"""
         return self.name
-    
-    @property
-    def is_archived(self) -> bool:
-        """Check if the group is archived"""
-        return self.archived_at is not None
     
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
@@ -94,11 +82,6 @@ def group_search(db: Session, query, params: Optional[GroupQuery]):
         query = query.filter(Group.name.ilike(f"%{params.name}%"))
     if params.group_type is not None:
         query = query.filter(Group.group_type == params.group_type)
-    
-    if params.archived is not None and params.archived:
-        query = query.filter(Group.archived_at.is_not(None))
-    else:
-        query = query.filter(Group.archived_at.is_(None))
     
     return query
 

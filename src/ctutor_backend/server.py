@@ -47,6 +47,7 @@ from ctutor_backend.api.user_roles import user_roles_router
 from ctutor_backend.api.role_claims import role_claim_router
 from ctutor_backend.api.user import user_router
 from ctutor_backend.api.info import info_router
+from ctutor_backend.api.tasks import tasks_router
 
 async def init_execution_backend_api(db: Session):
 
@@ -242,6 +243,12 @@ app.include_router(
     info_router,
     prefix="/info",
     tags=["info"]
+)
+
+app.include_router(
+    tasks_router,
+    tags=["tasks"],
+    dependencies=[Depends(get_current_permissions)]
 )
 
 @app.head("/", status_code=204)

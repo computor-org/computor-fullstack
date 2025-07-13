@@ -1,7 +1,7 @@
 from typing import Optional
 import pandas as pd
 from pydantic import BaseModel, EmailStr, Field
-from unidecode import unidecode
+from text_unidecode import unidecode
 
 # pip install odfpy
 

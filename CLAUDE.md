@@ -38,11 +38,20 @@ alembic upgrade head        # Apply all pending migrations
 # Build and install CLI
 pip install -e src
 
-# Task Workers (requires Redis)
-ctutor worker start              # Start task worker (all queues)
+# Celery Task Workers (requires Redis)
+ctutor worker start              # Start Celery worker (all queues)
 ctutor worker start --burst      # Process jobs and exit
 ctutor worker start --queues=high_priority,default  # Specific queues
 ctutor worker status             # Check worker and queue status
+
+# Direct Celery commands
+python -m celery -A ctutor_backend.tasks.celery_app worker --loglevel=info
+python -m celery -A ctutor_backend.tasks.celery_app flower  # Start Flower UI
+
+# Docker Celery testing and monitoring
+./test_celery_docker.sh start   # Start Docker services including Flower
+./test_celery_docker.sh ui      # Show Flower UI access information
+./test_celery_docker.sh all     # Full test cycle with Docker
 ```
 
 ### Frontend
@@ -127,28 +136,33 @@ cd frontend && npm install   # Install dependencies
   - Hierarchical paths using PostgreSQL ltree extension
   - UUID primary keys with proper relationships
 
-### ✅ Task Executor Framework (Completed)
-Comprehensive Redis Queue (RQ) based system for handling long-running operations:
-- **Priority Queues**: High, default, and low priority task processing
-- **Horizontal Scaling**: Multiple worker instances with Docker Compose
-- **FastAPI Integration**: RESTful endpoints for task submission and monitoring
-- **CLI Tools**: Worker management commands (`ctutor worker start/status`)
-- **Examples**: Ready-to-use task implementations and testing framework
-- **Documentation**: Complete setup guide at `/docs/TASK_EXECUTOR.md`
-- **Benefits**: Eliminates request timeouts, provides immediate feedback, enables scaling
+### ✅ Celery Task Executor Framework (Completed)
+Comprehensive Celery-based system for handling long-running operations:
+- **Priority Queues**: High, default, and low priority task processing with Celery
+- **Horizontal Scaling**: Multiple Celery worker instances with Docker Compose
+- **FastAPI Integration**: RESTful endpoints for task submission, monitoring, and worker status
+- **CLI Tools**: Worker management commands (`ctutor worker start/status`) with Celery backend
+- **Flower UI**: Web-based monitoring and diagnostics interface for real-time task monitoring
+- **Docker Integration**: Complete Docker Compose setup with Redis broker and Celery workers
+- **Comprehensive Testing**: 29 tests including unit tests and Docker integration tests
+- **Examples**: Ready-to-use Celery task implementations with async execution support
+- **Benefits**: Production-ready task queue, real-time monitoring, eliminates request timeouts
 
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
 - `/docs/TASK_EXECUTOR.md`: Task executor framework guide
 - `/docs/DOCKER_TASK_WORKERS.md`: Docker task worker configuration
-- `/docker-compose-dev.yaml`: Development environment with task workers
-- `/docker-compose-prod.yaml`: Production environment with scaling
-- `/src/ctutor_backend/tasks/`: Task executor framework implementation
+- `/docker-compose-dev.yaml`: Development environment with Celery workers and Flower UI
+- `/docker-compose-prod.yaml`: Production environment with Celery scaling
+- `/src/ctutor_backend/tasks/`: Celery task executor framework implementation
+- `/src/ctutor_backend/tasks/celery_app.py`: Celery application configuration and setup
+- `/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
+- `/.env.flower.example`: Example Flower UI configuration
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration
-- `/src/ctutor_backend/tests/`: Test files for comprehensive testing
+- `/src/ctutor_backend/tests/`: Test files for comprehensive testing (including Docker integration)
 - `/src/ctutor_backend/scripts/`: Development and maintenance scripts
 
 ## Development Principles
@@ -224,6 +238,16 @@ git push
 ```
 
 ## Recent Enhancements
+
+### ✅ Task Queue Migration: RQ → Celery (Completed)
+Successfully migrated the task execution framework from Redis Queue (RQ) to Celery:
+- **Enhanced Scalability**: Celery provides better horizontal scaling and worker management
+- **Production Ready**: More robust task queue system with better error handling and retries
+- **Monitoring & Diagnostics**: Integrated Flower UI for real-time task and worker monitoring
+- **Docker Integration**: Complete Docker Compose setup with Celery workers and Flower
+- **Comprehensive Testing**: 29 tests including unit tests and Docker integration tests
+- **Backwards Compatibility**: Maintained existing CLI and API interfaces
+- **Key Benefits**: Better reliability, monitoring, scaling, and production deployment support
 
 ### ✅ Database Refactoring (Completed)
 Successfully migrated from PostgreSQL migration files to pure SQLAlchemy/Alembic approach:

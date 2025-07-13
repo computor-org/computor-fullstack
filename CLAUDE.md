@@ -123,6 +123,9 @@ def calculate_student_final_grade(assignments: List[Assignment], exam_score: flo
 - **Backend Tests** (in `/src/ctutor_backend/tests/`):
   - Model tests: `test_models.py` - SQLAlchemy model imports and relationships
   - API tests: `test_api.py` - API module imports and basic functionality
+  - API endpoint tests: `test_api_endpoints.py` - Comprehensive API endpoint testing with authentication and caching
+  - DTO validation tests: `test_dto_validation.py`, `test_dto_properties.py`, `test_dto_edge_cases.py` - Pydantic validation testing
+  - Redis caching tests: `test_redis_caching.py` - Cache functionality and performance testing
   - Color validation tests: `test_color_validation.py` - Color system validation
   - Pytest configuration: `conftest.py` - Test fixtures and database setup
 - **Frontend**: Jest/React Testing Library
@@ -180,6 +183,18 @@ Upgraded color handling from rigid ENUMs to flexible validation:
   color = "tomato"               # Named color
   color = "emerald"              # Tailwind color
   ```
+
+### ✅ API DTO Refactoring (Completed)
+Complete Pydantic v1 to v2 migration with enhanced API infrastructure:
+- **Pydantic Migration**: All `@validator` patterns migrated to `@field_validator` with proper decorators
+- **Enhanced Validation**: Added `model_validator` for cross-field validation and comprehensive error handling
+- **BaseEntityList Architecture**: Clean inheritance hierarchy for consistent datetime handling across all DTOs
+- **Redis Caching System**: Full implementation with appropriate TTL values (60s-600s) and proper JSON serialization
+- **API Testing Suite**: Comprehensive endpoint testing with 14 test cases covering authentication, caching, and validation
+- **Missing Routes Fixed**: Added groups, profiles, sessions endpoints that were missing from API registration
+- **Datetime Serialization**: Fixed JSON serialization issues for proper API responses
+- **Interface Coverage**: All core entities (Users, Accounts, Organizations, Roles) and course-dependent entities refactored
+- **Current State**: All 148 tests passing, all API endpoints functional, Redis caching operational
 
 ## Notes
 - The web UI is in early development stages

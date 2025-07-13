@@ -59,7 +59,7 @@ cd frontend && npm install   # Install dependencies
 ### Backend Structure (`/src/ctutor_backend/`)
 - **api/**: FastAPI endpoints organized by resource (courses, users, submissions, etc.)
 - **model/**: SQLAlchemy ORM models for database entities (single source of truth)
-- **interface/**: Pydantic schemas for API request/response validation
+- **interface/**: Pydantic schemas for API request/response validation (DTOs with EntityInterface pattern)
 - **flows/**: Prefect workflow definitions for async operations
 - **generator/**: Code generation utilities for student repositories
 - **cli/**: Command-line interface tools

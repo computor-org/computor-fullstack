@@ -121,20 +121,26 @@ def calculate_student_final_grade(assignments: List[Assignment], exam_score: flo
 
 ## Testing
 - **Backend Tests** (in `/src/ctutor_backend/tests/`):
-  - API tests in `/src/ctutor_backend/api/tests.py`
-  - Model integration tests: `tests/test_model_integration.py`
-  - API endpoint tests: `tests/test_api_endpoints.py`
-  - Color validation tests: `tests/test_color_refactoring.py`
-  - Migration tests: `tests/test_migration_and_seeder.py`
+  - Model tests: `test_models.py` - SQLAlchemy model imports and relationships
+  - API tests: `test_api.py` - API module imports and basic functionality
+  - Color validation tests: `test_color_validation.py` - Color system validation
+  - Pytest configuration: `conftest.py` - Test fixtures and database setup
 - **Frontend**: Jest/React Testing Library
+- **Test Runner**: `bash test.sh` - Comprehensive test runner with options
 - **Test Commands**:
   ```bash
-  # Run from /src/ctutor_backend/ directory
-  python tests/test_model_integration.py     # SQLAlchemy model tests
-  python tests/test_api_endpoints.py         # API integration tests
-  python tests/test_color_refactoring.py     # Color validation tests
-  python tests/test_migration_and_seeder.py  # Migration tests
-  pytest                                      # Run all pytest tests
+  # From project root
+  bash test.sh                 # Run all tests
+  bash test.sh --unit          # Run only unit tests
+  bash test.sh --integration   # Run only integration tests
+  bash test.sh --file test_models  # Run specific test file
+  bash test.sh -v              # Run with verbose output
+  
+  # From src directory (if pytest installed)
+  pytest                       # Run all tests
+  pytest -m unit              # Run unit tests only
+  pytest -m integration       # Run integration tests only
+  pytest -k "color"           # Run tests matching "color"
   ```
 
 ## Plugins

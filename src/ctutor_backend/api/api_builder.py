@@ -81,7 +81,7 @@ class CrudRouter:
             
             # Cache the result
             cache_data = {
-                "items": [item.model_dump() for item in list_result],
+                "items": [item.model_dump(mode='json') for item in list_result],
                 "total": total
             }
             await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)

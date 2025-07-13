@@ -1,35 +1,87 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.model.auth import Account
+from enum import Enum
+
+class AccountType(str, Enum):
+    oauth = "oauth"
+    saml = "saml"
+    ldap = "ldap"
+    local = "local"
+    token = "token"
 
 class AccountCreate(BaseModel):
-    provider: str
-    type: str
-    provider_account_id: str
-    user_id: str
-    properties: Optional[dict] = None
+    provider: str = Field(min_length=1, max_length=255, description="Authentication provider name")
+    type: AccountType = Field(description="Type of authentication account")
+    provider_account_id: str = Field(min_length=1, max_length=255, description="Account ID from the provider")
+    user_id: str = Field(description="Associated user ID")
+    properties: Optional[dict] = Field(None, description="Provider-specific properties")
     
-class AccountGet(BaseEntityGet,AccountCreate):
-    id: str
-
-    model_config = ConfigDict(from_attributes=True)
+    @validator('provider')
+    def validate_provider(cls, v):
+        if not v.strip():
+            raise ValueError('Provider cannot be empty')
+        return v.strip().lower()
+    
+    @validator('provider_account_id')
+    def validate_provider_account_id(cls, v):
+        if not v.strip():
+            raise ValueError('Provider account ID cannot be empty')
+        return v.strip()
+    
+    model_config = ConfigDict(use_enum_values=True)
+    
+class AccountGet(BaseEntityGet):
+    id: str = Field(description="Account unique identifier")
+    provider: str = Field(description="Authentication provider name")
+    type: AccountType = Field(description="Type of authentication account")
+    provider_account_id: str = Field(description="Account ID from the provider")
+    user_id: str = Field(description="Associated user ID")
+    properties: Optional[dict] = Field(None, description="Provider-specific properties")
+    
+    @property
+    def display_name(self) -> str:
+        """Get display name for the account"""
+        return f"{self.provider} ({self.type}): {self.provider_account_id}"
+    
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 class AccountList(BaseModel):
-    id: str
-    provider: str
-    type: str
-    provider_account_id: str
-    user_id: str
-
-    model_config = ConfigDict(from_attributes=True)
+    id: str = Field(description="Account unique identifier")
+    provider: str = Field(description="Authentication provider name")
+    type: AccountType = Field(description="Type of authentication account")
+    provider_account_id: str = Field(description="Account ID from the provider")
+    user_id: str = Field(description="Associated user ID")
+    created_at: Optional[str] = Field(None, description="Creation timestamp")
+    
+    @property
+    def display_name(self) -> str:
+        """Get display name for lists"""
+        return f"{self.provider} ({self.type})"
+    
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
 class AccountUpdate(BaseModel):
-    provider: Optional[str] = None
-    type: Optional[str] = None
-    provider_account_id: Optional[str] = None
-    properties: Optional[dict] = None
+    provider: Optional[str] = Field(None, min_length=1, max_length=255, description="Authentication provider name")
+    type: Optional[AccountType] = Field(None, description="Type of authentication account")
+    provider_account_id: Optional[str] = Field(None, min_length=1, max_length=255, description="Account ID from the provider")
+    properties: Optional[dict] = Field(None, description="Provider-specific properties")
+    
+    @validator('provider')
+    def validate_provider(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('Provider cannot be empty')
+        return v.strip().lower() if v else v
+    
+    @validator('provider_account_id')
+    def validate_provider_account_id(cls, v):
+        if v is not None and not v.strip():
+            raise ValueError('Provider account ID cannot be empty')
+        return v.strip() if v else v
+    
+    model_config = ConfigDict(use_enum_values=True)
 
 class AccountQuery(ListQuery):
     id: Optional[str] = None
@@ -62,3 +114,4 @@ class AccountInterface(EntityInterface):
     search = account_search
     endpoint = "accounts"
     model = Account
+    cache_ttl = 180  # 3 minutes cache for account data

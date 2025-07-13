@@ -4,7 +4,7 @@ import shutil
 from typing import Any, Tuple
 from gitlab import Gitlab
 from gitlab.v4.objects import Project, Group
-from unidecode import unidecode
+from text_unidecode import unidecode
 from pydantic_yaml import to_yaml_str
 from ctutor_backend.api.system import CourseReleaseUpdate
 from ctutor_backend.api.utils import directory_path_to_db_path_and_parent_path, directory_path_to_position

@@ -3,7 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from sqlalchemy.orm import Session
-import unidecode
+from text_unidecode import unidecode
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.student_profile import StudentProfileGet
 from ctutor_backend.model.auth import User
@@ -102,7 +102,7 @@ class UserInterface(EntityInterface):
 
 
 def replace_special_chars(name: str) -> str:
-    return unidecode.unidecode(name.lower().replace("ö","oe").replace("ä","ae").replace("ü","ue").encode().decode("utf8"))
+    return unidecode(name.lower().replace("ö","oe").replace("ä","ae").replace("ü","ue").encode().decode("utf8"))
 
 def gitlab_project_path(user: UserGet | UserList):
     first_name = replace_special_chars(user.given_name).replace(" ", "_")

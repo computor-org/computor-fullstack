@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.model.role import UserRole
@@ -12,9 +12,13 @@ class UserRoleGet(BaseEntityGet):
     user_id: str
     role_id: str
     
+    model_config = ConfigDict(from_attributes=True)
+    
 class UserRoleList(BaseModel):
     user_id: str
     role_id: str
+    
+    model_config = ConfigDict(from_attributes=True)
     
 class UserRoleUpdate(BaseModel):
     role_id: str

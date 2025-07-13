@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.model.course import CourseExecutionBackend
@@ -14,9 +14,13 @@ class CourseExecutionBackendGet(BaseEntityGet):
     course_id: str
     properties: Optional[dict] = None
     
+    model_config = ConfigDict(from_attributes=True)
+    
 class CourseExecutionBackendList(BaseModel):
     execution_backend_id: str
     course_id: str
+    
+    model_config = ConfigDict(from_attributes=True)
     
 class CourseExecutionBackendUpdate(BaseModel):
     properties: Optional[dict] = None

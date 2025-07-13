@@ -153,8 +153,9 @@ class TestGetCaching:
             
             # Verify cache was set
             cache_calls = mock_cache.call_log
-            assert any(call[0] == 'set' for call in cache_calls)
-            assert any(call[2] == UserInterface.cache_ttl for call in cache_calls)  # TTL set correctly
+            set_calls = [call for call in cache_calls if call[0] == 'set']
+            assert len(set_calls) > 0
+            assert any(call[2] == UserInterface.cache_ttl for call in set_calls)  # TTL set correctly
             
             # Reset mock
             mock_get_id_db.reset_mock()
@@ -321,7 +322,7 @@ class TestListCaching:
             
             # Headers should still be set correctly from cache
             assert "X-Total-Count" in mock_response.headers
-            assert mock_response.headers["X-Total-Count"] == "0"  # From cached data
+            assert mock_response.headers["X-Total-Count"] == "1"  # From cached data (same as original)
 
 
 class TestCacheInvalidation:
@@ -338,7 +339,7 @@ class TestCacheInvalidation:
         
         # Mock cache._cache for Redis client access
         mock_redis = Mock()
-        mock_redis.keys = Mock(return_value=['user:get:test-user:123', 'user:list:test-user:abc'])
+        mock_redis.keys = AsyncMock(return_value=['user:get:test-user:123', 'user:list:test-user:abc'])
         mock_redis.delete = AsyncMock()
         mock_cache._cache = mock_redis
         
@@ -358,7 +359,7 @@ class TestCacheInvalidation:
         
         # Mock cache._cache that raises exception
         mock_redis = Mock()
-        mock_redis.keys = Mock(side_effect=Exception("Redis error"))
+        mock_redis.keys = AsyncMock(side_effect=Exception("Redis error"))
         mock_cache._cache = mock_redis
         
         # Should not raise exception

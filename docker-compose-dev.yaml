@@ -77,6 +77,108 @@ services:
     - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
     depends_on:
       - traefik
+  # FastAPI Backend Service (Development)
+  uvicorn:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command: ["uvicorn", "ctutor_backend.server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./src:/home/uvicorn/src
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_LOCAL_STORAGE_DIR}
+    ports:
+      - 8000:8000
+    environment:
+      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
+      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
+      PREFECT_API_URL: http://prefect:4200/api
+      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5437
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DEBUG_MODE: development
+      TOKEN_SECRET: ${TOKEN_SECRET}
+    depends_on:
+      - postgres
+      - redis
+      - prefect
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.uvicorn.entrypoints=web"
+      - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
+
+  # Task Worker Service - High Priority Queue
+  task-worker-high:
+    build:
+      context: ./
+      dockerfile: ./docker/task-worker/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./src:/home/taskworker/src
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_LOCAL_STORAGE_DIR}
+    environment:
+      TASK_QUEUES: high_priority
+      EXECUTION_BACKEND_API_URL: http://uvicorn:8000
+      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
+      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
+      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5437
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DEBUG_MODE: development
+      TOKEN_SECRET: ${TOKEN_SECRET}
+    depends_on:
+      - postgres
+      - redis
+      - uvicorn
+    labels:
+      - traefik.enable=false
+
+  # Task Worker Service - Default Priority Queue
+  task-worker-default:
+    build:
+      context: ./
+      dockerfile: ./docker/task-worker/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./src:/home/taskworker/src
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_LOCAL_STORAGE_DIR}
+    environment:
+      TASK_QUEUES: default,low_priority
+      EXECUTION_BACKEND_API_URL: http://uvicorn:8000
+      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
+      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
+      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5437
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      DEBUG_MODE: development
+      TOKEN_SECRET: ${TOKEN_SECRET}
+    depends_on:
+      - postgres
+      - redis
+      - uvicorn
+    labels:
+      - traefik.enable=false
+
   # backup:
   #   build:
   #     context: ./

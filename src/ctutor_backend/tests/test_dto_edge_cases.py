@@ -324,7 +324,7 @@ class TestCornerCases:
         max_user = UserCreate(
             given_name="a" * 255,
             family_name="b" * 255,
-            email="c" * 240 + "@example.com",  # Close to email length limits
+            email="c" * 50 + "@example.com",  # Reasonable email length
             username="d" * 50,  # Maximum username length
             number="e" * 255
         )

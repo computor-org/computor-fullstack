@@ -29,8 +29,12 @@ class ProfileCreate(BaseModel):
     @field_validator('url', 'avatar_image')
     @classmethod
     def validate_urls(cls, v):
-        if v and not (v.startswith('http://') or v.startswith('https://')):
-            raise ValueError('URL must start with http:// or https://')
+        if v:
+            if not (v.startswith('http://') or v.startswith('https://')):
+                raise ValueError('URL must start with http:// or https://')
+            # Check for incomplete URLs
+            if v == 'http://' or v == 'https://':
+                raise ValueError('URL must include a domain after the protocol')
         return v
     
     @field_validator('bio')
@@ -108,8 +112,12 @@ class ProfileUpdate(BaseModel):
     @field_validator('url', 'avatar_image')
     @classmethod
     def validate_urls(cls, v):
-        if v and not (v.startswith('http://') or v.startswith('https://')):
-            raise ValueError('URL must start with http:// or https://')
+        if v:
+            if not (v.startswith('http://') or v.startswith('https://')):
+                raise ValueError('URL must start with http:// or https://')
+            # Check for incomplete URLs
+            if v == 'http://' or v == 'https://':
+                raise ValueError('URL must include a domain after the protocol')
         return v
 
 class ProfileQuery(ListQuery):

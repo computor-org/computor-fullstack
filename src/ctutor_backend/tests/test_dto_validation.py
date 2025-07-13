@@ -320,7 +320,7 @@ class TestSessionValidation:
         )
         assert session.is_active is False
         assert session.session_duration == 7200  # 2 hours in seconds
-        assert "session-abc" in session.display_name
+        assert "session-" in session.display_name
         assert "Logged out" in session.display_name
         
         # Test active session

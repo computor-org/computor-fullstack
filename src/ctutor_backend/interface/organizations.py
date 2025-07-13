@@ -1,5 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, field_validator, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator, Field, EmailStr
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
@@ -55,27 +55,26 @@ class OrganizationCreate(BaseModel):
             raise ValueError('Path must be valid ltree format (alphanumeric, underscores, hyphens, dots)')
         return v
     
-    @field_validator('title')
+    @model_validator(mode='after')
     @classmethod
-    def validate_title_for_type(cls, v, info):
-        if info.data and 'organization_type' in info.data:
-            org_type = info.data['organization_type']
-            if org_type == OrganizationType.user and v is not None:
-                raise ValueError('User organizations cannot have a title')
-            elif org_type != OrganizationType.user and not v:
-                raise ValueError('Non-user organizations must have a title')
-        return v
-    
-    @field_validator('user_id')
-    @classmethod
-    def validate_user_id_for_type(cls, v, info):
-        if info.data and 'organization_type' in info.data:
-            org_type = info.data['organization_type']
-            if org_type == OrganizationType.user and not v:
-                raise ValueError('User organizations must have a user_id')
-            elif org_type != OrganizationType.user and v is not None:
-                raise ValueError('Non-user organizations cannot have a user_id')
-        return v
+    def validate_organization_constraints(cls, values):
+        org_type = values.organization_type
+        title = values.title
+        user_id = values.user_id
+        
+        # Title validation
+        if org_type == OrganizationType.user and title is not None:
+            raise ValueError('User organizations cannot have a title')
+        elif org_type != OrganizationType.user and not title:
+            raise ValueError('Non-user organizations must have a title')
+            
+        # User ID validation
+        if org_type == OrganizationType.user and not user_id:
+            raise ValueError('User organizations must have a user_id')
+        elif org_type != OrganizationType.user and user_id is not None:
+            raise ValueError('Non-user organizations cannot have a user_id')
+            
+        return values
     
     @field_validator('url')
     @classmethod

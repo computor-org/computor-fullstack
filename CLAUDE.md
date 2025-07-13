@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Computor is a full-stack university programming course management platform with:
-- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Prefect for workflow orchestration
+- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Redis Queue (RQ) for task execution
 - **Frontend**: React 19 + TypeScript with Material-UI, TanStack Table, Recharts, and modern tooling
-- **Infrastructure**: Docker-based deployment with Traefik/Nginx
+- **Infrastructure**: Docker-based deployment with Traefik/Nginx and horizontal task worker scaling
 - **Database**: Pure SQLAlchemy/Alembic approach with comprehensive model validation
 
 ## Development Commands
@@ -24,6 +24,10 @@ bash startup.sh             # All Docker services (dev/prod)
 bash api.sh                 # FastAPI only
 bash system_agent.sh        # System agent
 
+# Docker services (includes task workers)
+docker-compose -f docker-compose-dev.yaml up -d     # Development with workers
+docker-compose -f docker-compose-prod.yaml up -d    # Production with scaling
+
 # Database operations
 bash migrations.sh          # Alembic migrations
 bash initialize_system.sh   # Initialize system data (roles, admin user)
@@ -33,6 +37,12 @@ alembic upgrade head        # Apply all pending migrations
 
 # Build and install CLI
 pip install -e src
+
+# Task Workers (requires Redis)
+ctutor worker start              # Start task worker (all queues)
+ctutor worker start --burst      # Process jobs and exit
+ctutor worker start --queues=high_priority,default  # Specific queues
+ctutor worker status             # Check worker and queue status
 ```
 
 ### Frontend
@@ -117,10 +127,24 @@ cd frontend && npm install   # Install dependencies
   - Hierarchical paths using PostgreSQL ltree extension
   - UUID primary keys with proper relationships
 
+### ✅ Task Executor Framework (Completed)
+Comprehensive Redis Queue (RQ) based system for handling long-running operations:
+- **Priority Queues**: High, default, and low priority task processing
+- **Horizontal Scaling**: Multiple worker instances with Docker Compose
+- **FastAPI Integration**: RESTful endpoints for task submission and monitoring
+- **CLI Tools**: Worker management commands (`ctutor worker start/status`)
+- **Examples**: Ready-to-use task implementations and testing framework
+- **Documentation**: Complete setup guide at `/docs/TASK_EXECUTOR.md`
+- **Benefits**: Eliminates request timeouts, provides immediate feedback, enables scaling
+
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
-- `/docker/docker-compose.dev.yml`: Development environment setup
+- `/docs/TASK_EXECUTOR.md`: Task executor framework guide
+- `/docs/DOCKER_TASK_WORKERS.md`: Docker task worker configuration
+- `/docker-compose-dev.yaml`: Development environment with task workers
+- `/docker-compose-prod.yaml`: Production environment with scaling
+- `/src/ctutor_backend/tasks/`: Task executor framework implementation
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration

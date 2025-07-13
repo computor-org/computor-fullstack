@@ -184,3 +184,4 @@ class ResultInterface(EntityInterface):
     search = result_search
     endpoint = "results"
     model = Result
+    cache_ttl = 60  # 1 minute - results change frequently as students submit work

@@ -22,16 +22,16 @@ class CourseFamilyPropertiesGet(BaseModel):
     )
 
 class CourseFamilyCreate(BaseModel):
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     path: str
     organization_id: str
     properties: Optional[CourseFamilyProperties] = None
 
 class CourseFamilyGet(BaseEntityGet):
     id: str
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     path: str
     organization_id: str
     properties: Optional[CourseFamilyPropertiesGet] = None
@@ -45,9 +45,9 @@ class CourseFamilyGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
-class CourseFamiliyList(BaseModel):
+class CourseFamilyList(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     organization_id: str
     path: str
 
@@ -59,19 +59,19 @@ class CourseFamiliyList(BaseModel):
         return str(value)
     
 class CourseFamilyUpdate(BaseModel):
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
-    path: Optional[str | None] = None
-    organization_id: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    path: Optional[str] = None
+    organization_id: Optional[str] = None
     properties: Optional[CourseFamilyProperties] = None
 
 
 class CourseFamilyQuery(ListQuery):
-    id: Optional[str | None] = None
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
-    path: Optional[str | None] = None
-    organization_id: Optional[str | None] = None
+    id: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    path: Optional[str] = None
+    organization_id: Optional[str] = None
     properties: Optional[str] = None
     
 def course_family_search(db: Session, query, params: Optional[CourseFamilyQuery]):
@@ -93,7 +93,7 @@ def course_family_search(db: Session, query, params: Optional[CourseFamilyQuery]
 class CourseFamilyInterface(EntityInterface):
     create = CourseFamilyCreate
     get = CourseFamilyGet
-    list = CourseFamiliyList
+    list = CourseFamilyList
     update = CourseFamilyUpdate
     query = CourseFamilyQuery
     search = course_family_search

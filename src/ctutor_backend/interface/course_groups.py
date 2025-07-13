@@ -5,8 +5,8 @@ from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQu
 from ctutor_backend.model.course import CourseGroup
 
 class CourseGroupCreate(BaseModel):
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     course_id: str
     properties: Optional[dict] = None
 
@@ -16,20 +16,20 @@ class CourseGroupGet(BaseEntityGet,CourseGroupCreate):
     model_config = ConfigDict(from_attributes=True)
 class CourseGroupList(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_id: str
 
     model_config = ConfigDict(from_attributes=True)
     
 class CourseGroupUpdate(BaseModel):
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
-    course_id: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    course_id: Optional[str] = None
     properties: Optional[dict] = None
 
 class CourseGroupQuery(ListQuery):
     id: Optional[str] = None
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_id: Optional[str] = None
     properties: Optional[str] = None
     

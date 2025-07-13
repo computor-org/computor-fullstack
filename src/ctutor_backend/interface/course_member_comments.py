@@ -57,3 +57,4 @@ class CourseMemberCommentInterface(EntityInterface):
     search = course_member_comment_search
     endpoint = "course-member-comments"
     model = CourseMemberComment
+    cache_ttl = 120  # 2 minutes - comments change moderately frequently

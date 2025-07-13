@@ -30,7 +30,7 @@ class SubmissionGroupMemberGet(BaseEntityGet):
 
     model_config = ConfigDict(from_attributes=True)
 
-class SubmissionGroupMemberList(ListQuery):
+class SubmissionGroupMemberList(BaseModel):
     id: str
     course_id: str
     course_content_id: str
@@ -72,6 +72,8 @@ def submission_group_member_search(db: Session, query, params: Optional[Submissi
         query = query.filter(CourseSubmissionGroupMember.grading == params.grading)
     if params.status != None:
         query = query.filter(CourseSubmissionGroupMember.status == params.status)
+    
+    return query
 
 class SubmissionGroupMemberInterface(EntityInterface):
     create = SubmissionGroupMemberCreate
@@ -82,3 +84,4 @@ class SubmissionGroupMemberInterface(EntityInterface):
     search = submission_group_member_search
     endpoint = "submission-group-members"
     model = CourseSubmissionGroupMember
+    cache_ttl = 120  # 2 minutes - submission data changes moderately frequently

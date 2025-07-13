@@ -76,3 +76,4 @@ class SubmissionGroupInterface(EntityInterface):
     search = submission_group_search
     endpoint = "submission-groups"
     model = CourseSubmissionGroup
+    cache_ttl = 120  # 2 minutes - submission groups change moderately frequently

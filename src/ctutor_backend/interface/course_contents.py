@@ -65,7 +65,7 @@ class CourseContentGet(BaseEntityGet):
     def cast_str_to_ltree(cls, value):
         return str(value)
 
-    model_config = ConfigDict(from_attributes=True,use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
 class CourseContentList(BaseModel):
     id: str
@@ -86,7 +86,7 @@ class CourseContentList(BaseModel):
     def cast_str_to_ltree(cls, value):
         return str(value)
 
-    model_config = ConfigDict(from_attributes=True,use_enum_values=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
 class CourseContentUpdate(BaseModel):
     path: Optional[str] = None

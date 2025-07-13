@@ -1,7 +1,7 @@
 from abc import ABC
 from datetime import datetime
 from typing import List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class ListQuery(BaseModel):
     skip: Optional[int] = 0
@@ -37,8 +37,10 @@ class EntityInterface(ABC):
                 claims.append(("permission", f"{model.__tablename__}:{action}"))
         return claims
     
-class BaseEntityGet(BaseModel):
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+class BaseEntityList(BaseModel):
+    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
+    updated_at: Optional[datetime] = Field(None, description="Update timestamp")
+
+class BaseEntityGet(BaseEntityList):
     created_by: Optional[str] = None
     updated_by: Optional[str] = None

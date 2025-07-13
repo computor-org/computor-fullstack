@@ -47,3 +47,4 @@ class CourseExecutionBackendInterface(EntityInterface):
     search = course_execution_backend_search
     endpoint = "course-execution-backends"
     model = CourseExecutionBackend
+    cache_ttl = 600  # 10 minutes - backend configurations change infrequently

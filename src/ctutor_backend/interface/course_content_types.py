@@ -8,8 +8,8 @@ from ctutor_backend.utils.color_validation import is_valid_color, validate_color
 
 class CourseContentTypeCreate(BaseModel):
     slug: str
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     color: Optional[str] = 'green'
     properties: Optional[dict] = None
     course_id: str
@@ -32,8 +32,8 @@ class CourseContentTypeCreate(BaseModel):
 class CourseContentTypeGet(BaseEntityGet):
     id: str 
     slug: str
-    title: Optional[str | None] = None
-    description: Optional[str | None] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
     color: str
     properties: Optional[dict] = None
     course_id: str
@@ -46,7 +46,7 @@ class CourseContentTypeGet(BaseEntityGet):
 class CourseContentTypeList(BaseModel):
     id: str
     slug: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     color: str
     course_id: str
     course_content_kind_id: str

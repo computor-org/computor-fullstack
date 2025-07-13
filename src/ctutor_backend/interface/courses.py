@@ -51,7 +51,7 @@ class CourseGet(BaseEntityGet,CourseCreate):
 
 class CourseList(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -112,3 +112,4 @@ class CourseInterface(EntityInterface):
     search = course_search
     endpoint = "courses"
     model = Course
+    cache_ttl = 300  # 5 minutes - course data changes moderately frequently

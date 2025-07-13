@@ -197,4 +197,5 @@ class CourseContentInterface(EntityInterface):
     search = course_content_search
     endpoint = "course-contents"
     model = CourseContent
+    cache_ttl = 300  # 5 minutes cache for course content data
     post_create = post_create

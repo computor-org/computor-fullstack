@@ -139,3 +139,4 @@ class CourseMemberInterface(EntityInterface):
     endpoint = "course-members"
     model = CourseMember
     post_create = post_create
+    cache_ttl = 300  # 5 minutes - membership changes moderately frequently

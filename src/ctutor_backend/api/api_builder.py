@@ -64,7 +64,7 @@ class CrudRouter:
         return route
 
     def list(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], response: Response, params: self.dto.query = Depends(), cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], cache: Annotated[BaseCache, Depends(get_redis_client)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
             # Generate cache key based on params and user permissions
             import hashlib
             params_hash = hashlib.sha256(params.model_dump_json(exclude_none=True).encode()).hexdigest()
@@ -112,8 +112,8 @@ class CrudRouter:
                 # Clear related cache entries
             await self._clear_entity_cache(cache, self.dto.model.__tablename__)
 
-                for task in self.on_created:
-                    background_tasks.add_task(task, entity_deleted, db, permissions)
+            for task in self.on_created:
+                background_tasks.add_task(task, entity_deleted, db, permissions)
 
             return delete_db(permissions, db, id, self.dto.model)
 

@@ -149,3 +149,4 @@ class CourseContentStudentInterface(EntityInterface):
     query = CourseContentStudentQuery
     search = course_content_student_search
     endpoint = "student-course-contents"
+    cache_ttl = 180  # 3 minutes - course content changes frequently during active sessions

@@ -11,7 +11,7 @@ class StudentProfileCreate(BaseModel):
     user_id: Optional[str] = None
 
 class StudentProfileGet(BaseEntityGet,StudentProfileCreate):
-    id: str = None
+    id: str
     student_id: Optional[str] = None
     student_email: Optional[str] = None
     user_id: str
@@ -19,7 +19,7 @@ class StudentProfileGet(BaseEntityGet,StudentProfileCreate):
     model_config = ConfigDict(from_attributes=True)
 
 class StudentProfileList(BaseModel):
-    id: str = None
+    id: str
     student_id: Optional[str] = None
     student_email: Optional[str] = None
     user_id: str
@@ -59,3 +59,4 @@ class StudentProfileInterface(EntityInterface):
     search = student_profile_search
     endpoint = "student-profiles"
     model = StudentProfile
+    cache_ttl = 300  # 5 minutes - student profile changes moderately

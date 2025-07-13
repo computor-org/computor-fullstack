@@ -12,7 +12,7 @@ class CourseTutorRepository(BaseModel):
 
 class CourseTutorGet(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -29,7 +29,7 @@ class CourseTutorGet(BaseModel):
 
 class CourseTutorList(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -75,3 +75,5 @@ class CourseTutorInterface(EntityInterface):
     list = CourseTutorList
     query = CourseTutorQuery
     search = course_tutor_search
+    endpoint = "tutor-courses"
+    cache_ttl = 300  # 5 minutes - tutor course data changes moderately

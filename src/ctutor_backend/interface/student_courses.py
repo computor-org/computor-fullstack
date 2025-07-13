@@ -12,7 +12,7 @@ class CourseStudentRepository(BaseModel):
 
 class CourseStudentGet(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -30,7 +30,7 @@ class CourseStudentGet(BaseModel):
 
 class CourseStudentList(BaseModel):
     id: str
-    title: Optional[str | None] = None
+    title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     version_identifier: Optional[str] = None
@@ -88,3 +88,4 @@ class CourseStudentInterface(EntityInterface):
     query = CourseStudentQuery
     search = course_student_search
     endpoint = "student-courses"
+    cache_ttl = 300  # 5 minutes - student course data changes moderately

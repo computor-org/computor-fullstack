@@ -27,7 +27,7 @@ class TutorCourseMemberList(BaseModel):
     id: str
     user_id: str
     course_id: str
-    course_group_id: Optional[str] = None # not done
+    course_group_id: Optional[str] = None
     course_role_id: str
     unreviewed: Optional[bool] = None
 

@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, EmailStr
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from text_unidecode import unidecode
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.interface.student_profile import StudentProfileGet
 from ctutor_backend.model.auth import User
 
@@ -69,14 +69,13 @@ class UserGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
-class UserList(BaseModel):
+class UserList(BaseEntityList):
     id: str = Field(description="User unique identifier")
     given_name: Optional[str] = Field(None, description="User's given name")
     family_name: Optional[str] = Field(None, description="User's family name")
-    email: Optional[EmailStr] = Field(None, description="User's email address")
+    email: Optional[str] = Field(None, description="User's email address")
     user_type: Optional[UserTypeEnum] = Field(None, description="Type of user account")
     username: Optional[str] = Field(None, description="Unique username")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     
     @property

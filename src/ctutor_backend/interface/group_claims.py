@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.group import GroupClaim
 
 class GroupClaimCreate(BaseModel):
@@ -44,11 +44,10 @@ class GroupClaimGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
-class GroupClaimList(BaseModel):
+class GroupClaimList(BaseEntityList):
     group_id: str = Field(description="Group ID")
     claim_type: str = Field(description="Type of claim")
     claim_value: str = Field(description="Value of the claim")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     
     @property
     def display_name(self) -> str:

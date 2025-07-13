@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session as DBSession
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.auth import Session
 import ipaddress
 
@@ -57,13 +57,12 @@ class SessionGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
-class SessionList(BaseModel):
+class SessionList(BaseEntityList):
     id: str = Field(description="Session unique identifier")
     user_id: str = Field(description="Associated user ID")
     session_id: str = Field(description="Session identifier/token")
     logout_time: Optional[datetime] = Field(None, description="Logout timestamp")
     ip_address: str = Field(description="IP address")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     
     @property
     def is_active(self) -> bool:

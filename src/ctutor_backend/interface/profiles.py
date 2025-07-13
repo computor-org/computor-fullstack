@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.auth import Profile
 
 class ProfileCreate(BaseModel):
@@ -75,13 +75,12 @@ class ProfileGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
-class ProfileList(BaseModel):
+class ProfileList(BaseEntityList):
     id: str = Field(description="Profile unique identifier")
     user_id: str = Field(description="Associated user ID")
     nickname: Optional[str] = Field(None, description="Unique nickname")
     avatar_image: Optional[str] = Field(None, description="Avatar image URL")
     avatar_color: Optional[int] = Field(None, description="Avatar color")
-    created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     
     @property
     def display_name(self) -> str:

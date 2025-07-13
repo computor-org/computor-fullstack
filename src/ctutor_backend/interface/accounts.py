@@ -1,7 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional
+from datetime import datetime
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
+from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.auth import Account
 from enum import Enum
 
@@ -50,13 +51,12 @@ class AccountGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
-class AccountList(BaseModel):
+class AccountList(BaseEntityList):
     id: str = Field(description="Account unique identifier")
     provider: str = Field(description="Authentication provider name")
     type: AccountType = Field(description="Type of authentication account")
     provider_account_id: str = Field(description="Account ID from the provider")
     user_id: str = Field(description="Associated user ID")
-    created_at: Optional[str] = Field(None, description="Creation timestamp")
     
     @property
     def display_name(self) -> str:

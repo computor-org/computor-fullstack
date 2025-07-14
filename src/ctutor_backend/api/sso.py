@@ -396,7 +396,7 @@ async def get_current_user_info(
     
     # Get user roles
     user_roles = db.query(UserRole).filter(UserRole.user_id == user.id).all()
-    role_names = [ur.role.name for ur in user_roles if ur.role]
+    role_names = [ur.role.id for ur in user_roles if ur.role]
     
     return {
         "user": {

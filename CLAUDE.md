@@ -143,9 +143,10 @@ Comprehensive Celery-based system for handling long-running operations:
 - **Horizontal Scaling**: Multiple Celery worker instances with Docker Compose
 - **FastAPI Integration**: RESTful endpoints for task submission, monitoring, and worker status
 - **CLI Tools**: Worker management commands (`ctutor worker start/status`) with Celery backend
-- **Flower UI**: Web-based monitoring and diagnostics interface for real-time task monitoring
+- **Flower UI**: Web-based monitoring and diagnostics interface with automatic configuration
 - **Docker Integration**: Complete Docker Compose setup with Redis broker and Celery workers
 - **Clean Configuration**: Structured Redis setup with `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD` variables
+- **Simplified Setup**: Environment variables with fallback defaults, no separate config files needed
 - **Comprehensive Testing**: 29 tests including unit tests and Docker integration tests
 - **Examples**: Ready-to-use Celery task implementations with async execution support
 - **Benefits**: Production-ready task queue, real-time monitoring, eliminates request timeouts

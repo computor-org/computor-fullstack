@@ -17,8 +17,10 @@ import { Settings, Login, Logout } from '@mui/icons-material';
 import Dashboard from './pages/Dashboard';
 import StudentsPage from './pages/StudentsPage';
 import CoursesPage from './pages/CoursesPage';
+import SSODebug from './pages/SSODebug';
 import Sidebar from './components/Sidebar';
-import LoginModal from './components/LoginModal';
+import SSOLoginModal from './components/SSOLoginModal';
+import SSOCallback from './components/SSOCallback';
 import { SidebarProvider, useSidebar } from './hooks/useSidebar';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 
@@ -164,7 +166,7 @@ function TopBar() {
         </Toolbar>
       </AppBar>
       
-      <LoginModal
+      <SSOLoginModal
         open={loginModalOpen}
         onClose={() => setLoginModalOpen(false)}
       />
@@ -199,11 +201,13 @@ function AuthenticatedAppContent() {
       >
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/students" element={<StudentsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/course/:courseId" element={<Dashboard />} />
           <Route path="/course/:courseId/students" element={<StudentsPage />} />
           <Route path="/admin/*" element={<Dashboard />} />
+          <Route path="/debug/sso" element={<SSODebug />} />
         </Routes>
       </Box>
     </Box>
@@ -256,6 +260,14 @@ function AppContent() {
 
 function AuthenticatedSidebarProvider() {
   const { state: authState } = useAuth();
+  
+  // Check if we're on an SSO callback route
+  const isSSoCallback = window.location.pathname === '/auth/success' || 
+                        window.location.pathname === '/auth/callback';
+  
+  if (isSSoCallback) {
+    return <SSOCallback />;
+  }
   
   if (!authState.isAuthenticated || !authState.user) {
     return <AppContent />;

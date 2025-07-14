@@ -394,6 +394,10 @@ async def get_current_user_info(
     # Get user's accounts
     accounts = db.query(Account).filter(Account.user_id == user.id).all()
     
+    # Get user roles
+    user_roles = db.query(UserRole).filter(UserRole.user_id == user.id).all()
+    role_names = [ur.role.name for ur in user_roles if ur.role]
+    
     return {
         "user": {
             "id": str(user.id),
@@ -403,7 +407,9 @@ async def get_current_user_info(
             "family_name": user.family_name,
             "user_type": user.user_type
         },
-        "roles": principal.roles,
+        "roles": role_names + principal.roles,  # Include both DB roles and principal roles
+        "principal_roles": principal.roles,  # Original principal roles
+        "db_roles": role_names,  # Roles from database
         "accounts": [
             {
                 "provider": acc.provider,

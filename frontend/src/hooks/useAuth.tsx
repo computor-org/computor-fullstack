@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AuthState, AuthContextType, LoginCredentials } from '../types/auth';
 import { AuthService } from '../services/authService';
+import { SSOAuthService } from '../services/ssoAuthService';
 
 // Auth state reducer
 type AuthAction =
@@ -81,8 +82,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check for stored authentication on app start
   useEffect(() => {
     const checkStoredAuth = async () => {
+      // Check if we're on SSO callback page - don't check auth yet
+      if (SSOAuthService.isSSOCallback()) {
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+
+      // First check for SSO auth
+      const ssoAuth = SSOAuthService.getStoredAuth();
+      if (ssoAuth) {
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: {
+            user: ssoAuth.user,
+            token: ssoAuth.token,
+          },
+        });
+        return;
+      }
+
+      // Fall back to mock auth
       const storedAuth = AuthService.getStoredAuth();
-      
       if (storedAuth) {
         // Try to refresh token to ensure it's still valid
         const refreshResult = await AuthService.refreshToken();
@@ -143,7 +163,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await AuthService.logout();
+      // Check if we have SSO auth
+      const ssoAuth = SSOAuthService.getStoredAuth();
+      if (ssoAuth) {
+        await SSOAuthService.logout();
+      } else {
+        await AuthService.logout();
+      }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -153,7 +179,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshToken = async (): Promise<boolean> => {
     try {
-      const result = await AuthService.refreshToken();
+      // Check if we have SSO auth
+      const ssoAuth = SSOAuthService.getStoredAuth();
+      let result;
+      
+      if (ssoAuth) {
+        result = await SSOAuthService.refreshToken();
+      } else {
+        result = await AuthService.refreshToken();
+      }
       
       if (result.success && result.user && result.token) {
         dispatch({

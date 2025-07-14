@@ -340,6 +340,17 @@ This approach provides:
 - **Consistent URL building** across all modules
 - **Environment-specific configuration** for dev/staging/production
 
+### Flower UI Configuration
+Flower monitoring is configured via environment variables with built-in defaults:
+
+```bash
+# Optional Flower Configuration (add to .env if customization needed)
+FLOWER_USER=admin             # Default: admin
+FLOWER_PASSWORD=flower123     # Default: flower123
+```
+
+Configuration is handled automatically by Docker Compose with fallback values, eliminating the need for separate configuration files.
+
 ## Key Features
 
 1. **Async Support**: Tasks can use async/await

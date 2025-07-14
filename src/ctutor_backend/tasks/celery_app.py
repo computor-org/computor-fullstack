@@ -27,10 +27,9 @@ POSTGRES_DB = os.environ.get('POSTGRES_DB', 'codeability')
 # Build PostgreSQL URL for result backend
 POSTGRES_URL = f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}'
 
-# Use Redis for message broker, Redis for result backend (temporary for testing)
+# Use Redis for message broker, PostgreSQL for result backend
 BROKER_URL = REDIS_URL
-# BACKEND_URL = f'db+{POSTGRES_URL}'
-BACKEND_URL = REDIS_URL
+BACKEND_URL = f'db+{POSTGRES_URL}'
 
 # Create Celery application
 app = Celery(

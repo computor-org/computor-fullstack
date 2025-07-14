@@ -11,6 +11,12 @@ import logging
 from .base import AuthenticationPlugin, PluginConfig, PluginMetadata, AuthResult, UserInfo
 from .loader import PluginLoader, PluginLoadError
 
+# Import built-in providers if available
+try:
+    from ctutor_backend.auth.providers import BUILTIN_PROVIDERS
+except ImportError:
+    BUILTIN_PROVIDERS = {}
+
 logger = logging.getLogger(__name__)
 
 
@@ -89,8 +95,17 @@ class PluginRegistry:
     
     async def load_plugins(self) -> None:
         """Load all enabled plugins."""
+        # First, load built-in providers
+        for provider_name in BUILTIN_PROVIDERS:
+            if provider_name in self._enabled_plugins:
+                try:
+                    await self.load_builtin_provider(provider_name)
+                except Exception as e:
+                    logger.error(f"Failed to load built-in provider {provider_name}: {e}")
+        
+        # Then, load external plugins
         discovered = self.loader.discover_plugins()
-        logger.info(f"Discovered {len(discovered)} plugins")
+        logger.info(f"Discovered {len(discovered)} external plugins")
         
         for plugin_name in discovered:
             if plugin_name in self._enabled_plugins:
@@ -98,6 +113,38 @@ class PluginRegistry:
                     await self.load_plugin(plugin_name)
                 except Exception as e:
                     logger.error(f"Failed to load plugin {plugin_name}: {e}")
+    
+    async def load_builtin_provider(self, provider_name: str) -> None:
+        """
+        Load and initialize a built-in provider.
+        
+        Args:
+            provider_name: Name of the built-in provider to load
+        """
+        if provider_name in self._plugins:
+            logger.warning(f"Provider {provider_name} already loaded")
+            return
+        
+        if provider_name not in BUILTIN_PROVIDERS:
+            raise ValueError(f"Built-in provider not found: {provider_name}")
+        
+        try:
+            # Get configuration for this provider
+            config = self._configs.get(provider_name, PluginConfig())
+            
+            # Create provider instance
+            provider_class = BUILTIN_PROVIDERS[provider_name]
+            provider = provider_class(config)
+            
+            # Initialize the provider
+            await provider.initialize()
+            
+            self._plugins[provider_name] = provider
+            logger.info(f"Successfully loaded built-in provider: {provider_name}")
+            
+        except Exception as e:
+            logger.error(f"Failed to load built-in provider {provider_name}: {e}")
+            raise
     
     async def load_plugin(self, plugin_name: str) -> None:
         """

@@ -242,9 +242,13 @@ http://localhost:5555
 # Production - Via Traefik
 http://your-domain/flower
 
-# Default credentials (configurable via .env):
-# Username: admin
-# Password: flower123
+# Default credentials (configurable via environment variables):
+# Username: admin (FLOWER_USER)
+# Password: flower123 (FLOWER_PASSWORD)
+
+# To customize, add to your .env file:
+# FLOWER_USER=your-username
+# FLOWER_PASSWORD=your-secure-password
 
 # Using test script helper
 ./test_celery_docker.sh ui  # Shows Flower UI access info

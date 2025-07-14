@@ -160,7 +160,6 @@ Comprehensive Celery-based system for handling long-running operations:
 - `/src/ctutor_backend/tasks/`: Celery task executor framework implementation
 - `/src/ctutor_backend/tasks/celery_app.py`: Celery application configuration and setup
 - `/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
-- `/.env.flower.example`: Example Flower UI configuration
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration

@@ -3,7 +3,7 @@ import json
 import hashlib
 import base64
 import binascii
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -21,7 +21,6 @@ from ctutor_backend.api.exceptions import NotFoundException, UnauthorizedExcepti
 from fastapi.security.utils import get_authorization_scheme_param
 from ctutor_backend.model.role import UserRole
 from ctutor_backend.redis_cache import get_redis_client
-from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -224,54 +223,6 @@ async def get_user_permission_from_glpat(gitlab_credentials: GLPAuthConfig):
 
     return principal
 
-
-async def get_permissions_from_sso_token(credentials: SSOAuthCredentials):
-    """
-    Get user permissions from SSO Bearer token.
-    
-    This retrieves the user session from Redis using the token as a key,
-    then builds the Principal object with claims.
-    """
-    cache = await get_redis_client()
-    
-    # Hash the token for cache key to avoid storing raw tokens
-    hashed_cache_key = hashlib.sha256(f"sso_permissions:{credentials.token}".encode()).hexdigest()
-    
-    # Check if we have cached permissions for this token
-    cached_auth = await cache.get(hashed_cache_key)
-    
-    if cached_auth is not None:
-        return Principal.model_validate(json.loads(cached_auth), from_attributes=True)
-    
-    try:
-        with next(get_db()) as db:
-            # Get user ID and roles from SSO token
-            user_id, role_ids = await get_user_id_from_sso_token(credentials.token, db)
-            
-            # Get claims for the user
-            claim_values = db_get_claims(user_id, db)
-            claim_values.extend(db_get_course_claims(user_id, db))
-        
-        principal = Principal(
-            user_id=user_id,
-            roles=role_ids,
-            claims=build_claim_actions(claim_values)
-        )
-        
-        # Cache the permissions
-        try:
-            await cache.set(hashed_cache_key, principal.model_dump_json(), ttl=_expiry_time_authenticated)
-        except Exception as e:
-            logger.error(f"Failed to cache SSO permissions: {e}")
-        
-        return principal
-        
-    except UnauthorizedException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting permissions from SSO token: {e}")
-        raise UnauthorizedException("Failed to authenticate SSO token")
-
 def get_permissions_from_basic_auth(credentials: HTTPBasicCredentials):
 
     current_username_bytes = credentials.username.encode()
@@ -297,6 +248,16 @@ def get_permissions_from_basic_auth(credentials: HTTPBasicCredentials):
         )
 
         return principal
+        
+    except UnauthorizedException as e:
+        raise e
+
+    except Exception as e:
+        print(f"ERROR {str(e)}")
+        raise UnauthorizedException(
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
 
 
 async def get_permissions_from_sso_token(credentials: SSOAuthCredentials):
@@ -345,16 +306,6 @@ async def get_permissions_from_sso_token(credentials: SSOAuthCredentials):
     except Exception as e:
         logger.error(f"Error getting permissions from SSO token: {e}")
         raise UnauthorizedException("Failed to authenticate SSO token")
-        
-    except UnauthorizedException as e:
-        raise e
-
-    except Exception as e:
-        print(f"ERROR {str(e)}")
-        raise UnauthorizedException(
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
 
 def get_permissions_from_mockup(user_id: str):
 
@@ -389,54 +340,6 @@ def get_permissions_from_mockup(user_id: str):
         )
 
         return principal
-
-
-async def get_permissions_from_sso_token(credentials: SSOAuthCredentials):
-    """
-    Get user permissions from SSO Bearer token.
-    
-    This retrieves the user session from Redis using the token as a key,
-    then builds the Principal object with claims.
-    """
-    cache = await get_redis_client()
-    
-    # Hash the token for cache key to avoid storing raw tokens
-    hashed_cache_key = hashlib.sha256(f"sso_permissions:{credentials.token}".encode()).hexdigest()
-    
-    # Check if we have cached permissions for this token
-    cached_auth = await cache.get(hashed_cache_key)
-    
-    if cached_auth is not None:
-        return Principal.model_validate(json.loads(cached_auth), from_attributes=True)
-    
-    try:
-        with next(get_db()) as db:
-            # Get user ID and roles from SSO token
-            user_id, role_ids = await get_user_id_from_sso_token(credentials.token, db)
-            
-            # Get claims for the user
-            claim_values = db_get_claims(user_id, db)
-            claim_values.extend(db_get_course_claims(user_id, db))
-        
-        principal = Principal(
-            user_id=user_id,
-            roles=role_ids,
-            claims=build_claim_actions(claim_values)
-        )
-        
-        # Cache the permissions
-        try:
-            await cache.set(hashed_cache_key, principal.model_dump_json(), ttl=_expiry_time_authenticated)
-        except Exception as e:
-            logger.error(f"Failed to cache SSO permissions: {e}")
-        
-        return principal
-        
-    except UnauthorizedException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting permissions from SSO token: {e}")
-        raise UnauthorizedException("Failed to authenticate SSO token")
         
     except UnauthorizedException as e:
         raise e

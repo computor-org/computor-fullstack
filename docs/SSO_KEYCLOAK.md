@@ -89,6 +89,7 @@ keycloak:
 - `GET /auth/{provider}/login` - Initiate login flow
 - `GET /auth/{provider}/callback` - Handle OAuth callback
 - `POST /auth/{provider}/logout` - Logout from provider
+- `GET /auth/me` - Get current user info (requires authentication)
 
 ### User Registration
 
@@ -205,6 +206,65 @@ bash api.sh
 3. Login with demo credentials
 4. Check logs for any errors
 
+## API Authentication with SSO
+
+### Using Bearer Tokens
+
+After successful SSO authentication, users receive a session token that can be used for API calls:
+
+1. **Login via SSO**: Navigate to `/auth/keycloak/login`
+2. **Get Token**: After login, the redirect URL includes a `token` parameter
+3. **Use Token**: Include the token in API requests as a Bearer token
+
+### Example API Call
+
+```bash
+# Using the token from SSO callback
+TOKEN="your-session-token-here"
+
+# Make authenticated API call
+curl -H "Authorization: Bearer $TOKEN" \
+     http://localhost:8000/auth/me
+```
+
+### Response Example
+
+```json
+{
+  "user": {
+    "id": "30a0f2dd-b087-42af-b4af-368c5110f6ce",
+    "username": "admin",
+    "email": "admin@system.local",
+    "given_name": "System",
+    "family_name": "Administrator",
+    "user_type": "user"
+  },
+  "roles": ["_admin"],
+  "accounts": [
+    {
+      "provider": "keycloak",
+      "type": "oidc",
+      "provider_account_id": "729ace31-a8b8-4073-b17f-062535928328"
+    }
+  ],
+  "authenticated_via": "sso"
+}
+```
+
+### Token Lifecycle
+
+- Tokens are stored in Redis with a 24-hour TTL
+- Each API call refreshes the token expiration
+- Tokens are invalidated on logout
+
+### Testing Script
+
+A test script is provided at `test_sso_api.py` to demonstrate:
+- SSO login flow
+- Token extraction
+- API calls with Bearer authentication
+- Protected endpoint access
+
 ## Future Enhancements
 
 - Group/role mapping from Keycloak claims
@@ -212,3 +272,5 @@ bash api.sh
 - Multi-factor authentication
 - User profile synchronization
 - SAML support
+- Token refresh mechanism
+- JWT-based stateless authentication

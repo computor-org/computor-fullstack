@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Computor is a full-stack university programming course management platform with:
-- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Redis Queue (RQ) for task execution
+- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Celery for task execution
 - **Frontend**: React 19 + TypeScript with Material-UI, TanStack Table, Recharts, and modern tooling
 - **Infrastructure**: Docker-based deployment with Traefik/Nginx and horizontal task worker scaling
 - **Database**: Pure SQLAlchemy/Alembic approach with comprehensive model validation

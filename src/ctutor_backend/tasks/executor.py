@@ -353,12 +353,30 @@ def _execute_task_with_celery(celery_task, task_class, **kwargs):
     # Create task instance
     task_instance = task_class()
     
+    # Inject progress update method
+    async def update_progress(percentage: int, metadata: dict = None):
+        """Update task progress via Celery."""
+        celery_task.update_state(
+            state=states.STARTED,
+            meta={
+                'started_at': datetime.utcnow().isoformat(),
+                'progress': {
+                    'percentage': percentage,
+                    'metadata': metadata or {},
+                    'status': 'running'
+                }
+            }
+        )
+    
+    # Override the default update_progress method
+    task_instance.update_progress = update_progress
+    
     # Update task state to STARTED
     celery_task.update_state(
         state=states.STARTED,
         meta={
             'started_at': datetime.utcnow().isoformat(),
-            'progress': {'status': 'started'}
+            'progress': {'status': 'started', 'percentage': 0}
         }
     )
     

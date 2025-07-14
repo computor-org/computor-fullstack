@@ -184,12 +184,11 @@ The project includes two Docker Compose files in the root directory with complet
 
 #### Development (`docker-compose-dev.yaml`)
 ```bash
-# Start all services including Celery workers and Flower
+# Start all services including Celery system worker and Flower
 docker-compose -f docker-compose-dev.yaml up -d
 
 # Services included:
-# - celery-worker-high: Handles high_priority queue (concurrency=2)
-# - celery-worker-default: Handles default and low_priority queues (concurrency=3)
+# - celery-system-worker: Handles all system tasks (concurrency=4)
 # - flower: Web UI for monitoring at http://localhost:5555
 # - redis: Message broker on port 6379
 # - postgres: Database on port 5432
@@ -201,12 +200,11 @@ docker-compose -f docker-compose-dev.yaml up -d
 # Start all services with configurable replicas
 docker-compose -f docker-compose-prod.yaml up -d
 
-# Scale workers using environment variables:
-# TASK_WORKER_HIGH_REPLICAS=1 (default)
-# TASK_WORKER_DEFAULT_REPLICAS=2 (default)
+# Scale system workers using environment variable:
+# CELERY_SYSTEM_WORKER_REPLICAS=1 (default)
 
-# Example: Scale high priority workers to 3 instances
-TASK_WORKER_HIGH_REPLICAS=3 docker-compose -f docker-compose-prod.yaml up -d
+# Example: Scale system workers to 3 instances
+CELERY_SYSTEM_WORKER_REPLICAS=3 docker-compose -f docker-compose-prod.yaml up -d
 
 # Production features:
 # - Automatic scaling with replica configuration
@@ -219,15 +217,10 @@ TASK_WORKER_HIGH_REPLICAS=3 docker-compose -f docker-compose-prod.yaml up -d
 
 Both Docker Compose files configure:
 
-1. **High Priority Worker** (`celery-worker-high`):
-   - Queues: `high_priority` only
-   - Concurrency: 2 workers
-   - Use case: Critical tasks like student test execution
-
-2. **Default Worker** (`celery-worker-default`):
-   - Queues: `default`, `low_priority`
-   - Concurrency: 3 workers
-   - Use case: General tasks and background operations
+1. **System Worker** (`celery-system-worker`):
+   - Queues: `high_priority`, `default`, `low_priority`
+   - Concurrency: 4 workers
+   - Use case: System-dependent tasks like releases, filesystem operations, and background tasks
 
 3. **Flower Monitoring** (`flower`):
    - Port: 5555 (development) or via Traefik at `/flower` (production)

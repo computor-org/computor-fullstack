@@ -11,15 +11,30 @@ const SSOCallback: React.FC = () => {
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // Parse URL parameters
-        const params = new URLSearchParams(window.location.search);
-        const token = params.get('token');
-        const refreshToken = params.get('refresh_token');
-        const userId = params.get('user_id');
+        // Parse URL parameters - handle both search and hash fragments
+        let params = new URLSearchParams(window.location.search);
+        let token = params.get('token');
+        let refreshToken = params.get('refresh_token');
+        let userId = params.get('user_id');
         
-        console.log('SSOCallback: Processing with token:', token?.substring(0, 20) + '...');
-
+        // Some OAuth flows put params in hash fragment
+        if (!token && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          token = hashParams.get('token');
+          refreshToken = hashParams.get('refresh_token');
+          userId = hashParams.get('user_id');
+        }
+        
+        console.log('SSOCallback: Full URL:', window.location.href);
+        console.log('SSOCallback: Search params:', window.location.search);
+        console.log('SSOCallback: Hash:', window.location.hash);
+        console.log('SSOCallback: Token present:', !!token);
+        console.log('SSOCallback: All params:', Object.fromEntries(params.entries()));
+        
         if (!token) {
+          // Log more details for debugging
+          console.error('SSOCallback: No token found in URL');
+          console.error('SSOCallback: Available params:', Array.from(params.keys()));
           throw new Error('No authentication token received');
         }
 
@@ -50,10 +65,11 @@ const SSOCallback: React.FC = () => {
         setStatus('Authentication successful! Redirecting...');
         console.log('SSOCallback: Authentication successful, redirecting to:', redirectPath);
         
-        // Small delay to show success message
+        // Small delay to show success message, then force reload to ensure auth state is picked up
         setTimeout(() => {
-          // Use navigate for client-side routing
-          navigate(redirectPath);
+          // Use window.location to force a full page reload
+          // This ensures the auth context picks up the new authentication state
+          window.location.href = redirectPath;
         }, 500);
         
       } catch (err) {

@@ -107,7 +107,7 @@ def status():
         click.echo(f"✗ Error checking status: {str(e)}")
         raise click.ClickException(str(e))
 
-@worker.command()
+@worker.command('test-job')
 @click.option('--task', default='example_long_running', help='Task name to run')
 @click.option('--duration', default=5, help='Duration for long running tasks (seconds)')
 @click.option('--priority', default=5, help='Task priority (0-10)')

@@ -159,12 +159,17 @@ Full Single Sign-On implementation with Keycloak identity provider:
 - **Account Linking**: Seamless linking between local user accounts and Keycloak identities
 - **Docker Integration**: Keycloak service with PostgreSQL backend in docker-compose
 - **Realm Configuration**: Pre-configured realm with demo users and client settings
+- **Frontend Integration**: Complete React frontend SSO authentication flow
 - **Key Features**:
   - JWT token verification with JWKS
   - Session management with Redis
+  - Bearer token authentication for API access
+  - Token refresh mechanism
   - Role-based access control ready
   - Email verification support
   - Password management through Keycloak
+  - Automatic token inclusion in API requests
+  - Debug tools for troubleshooting SSO issues
 - **Default Users**:
   - Admin: `admin`/`admin` (synced from environment variables)
   - Demo users: `demo_user` and `demo_admin` (password: `password`)
@@ -174,6 +179,7 @@ Full Single Sign-On implementation with Keycloak identity provider:
 - `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
 - `/docs/TASK_EXECUTOR.md`: Task executor framework guide
 - `/docs/DOCKER_TASK_WORKERS.md`: Docker task worker configuration
+- `/docs/SSO_FRONTEND_INTEGRATION.md`: SSO frontend integration guide
 - `/docker-compose-dev.yaml`: Development environment with Celery workers and Flower UI
 - `/docker-compose-prod.yaml`: Production environment with Celery scaling
 - `/src/ctutor_backend/tasks/`: Celery task executor framework implementation

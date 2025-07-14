@@ -5,6 +5,7 @@ Generic SSO authentication API endpoints.
 import secrets
 from typing import Dict, List, Optional
 from urllib.parse import urlencode
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -19,6 +20,7 @@ from ctutor_backend.model.role import UserRole
 from ctutor_backend.plugins import PluginMetadata, AuthStatus, UserInfo
 from ctutor_backend.plugins.registry import get_plugin_registry
 from ctutor_backend.redis_cache import get_redis_client
+from ctutor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
 import json
 import logging
 
@@ -56,6 +58,26 @@ class SSOAuthResponse(BaseModel):
     is_new_user: bool = Field(..., description="Whether this is a new user")
 
 
+class UserRegistrationRequest(BaseModel):
+    """User registration request."""
+    username: str = Field(..., min_length=3, max_length=50, description="Username")
+    email: str = Field(..., description="Email address")
+    password: str = Field(..., min_length=8, description="Password")
+    given_name: str = Field(..., min_length=1, description="First name")
+    family_name: str = Field(..., min_length=1, description="Last name")
+    provider: str = Field("keycloak", description="Authentication provider to register with")
+    send_verification_email: bool = Field(True, description="Send email verification")
+
+
+class UserRegistrationResponse(BaseModel):
+    """Response after successful user registration."""
+    user_id: str = Field(..., description="User ID in Computor")
+    provider_user_id: str = Field(..., description="User ID in authentication provider")
+    username: str = Field(..., description="Username")
+    email: str = Field(..., description="Email address")
+    message: str = Field(..., description="Success message")
+
+
 @sso_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers():
     """
@@ -66,8 +88,13 @@ async def list_providers():
     registry = get_plugin_registry()
     providers = []
     
+    # Debug logging
+    logger.info(f"Registry enabled plugins: {registry.get_enabled_plugins()}")
+    logger.info(f"Registry loaded plugins: {registry.get_loaded_plugins()}")
+    
     for plugin_name in registry.get_enabled_plugins():
         metadata = registry.get_plugin_metadata(plugin_name)
+        logger.info(f"Plugin {plugin_name} metadata: {metadata}")
         if metadata:
             providers.append(ProviderInfo(
                 name=plugin_name,
@@ -93,6 +120,16 @@ async def initiate_login(
     """
     registry = get_plugin_registry()
     
+    # Debug logging
+    logger.info(f"Attempting login for provider: {provider}")
+    logger.info(f"Provider type: {type(provider)}")
+    logger.info(f"Provider repr: {repr(provider)}")
+    enabled_plugins = registry.get_enabled_plugins()
+    logger.info(f"Enabled plugins: {enabled_plugins}")
+    logger.info(f"Enabled plugins type: {type(enabled_plugins)}")
+    logger.info(f"Loaded plugins: {registry.get_loaded_plugins()}")
+    logger.info(f"Provider in enabled_plugins: {provider in enabled_plugins}")
+    
     # Check if provider exists and is enabled
     if provider not in registry.get_enabled_plugins():
         raise NotFoundException(f"Authentication provider not found or not enabled: {provider}")
@@ -107,10 +144,10 @@ async def initiate_login(
         "redirect_uri": redirect_uri or str(request.url_for("sso_success")),
         "timestamp": str(request.headers.get("date", ""))
     }
-    await redis_client.setex(
+    await redis_client.set(
         f"sso_state:{state}",
-        600,  # 10 minutes
-        json.dumps(state_data)
+        json.dumps(state_data),
+        ttl=600  # 10 minutes
     )
     
     # Get callback URL
@@ -125,7 +162,9 @@ async def initiate_login(
         
     except Exception as e:
         logger.error(f"Failed to initiate login for {provider}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to initiate login")
+        logger.error(f"Exception type: {type(e)}")
+        logger.error(f"Exception traceback:", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to initiate login: {str(e)}")
 
 
 @sso_router.get("/{provider}/callback", name="handle_callback")
@@ -162,8 +201,11 @@ async def handle_callback(
             raise BadRequestException("Provider mismatch in state parameter")
     
     try:
+        # Get the callback URL (same as used in the original authorization request)
+        callback_url = str(request.url_for("handle_callback", provider=provider))
+        
         # Handle callback with provider
-        auth_result = await registry.handle_callback(provider, code, state)
+        auth_result = await registry.handle_callback(provider, code, state, callback_url)
         
         if auth_result.status != AuthStatus.SUCCESS:
             raise UnauthorizedException(f"Authentication failed: {auth_result.error_message}")
@@ -227,12 +269,9 @@ async def handle_callback(
             )
             db.add(account)
             
-            # Add default user role
-            user_role = UserRole(
-                user_id=user.id,
-                role_id="_user"
-            )
-            db.add(user_role)
+            # Note: No default role assigned to SSO users
+            # Roles should be assigned based on groups/claims from the provider
+            # or manually by an administrator
         
         db.commit()
         
@@ -254,10 +293,10 @@ async def handle_callback(
                 delta = auth_result.expires_at - now
                 expiration = max(int(delta.total_seconds()), 60)  # At least 1 minute
             
-            await redis_client.setex(
+            await redis_client.set(
                 token_key,
-                expiration,
-                json.dumps(token_data)
+                json.dumps(token_data),
+                ttl=expiration
             )
         
         # Get redirect URI from state or use default
@@ -431,3 +470,103 @@ async def reload_plugins(principal: Principal = Depends(get_current_permissions)
         "message": "Plugins reloaded",
         "loaded": registry.get_loaded_plugins()
     }
+
+
+@sso_router.post("/register", response_model=UserRegistrationResponse)
+async def register_user(
+    request: UserRegistrationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Register a new user with SSO provider.
+    
+    Creates user in both the authentication provider and local database.
+    """
+    # Validate provider
+    registry = get_plugin_registry()
+    if request.provider not in registry.get_enabled_plugins():
+        raise BadRequestException(f"Authentication provider not enabled: {request.provider}")
+    
+    # Check if user already exists in local database
+    existing_user = db.query(User).filter(
+        (User.username == request.username) | (User.email == request.email)
+    ).first()
+    
+    if existing_user:
+        raise BadRequestException("User with this username or email already exists")
+    
+    try:
+        # Create user in authentication provider
+        if request.provider == "keycloak":
+            keycloak_admin = KeycloakAdminClient()
+            
+            # Check if user exists in Keycloak
+            if await keycloak_admin.user_exists(request.username):
+                raise BadRequestException("User already exists in Keycloak")
+            
+            # Create Keycloak user
+            keycloak_user = KeycloakUser(
+                username=request.username,
+                email=request.email,
+                firstName=request.given_name,
+                lastName=request.family_name,
+                enabled=True,
+                emailVerified=False,
+                credentials=[{
+                    "type": "password",
+                    "value": request.password,
+                    "temporary": False
+                }]
+            )
+            
+            provider_user_id = await keycloak_admin.create_user(keycloak_user)
+            
+            # Send verification email if requested
+            if request.send_verification_email and request.email:
+                try:
+                    await keycloak_admin.send_verify_email(provider_user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to send verification email: {e}")
+        else:
+            raise BadRequestException(f"Registration not implemented for provider: {request.provider}")
+        
+        # Create user in local database
+        local_user = User(
+            given_name=request.given_name,
+            family_name=request.family_name,
+            username=request.username,
+            email=request.email
+        )
+        db.add(local_user)
+        db.flush()
+        
+        # Create account linking to provider
+        account = Account(
+            provider=request.provider,
+            type="oidc",  # Keycloak uses OIDC
+            provider_account_id=provider_user_id,
+            user_id=local_user.id,
+            properties={
+                "email": request.email,
+                "username": request.username,
+                "registration_date": str(datetime.now(timezone.utc))
+            }
+        )
+        db.add(account)
+        
+        db.commit()
+        
+        return UserRegistrationResponse(
+            user_id=str(local_user.id),
+            provider_user_id=provider_user_id,
+            username=request.username,
+            email=request.email,
+            message=f"User registered successfully. {'Verification email sent.' if request.send_verification_email else ''}"
+        )
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to register user: {e}")
+        if "already exists" in str(e).lower():
+            raise BadRequestException(str(e))
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")

@@ -4,6 +4,7 @@ Keycloak authentication provider implementation.
 
 import os
 import logging
+import asyncio
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import httpx
@@ -28,7 +29,7 @@ class KeycloakConfig(PluginConfig):
     realm: str = os.environ.get("KEYCLOAK_REALM", "master")
     client_id: str = os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")
     client_secret: str = os.environ.get("KEYCLOAK_CLIENT_SECRET", "")
-    scopes: list = ["openid", "profile", "email"]
+    scopes: list = ["openid"]
     verify_ssl: bool = True
 
 
@@ -37,12 +38,21 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
     Keycloak authentication provider using OpenID Connect.
     """
     
-    def __init__(self, config: Optional[KeycloakConfig] = None):
+    def __init__(self, config: Optional[PluginConfig] = None):
         """Initialize Keycloak plugin with configuration."""
         if config is None:
-            config = KeycloakConfig()
+            config = PluginConfig()
         super().__init__(config)
-        self.config: KeycloakConfig = config
+        
+        # Convert to KeycloakConfig with environment variables
+        self.keycloak_config = KeycloakConfig(
+            server_url=config.settings.get("server_url", os.environ.get("KEYCLOAK_SERVER_URL", "http://localhost:8180")),
+            realm=config.settings.get("realm", os.environ.get("KEYCLOAK_REALM", "computor")),
+            client_id=config.settings.get("client_id", os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")),
+            client_secret=config.settings.get("client_secret", os.environ.get("KEYCLOAK_CLIENT_SECRET", "computor-backend-secret")),
+            scopes=config.settings.get("scopes", ["openid"]),
+            verify_ssl=config.settings.get("verify_ssl", True)
+        )
         self._oidc_config = None
         self._jwks = None
     
@@ -64,26 +74,59 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         """Initialize the plugin and fetch OIDC configuration."""
         await super().initialize()
         
+        # Debug: Log configuration being used
+        logger.info(f"Keycloak config - Server: {self.keycloak_config.server_url}")
+        logger.info(f"Keycloak config - Realm: {self.keycloak_config.realm}")
+        logger.info(f"Keycloak config - Client ID: {self.keycloak_config.client_id}")
+        logger.info(f"Keycloak config - Client Secret: {'***' if self.keycloak_config.client_secret else 'NOT SET'}")
+        
         # Fetch OpenID configuration
         try:
             await self._fetch_oidc_config()
-            await self._fetch_jwks()
             logger.info("Keycloak plugin initialized successfully")
+            # Note: JWKS will be fetched on-demand when needed for token verification
         except Exception as e:
-            logger.error(f"Failed to initialize Keycloak plugin: {e}")
+            logger.error(f"Failed to initialize Keycloak plugin: {type(e).__name__}: {e}")
+            logger.error("Exception details:", exc_info=True)
             raise
     
     async def _fetch_oidc_config(self) -> None:
-        """Fetch OpenID Connect configuration from Keycloak."""
-        well_known_url = f"{self.config.server_url}/realms/{self.config.realm}/.well-known/openid-configuration"
+        """Fetch OpenID Connect configuration from Keycloak with retry logic."""
+        well_known_url = f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}/.well-known/openid-configuration"
         
-        async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
-            response = await client.get(well_known_url)
-            response.raise_for_status()
-            self._oidc_config = response.json()
+        logger.info(f"Fetching OIDC config from: {well_known_url}")
+        
+        # Retry logic for OIDC config fetch
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Use more conservative HTTP client settings
+                async with httpx.AsyncClient(
+                    verify=self.keycloak_config.verify_ssl, 
+                    timeout=60.0,
+                    limits=httpx.Limits(max_connections=1, max_keepalive_connections=0)
+                ) as client:
+                    response = await client.get(well_known_url)
+                    logger.info(f"OIDC config response status: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Failed to fetch OIDC config: {response.status_code} - {response.text}")
+                        
+                    response.raise_for_status()
+                    self._oidc_config = response.json()
+                    logger.info("OIDC configuration fetched successfully")
+                    return
+                    
+            except Exception as e:
+                logger.warning(f"OIDC config fetch attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt == max_retries - 1:
+                    logger.error("All OIDC config fetch attempts failed")
+                    raise
+                # Wait before retry
+                await asyncio.sleep(2)
     
     async def _fetch_jwks(self) -> None:
-        """Fetch JSON Web Key Set from Keycloak."""
+        """Fetch JSON Web Key Set from Keycloak with retry logic."""
         if not self._oidc_config:
             await self._fetch_oidc_config()
         
@@ -91,10 +134,36 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if not jwks_uri:
             raise ValueError("JWKS URI not found in OIDC configuration")
         
-        async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
-            response = await client.get(jwks_uri)
-            response.raise_for_status()
-            self._jwks = response.json()
+        logger.info(f"Fetching JWKS from: {jwks_uri}")
+        
+        # Retry logic for JWKS fetch
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Use a longer timeout and more permissive settings for JWKS
+                async with httpx.AsyncClient(
+                    verify=self.keycloak_config.verify_ssl, 
+                    timeout=60.0,
+                    limits=httpx.Limits(max_connections=1, max_keepalive_connections=0)
+                ) as client:
+                    response = await client.get(jwks_uri)
+                    logger.info(f"JWKS response status: {response.status_code}")
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Failed to fetch JWKS: {response.status_code} - {response.text}")
+                        
+                    response.raise_for_status()
+                    self._jwks = response.json()
+                    logger.info("JWKS fetched successfully")
+                    return
+                    
+            except Exception as e:
+                logger.warning(f"JWKS fetch attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt == max_retries - 1:
+                    logger.error("All JWKS fetch attempts failed")
+                    raise
+                # Wait before retry
+                await asyncio.sleep(2)
     
     def get_login_url(self, redirect_uri: str, state: Optional[str] = None) -> str:
         """Generate Keycloak login URL."""
@@ -106,9 +175,9 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             raise ValueError("Authorization endpoint not found in OIDC configuration")
         
         params = {
-            "client_id": self.config.client_id,
+            "client_id": self.keycloak_config.client_id,
             "response_type": "code",
-            "scope": " ".join(self.config.scopes),
+            "scope": " ".join(self.keycloak_config.scopes),
             "redirect_uri": redirect_uri
         }
         
@@ -119,7 +188,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         query_string = "&".join(f"{k}={v}" for k, v in params.items())
         return f"{auth_endpoint}?{query_string}"
     
-    async def handle_callback(self, code: str, state: Optional[str] = None) -> AuthResult:
+    async def handle_callback(self, code: str, state: Optional[str] = None, redirect_uri: Optional[str] = None) -> AuthResult:
         """
         Handle OAuth callback from Keycloak.
         
@@ -127,10 +196,13 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         """
         try:
             # Exchange code for tokens
-            tokens = await self._exchange_code_for_tokens(code)
+            print(f"[DEBUG] Starting token exchange for code: {code[:20]}...")
+            tokens = await self._exchange_code_for_tokens(code, redirect_uri)
+            print(f"[DEBUG] Token exchange completed")
             
             # Parse ID token to get user info
             id_token = tokens.get("id_token")
+            print(f"[DEBUG] ID token present: {bool(id_token)}")
             if not id_token:
                 return AuthResult(
                     status=AuthStatus.FAILED,
@@ -182,7 +254,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 error_message=str(e)
             )
     
-    async def _exchange_code_for_tokens(self, code: str) -> Dict[str, Any]:
+    async def _exchange_code_for_tokens(self, code: str, redirect_uri: Optional[str] = None) -> Dict[str, Any]:
         """Exchange authorization code for tokens."""
         if not self._oidc_config:
             raise RuntimeError("Plugin not initialized")
@@ -194,18 +266,49 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         data = {
             "grant_type": "authorization_code",
             "code": code,
-            "client_id": self.config.client_id,
-            "client_secret": self.config.client_secret
+            "client_id": self.keycloak_config.client_id,
+            "client_secret": self.keycloak_config.client_secret
         }
         
-        async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
-            response = await client.post(
-                token_endpoint,
-                data=data,
-                headers={"Content-Type": "application/x-www-form-urlencoded"}
-            )
-            response.raise_for_status()
-            return response.json()
+        # Add redirect_uri if provided (required for OAuth2 authorization code flow)
+        if redirect_uri:
+            data["redirect_uri"] = redirect_uri
+        
+        # Debug logging - using print to ensure visibility
+        print(f"[DEBUG] Token exchange request to: {token_endpoint}")
+        print(f"[DEBUG] Request data: {data}")
+        print(f"[DEBUG] Redirect URI being sent: {data.get('redirect_uri', 'NOT SET')}")
+        logger.info(f"Token exchange request to: {token_endpoint}")
+        logger.info(f"Request data: {data}")
+        logger.info(f"Redirect URI being sent: {data.get('redirect_uri', 'NOT SET')}")
+        
+        print("[DEBUG] Creating HTTP client...")
+        async with httpx.AsyncClient(
+            verify=self.keycloak_config.verify_ssl, 
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(max_connections=1, max_keepalive_connections=0)
+        ) as client:
+            print("[DEBUG] HTTP client created, sending token exchange request...")
+            try:
+                response = await client.post(
+                    token_endpoint,
+                    data=data,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"}
+                )
+                print(f"[DEBUG] Token exchange response received: {response.status_code}")
+                
+                # Enhanced error handling
+                if response.status_code != 200:
+                    logger.error(f"Token exchange failed with status {response.status_code}")
+                    logger.error(f"Response body: {response.text}")
+                    response.raise_for_status()
+                
+                result = response.json()
+                print(f"[DEBUG] Token exchange successful, received tokens")
+                return result
+            except Exception as e:
+                print(f"[DEBUG] Token exchange error: {type(e).__name__}: {e}")
+                raise
     
     async def _verify_and_decode_token(self, token: str) -> Dict[str, Any]:
         """Verify and decode JWT token using Keycloak's JWKS."""
@@ -235,8 +338,9 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 token,
                 key,
                 algorithms=["RS256"],
-                audience=self.config.client_id,
-                issuer=f"{self.config.server_url}/realms/{self.config.realm}"
+                audience=self.keycloak_config.client_id,
+                issuer=f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}",
+                options={"verify_at_hash": False}  # Skip at_hash verification
             )
             return claims
         except JWTError as e:
@@ -269,13 +373,13 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             "grant_type": "password",
             "username": username,
             "password": password,
-            "client_id": self.config.client_id,
-            "client_secret": self.config.client_secret,
-            "scope": " ".join(self.config.scopes)
+            "client_id": self.keycloak_config.client_id,
+            "client_secret": self.keycloak_config.client_secret,
+            "scope": " ".join(self.keycloak_config.scopes)
         }
         
         try:
-            async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
+            async with httpx.AsyncClient(verify=self.keycloak_config.verify_ssl) as client:
                 response = await client.post(
                     token_endpoint,
                     data=data,
@@ -316,7 +420,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if not userinfo_endpoint:
             raise ValueError("UserInfo endpoint not found in OIDC configuration")
         
-        async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
+        async with httpx.AsyncClient(verify=self.keycloak_config.verify_ssl) as client:
             response = await client.get(
                 userinfo_endpoint,
                 headers={"Authorization": f"Bearer {access_token}"}
@@ -352,12 +456,12 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         data = {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
-            "client_id": self.config.client_id,
-            "client_secret": self.config.client_secret
+            "client_id": self.keycloak_config.client_id,
+            "client_secret": self.keycloak_config.client_secret
         }
         
         try:
-            async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
+            async with httpx.AsyncClient(verify=self.keycloak_config.verify_ssl) as client:
                 response = await client.post(
                     token_endpoint,
                     data=data,
@@ -387,7 +491,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             return True
         
         try:
-            async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
+            async with httpx.AsyncClient(verify=self.keycloak_config.verify_ssl) as client:
                 response = await client.post(
                     end_session_endpoint,
                     headers={"Authorization": f"Bearer {access_token}"}

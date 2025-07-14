@@ -15,6 +15,8 @@ from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
 from ctutor_backend.api.tests_celery import tests_celery_router
 from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.api.sso import sso_router
+from ctutor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.deployments import DeploymentFactory
@@ -119,6 +121,9 @@ async def startup_logic():
         await init_admin_user(db)
         await init_execution_backend_api(db)
         await mirror_db_to_filesystem(db)
+    
+    # Initialize plugin registry
+    await initialize_plugin_registry()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -256,6 +261,11 @@ app.include_router(
     tasks_router,
     tags=["tasks"],
     dependencies=[Depends(get_current_permissions)]
+)
+
+app.include_router(
+    sso_router,
+    tags=["sso", "authentication"]
 )
 
 @app.head("/", status_code=204)

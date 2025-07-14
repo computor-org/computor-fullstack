@@ -1,0 +1,25 @@
+{
+  "computor-sso-keycloak": {
+    "enabled": false,
+    "priority": 10,
+    "settings": {
+      "server_url": "http://localhost:8180",
+      "realm": "computor",
+      "client_id": "computor-backend",
+      "client_secret": "${KEYCLOAK_CLIENT_SECRET}",
+      "scopes": ["openid", "profile", "email"],
+      "verify_ssl": true
+    }
+  },
+  "computor-sso-gitlab": {
+    "enabled": false,
+    "priority": 5,
+    "settings": {
+      "gitlab_url": "https://gitlab.com",
+      "client_id": "${GITLAB_COM_CLIENT_ID}",
+      "client_secret": "${GITLAB_COM_CLIENT_SECRET}",
+      "scopes": ["read_user", "api"],
+      "redirect_uri": "http://localhost:8000/auth/computor-sso-gitlab/callback"
+    }
+  }
+}

@@ -132,6 +132,9 @@ async def lifespan(app: FastAPI):
 
     if settings.DEBUG_MODE == "production":
         await startup_logic()
+    else:
+        # Initialize plugin registry in development mode
+        await initialize_plugin_registry()
     
     yield
 

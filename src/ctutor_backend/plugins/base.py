@@ -155,13 +155,14 @@ class AuthenticationPlugin(ABC):
         pass
     
     @abstractmethod
-    async def handle_callback(self, code: str, state: Optional[str] = None) -> AuthResult:
+    async def handle_callback(self, code: str, state: Optional[str] = None, redirect_uri: Optional[str] = None) -> AuthResult:
         """
         Handle OAuth/OIDC callback.
         
         Args:
             code: Authorization code from provider
             state: State parameter for CSRF validation
+            redirect_uri: Redirect URI used in the original authorization request
             
         Returns:
             Authentication result

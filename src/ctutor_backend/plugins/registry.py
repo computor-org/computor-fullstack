@@ -14,7 +14,8 @@ from .loader import PluginLoader, PluginLoadError
 # Import built-in providers if available
 try:
     from ctutor_backend.auth.providers import BUILTIN_PROVIDERS
-except ImportError:
+except ImportError as e:
+    logger.warning(f"Failed to import BUILTIN_PROVIDERS: {e}")
     BUILTIN_PROVIDERS = {}
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,8 @@ class PluginRegistry:
     
     async def load_plugins(self) -> None:
         """Load all enabled plugins."""
+        logger.info(f"Loading plugins from {len(BUILTIN_PROVIDERS)} built-in providers")
+        
         # First, load built-in providers
         for provider_name in BUILTIN_PROVIDERS:
             if provider_name in self._enabled_plugins:
@@ -376,7 +379,7 @@ class PluginRegistry:
         
         return plugin.get_login_url(redirect_uri, state)
     
-    async def handle_callback(self, provider: str, code: str, state: Optional[str] = None) -> AuthResult:
+    async def handle_callback(self, provider: str, code: str, state: Optional[str] = None, redirect_uri: Optional[str] = None) -> AuthResult:
         """
         Handle OAuth callback for a provider.
         
@@ -384,6 +387,7 @@ class PluginRegistry:
             provider: Provider/plugin name
             code: Authorization code
             state: Optional state parameter
+            redirect_uri: Redirect URI used in the original authorization request
             
         Returns:
             Authentication result
@@ -395,7 +399,7 @@ class PluginRegistry:
         if not plugin:
             raise ValueError(f"Authentication provider not found or not enabled: {provider}")
         
-        return await plugin.handle_callback(code, state)
+        return await plugin.handle_callback(code, state, redirect_uri)
 
 
 # Global registry instance
@@ -407,6 +411,7 @@ def get_plugin_registry() -> PluginRegistry:
     global _registry
     if _registry is None:
         _registry = PluginRegistry()
+        logger.debug("Created new plugin registry instance (not initialized)")
     return _registry
 
 
@@ -423,4 +428,5 @@ async def initialize_plugin_registry(config_file: Optional[str] = None) -> Plugi
     global _registry
     _registry = PluginRegistry(config_file)
     await _registry.initialize()
+    logger.info(f"Plugin registry initialized with {len(_registry.get_enabled_plugins())} enabled plugins: {_registry.get_enabled_plugins()}")
     return _registry

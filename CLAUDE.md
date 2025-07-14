@@ -52,6 +52,11 @@ python -m celery -A ctutor_backend.tasks.celery_app flower  # Start Flower UI
 ./test_celery_docker.sh start   # Start Docker services including Flower
 ./test_celery_docker.sh ui      # Show Flower UI access information
 ./test_celery_docker.sh all     # Full test cycle with Docker
+
+# TypeScript Generation
+bash generate_types.sh          # Generate TypeScript interfaces
+ctutor generate-types           # Generate with CLI
+ctutor generate-types --watch   # Watch mode for auto-regeneration
 ```
 
 ### Frontend
@@ -174,12 +179,29 @@ Full Single Sign-On implementation with Keycloak identity provider:
   - Admin: `admin`/`admin` (synced from environment variables)
   - Demo users: `demo_user` and `demo_admin` (password: `password`)
 
+### ✅ TypeScript Interface Generation (Completed)
+Automatic TypeScript interface generation from Pydantic models:
+- **Type-Safe Frontend**: Generate TypeScript interfaces from backend Pydantic models
+- **CLI Integration**: `ctutor generate-types` command with watch mode
+- **Smart Categorization**: Organizes interfaces by domain (auth, users, courses, etc.)
+- **Full Type Support**: Handles complex types including Lists, Dicts, Unions, and nested models
+- **JSDoc Comments**: Preserves field descriptions and model documentation
+- **Easy Usage**: Simple bash script `generate_types.sh` for quick generation
+- **React Integration**: Example component showing best practices
+- **Benefits**:
+  - Zero manual type definitions
+  - Always in sync with backend
+  - Full IntelliSense support
+  - Compile-time type safety
+  - Reduces API integration errors
+
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
 - `/docs/TASK_EXECUTOR.md`: Task executor framework guide
 - `/docs/DOCKER_TASK_WORKERS.md`: Docker task worker configuration
 - `/docs/SSO_FRONTEND_INTEGRATION.md`: SSO frontend integration guide
+- `/docs/TYPESCRIPT_GENERATION.md`: TypeScript generation guide
 - `/docker-compose-dev.yaml`: Development environment with Celery workers and Flower UI
 - `/docker-compose-prod.yaml`: Production environment with Celery scaling
 - `/src/ctutor_backend/tasks/`: Celery task executor framework implementation

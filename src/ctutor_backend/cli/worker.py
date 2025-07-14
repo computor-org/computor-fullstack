@@ -148,7 +148,7 @@ def test_job(auth: CLIAuthConfig, task: str, duration: int, priority: int, wait:
         
         # Submit task via API
         client = get_custom_client(auth)
-        response = client.create("tasks/submit", task_data)
+        response = client.create("/tasks/submit", task_data)
         
         task_id = response.get("task_id")
         click.echo(f"✓ Task submitted successfully!")
@@ -164,27 +164,28 @@ def test_job(auth: CLIAuthConfig, task: str, duration: int, priority: int, wait:
             
             while elapsed < max_wait:
                 try:
-                    result_response = client.get(f"tasks/{task_id}/result")
+                    result_response = client.get(f"/tasks/{task_id}/result")
                     status = result_response.get("status")
                     
-                    if status in ["SUCCESS", "FAILURE"]:
+                    if status in ["SUCCESS", "FAILURE", "finished", "failed"]:
                         click.echo(f"✓ Task completed!")
                         click.echo(f"  Status: {status}")
                         
-                        if status == "SUCCESS" and "result" in result_response:
+                        if status in ["SUCCESS", "finished"] and "result" in result_response:
                             result_data = result_response["result"]
                             click.echo(f"  Result: {json.dumps(result_data, indent=2)}")
-                        elif status == "FAILURE" and "error" in result_response:
+                        elif status in ["FAILURE", "failed"] and "error" in result_response:
                             click.echo(f"  Error: {result_response['error']}")
                         break
                         
-                    elif status in ["PENDING", "STARTED"]:
+                    elif status in ["PENDING", "STARTED", "queued", "started"]:
                         click.echo(f"  Status: {status}...")
                         time.sleep(2)
                         elapsed += 2
                     else:
                         click.echo(f"  Unknown status: {status}")
-                        break
+                        time.sleep(2)
+                        elapsed += 2
                         
                 except Exception as e:
                     click.echo(f"  Error checking status: {str(e)}")

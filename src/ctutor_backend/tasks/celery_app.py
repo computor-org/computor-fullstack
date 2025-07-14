@@ -27,9 +27,10 @@ POSTGRES_DB = os.environ.get('POSTGRES_DB', 'codeability')
 # Build PostgreSQL URL for result backend
 POSTGRES_URL = f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}'
 
-# Use Redis for message broker, PostgreSQL for result backend
+# Use Redis for message broker, Redis for result backend (temporary for testing)
 BROKER_URL = REDIS_URL
-BACKEND_URL = f'db+{POSTGRES_URL}'
+# BACKEND_URL = f'db+{POSTGRES_URL}'
+BACKEND_URL = REDIS_URL
 
 # Create Celery application
 app = Celery(
@@ -57,21 +58,6 @@ app.conf.update(
     
     # Database result backend settings
     database_short_lived_sessions=True,
-    database_table_schemas={
-        'task': {
-            'task_id': 'VARCHAR(155)',
-            'status': 'VARCHAR(50)',
-            'result': 'TEXT',
-            'date_done': 'TIMESTAMP',
-            'traceback': 'TEXT',
-            'name': 'VARCHAR(155)',
-            'args': 'TEXT',
-            'kwargs': 'TEXT',
-            'worker': 'VARCHAR(155)',
-            'retries': 'INTEGER',
-            'queue': 'VARCHAR(155)'
-        }
-    },
     
     # Worker settings
     worker_prefetch_multiplier=1,

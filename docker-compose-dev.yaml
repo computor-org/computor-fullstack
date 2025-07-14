@@ -13,7 +13,7 @@ services:
     image: "redis:alpine"
     restart: unless-stopped
     ports:
-      - 6379:6379
+      - ${REDIS_PORT}:6379
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
@@ -77,16 +77,14 @@ services:
     - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
     depends_on:
       - traefik
-  # Celery Worker Service - High Priority Queue
-  celery-worker-high:
+  # Celery System Worker - Handles all system-dependent tasks
+  celery-system-worker:
     build:
       context: ./
       dockerfile: ./docker/api/Dockerfile
     restart: unless-stopped
-    # Option 1: Direct Celery command
-    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "worker", "--queues=high_priority", "--loglevel=info", "--concurrency=2"]
-    # Option 2: Using CLI (uncomment to use)
-    # command: ["ctutor", "worker", "start", "--queues=high_priority"]
+    # Process all queues with higher concurrency for system tasks
+    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "worker", "--queues=high_priority,default,low_priority", "--loglevel=info", "--concurrency=4"]
     volumes:
       - ./src:/home/uvicorn/src
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_LOCAL_STORAGE_DIR}
@@ -102,42 +100,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      DEBUG_MODE: development
-      TOKEN_SECRET: ${TOKEN_SECRET}
-    depends_on:
-      - postgres
-      - redis
-    labels:
-      - traefik.enable=false
-
-  # Celery Worker Service - Default and Low Priority Queues
-  celery-worker-default:
-    build:
-      context: ./
-      dockerfile: ./docker/api/Dockerfile
-    restart: unless-stopped
-    # Option 1: Direct Celery command
-    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "worker", "--queues=default,low_priority", "--loglevel=info", "--concurrency=3"]
-    # Option 2: Using CLI (uncomment to use)
-    # command: ["ctutor", "worker", "start", "--queues=default,low_priority"]
-    volumes:
-      - ./src:/home/uvicorn/src
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_LOCAL_STORAGE_DIR}
-    environment:
-      EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
-      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
-      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
-      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5437
-      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       DEBUG_MODE: development
       TOKEN_SECRET: ${TOKEN_SECRET}
@@ -160,7 +123,7 @@ services:
       - ./src:/home/uvicorn/src
     environment:
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
       FLOWER_URL_PREFIX: flower

@@ -6,19 +6,30 @@ import os
 from celery import Celery
 from kombu import Queue, Exchange
 
-# Get Redis configuration from environment
+# Get Redis configuration from environment (for broker)
 REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
 REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
 
-# Build Redis URL from components
+# Build Redis URL from components (for message broker)
 if REDIS_PASSWORD:
     REDIS_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}'
 else:
     REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}'
 
+# Get PostgreSQL configuration from environment (for result backend)
+POSTGRES_HOST = os.environ.get('POSTGRES_HOST', 'localhost')
+POSTGRES_PORT = int(os.environ.get('POSTGRES_PORT', '5432'))
+POSTGRES_USER = os.environ.get('POSTGRES_USER', 'postgres')
+POSTGRES_PASSWORD = os.environ.get('POSTGRES_PASSWORD', '')
+POSTGRES_DB = os.environ.get('POSTGRES_DB', 'codeability')
+
+# Build PostgreSQL URL for result backend
+POSTGRES_URL = f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}'
+
+# Use Redis for message broker, PostgreSQL for result backend
 BROKER_URL = REDIS_URL
-BACKEND_URL = REDIS_URL
+BACKEND_URL = f'db+{POSTGRES_URL}'
 
 # Create Celery application
 app = Celery(
@@ -42,8 +53,24 @@ app.conf.update(
     result_expires=86400,  # Results expire after 1 day
     result_backend_transport_options={
         'visibility_timeout': 3600,
-        'fanout_prefix': True,
-        'fanout_patterns': True
+    },
+    
+    # Database result backend settings
+    database_short_lived_sessions=True,
+    database_table_schemas={
+        'task': {
+            'task_id': 'VARCHAR(155)',
+            'status': 'VARCHAR(50)',
+            'result': 'TEXT',
+            'date_done': 'TIMESTAMP',
+            'traceback': 'TEXT',
+            'name': 'VARCHAR(155)',
+            'args': 'TEXT',
+            'kwargs': 'TEXT',
+            'worker': 'VARCHAR(155)',
+            'retries': 'INTEGER',
+            'queue': 'VARCHAR(155)'
+        }
     },
     
     # Worker settings

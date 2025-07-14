@@ -320,25 +320,41 @@ if __name__ == "__main__":
 
 ## Configuration
 
-### Redis Configuration
-The framework uses a clean Redis configuration approach with separate environment variables:
+### Hybrid Storage Architecture
 
+The framework uses a **hybrid approach** for optimal performance and persistence:
+
+**Redis (Message Broker):**
 ```bash
-# Environment Variables
 REDIS_HOST=localhost          # Redis server hostname
 REDIS_PORT=6379              # Redis server port (default: 6379)
 REDIS_PASSWORD=redis_password # Redis authentication password (optional)
 ```
 
-The system automatically builds Redis URLs from these components:
-- With password: `redis://:{password}@{host}:{port}`
-- Without password: `redis://{host}:{port}`
+**PostgreSQL (Result Backend):**
+```bash
+POSTGRES_HOST=localhost       # PostgreSQL server hostname
+POSTGRES_PORT=5432           # PostgreSQL server port (default: 5432)
+POSTGRES_USER=postgres       # PostgreSQL username
+POSTGRES_PASSWORD=postgres_secret # PostgreSQL password
+POSTGRES_DB=codeability      # PostgreSQL database name
+```
 
-This approach provides:
-- **Clear separation** of connection parameters
-- **Docker compatibility** with service names (e.g., `REDIS_HOST=redis`)
-- **Consistent URL building** across all modules
-- **Environment-specific configuration** for dev/staging/production
+### Why This Hybrid Approach?
+
+**Redis for Message Broker:**
+- ⚡ **High Performance**: Sub-millisecond message delivery
+- 🔄 **Real-time**: Instant task queue processing
+- 📊 **Low Latency**: Optimal for task distribution
+
+**PostgreSQL for Task Results:**
+- 💾 **Permanent Storage**: Task results survive system restarts
+- 🔍 **Rich Queries**: Advanced filtering and analytics
+- 📈 **Scalability**: Production-grade persistence
+- 🔒 **ACID Compliance**: Data integrity guarantees
+- 📊 **Reporting**: Join task data with business data
+
+This provides the **best of both worlds**: Redis speed for task queuing + PostgreSQL reliability for results.
 
 ### Flower UI Configuration
 Flower monitoring is configured via environment variables with built-in defaults:
@@ -361,6 +377,82 @@ Configuration is handled automatically by Docker Compose with fallback values, e
 6. **Horizontal Scaling**: Multiple workers can process tasks in parallel
 7. **Result Storage**: Results stored in Redis with configurable TTL
 8. **Clean Configuration**: Structured Redis configuration with host/port separation
+
+## Task Persistence & Recovery
+
+### Enhanced Persistence Capabilities ✅
+
+The framework provides **production-grade** task persistence through PostgreSQL:
+
+**Task Results & History:**
+- Task results stored **permanently** in PostgreSQL database
+- Complete task history with execution metadata
+- Full state tracking (PENDING → STARTED → SUCCESS/FAILURE)
+- Error messages, timing, and worker information preserved
+- **Advanced querying**: Filter, sort, and analyze task data with SQL
+
+**Data Persistence:**
+- **PostgreSQL backend**: ACID-compliant permanent storage
+- **Database tables**: Structured schema with proper indexing
+- **Backup-friendly**: Standard database backup/restore procedures
+- **Survives everything**: System reboots, container restarts, Redis failures
+
+**Message Broker:**
+- **Redis**: High-performance task queuing and distribution
+- **Persistent queues**: Tasks survive worker restarts
+- **Volume mounting**: `${SYSTEM_DEPLOYMENT_PATH}/redis-data:/data`
+
+**Celery Configuration:**
+- `task_acks_late=True` - prevents task loss during worker crashes
+- `task_track_started=True` - records all state changes
+- `database_short_lived_sessions=True` - optimized DB connections
+
+### Recovery Behavior After Shutdown ⚠️
+
+**What Survives:**
+- ✅ **All completed tasks**: Permanent storage in PostgreSQL (no expiration)
+- ✅ **Queued tasks**: Will be processed when workers restart
+- ✅ **Complete task history**: All execution metadata and error details
+- ✅ **Database integrity**: ACID compliance ensures data consistency
+
+**What's Lost:**
+- ❌ **Running tasks**: Tasks being executed during shutdown (but can be retried)
+- ❌ **Worker state**: Workers need manual restart (but task queue persists)
+
+**Recovery Steps:**
+```bash
+# 1. Restart Redis (if needed)
+docker-compose -f docker-compose-dev.yaml up -d redis
+
+# 2. Start workers
+ctutor worker start
+
+# 3. Check task status
+curl http://localhost:8000/api/tasks/{task_id}/status
+```
+
+### Recommendations for Enhanced Persistence
+
+For mission-critical deployments, consider:
+
+**1. Database Backend** (optional):
+```python
+# Use PostgreSQL instead of Redis for results
+CELERY_RESULT_BACKEND = 'db+postgresql://user:pass@localhost/celery'
+```
+
+**2. Monitoring & Alerts:**
+- Set up Flower UI alerts for failed tasks
+- Monitor Redis persistence and backup
+- Configure worker auto-restart with systemd
+
+**3. Task Retry Strategies:**
+```python
+# Add retry configuration to critical tasks
+@app.task(bind=True, autoretry_for=(Exception,), retry_kwargs={'max_retries': 3})
+def critical_task(self, data):
+    # Task implementation
+```
 
 ## Testing
 

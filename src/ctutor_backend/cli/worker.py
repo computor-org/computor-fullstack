@@ -3,7 +3,11 @@ CLI commands for managing Celery task workers.
 """
 
 import click
+import json
 from ctutor_backend.tasks import get_task_executor
+from ctutor_backend.cli.auth import authenticate, get_custom_client
+from ctutor_backend.cli.config import CLIAuthConfig
+from ctutor_backend.cli.crud import handle_api_exceptions
 
 @click.group()
 def worker():
@@ -101,6 +105,107 @@ def status():
             
     except Exception as e:
         click.echo(f"✗ Error checking status: {str(e)}")
+        raise click.ClickException(str(e))
+
+@worker.command()
+@click.option('--task', default='example_long_running', help='Task name to run')
+@click.option('--duration', default=5, help='Duration for long running tasks (seconds)')
+@click.option('--priority', default=5, help='Task priority (0-10)')
+@click.option('--wait', is_flag=True, help='Wait for task completion and show result')
+@authenticate
+@handle_api_exceptions
+def test_job(auth: CLIAuthConfig, task: str, duration: int, priority: int, wait: bool):
+    """
+    Submit a test job to the task queue via API.
+    
+    This command will create the PostgreSQL tables if they don't exist.
+    Requires authentication to access the task API.
+    
+    Examples:
+        ctutor worker test-job
+        ctutor worker test-job --task=example_long_running --duration=10
+        ctutor worker test-job --wait
+    """
+    click.echo(f"Submitting test job: {task}")
+    click.echo(f"Duration: {duration}s, Priority: {priority}")
+    
+    try:
+        # Create task submission payload
+        if task == 'example_long_running':
+            parameters = {"duration": duration, "message": "CLI test job"}
+        elif task == 'example_data_processing':
+            parameters = {"processing_type": "basic", "data_size": 100}
+        elif task == 'example_failing':
+            parameters = {"should_fail": False}
+        else:
+            parameters = {}
+        
+        task_data = {
+            "task_name": task,
+            "parameters": parameters,
+            "priority": priority
+        }
+        
+        # Submit task via API
+        client = get_custom_client(auth)
+        response = client.create("tasks/submit", task_data)
+        
+        task_id = response.get("task_id")
+        click.echo(f"✓ Task submitted successfully!")
+        click.echo(f"  Task ID: {task_id}")
+        
+        if wait and task_id:
+            click.echo("⏳ Waiting for task completion...")
+            
+            # Poll for completion
+            import time
+            max_wait = 60  # Maximum wait time in seconds
+            elapsed = 0
+            
+            while elapsed < max_wait:
+                try:
+                    result_response = client.get(f"tasks/{task_id}/result")
+                    status = result_response.get("status")
+                    
+                    if status in ["SUCCESS", "FAILURE"]:
+                        click.echo(f"✓ Task completed!")
+                        click.echo(f"  Status: {status}")
+                        
+                        if status == "SUCCESS" and "result" in result_response:
+                            result_data = result_response["result"]
+                            click.echo(f"  Result: {json.dumps(result_data, indent=2)}")
+                        elif status == "FAILURE" and "error" in result_response:
+                            click.echo(f"  Error: {result_response['error']}")
+                        break
+                        
+                    elif status in ["PENDING", "STARTED"]:
+                        click.echo(f"  Status: {status}...")
+                        time.sleep(2)
+                        elapsed += 2
+                    else:
+                        click.echo(f"  Unknown status: {status}")
+                        break
+                        
+                except Exception as e:
+                    click.echo(f"  Error checking status: {str(e)}")
+                    break
+            
+            if elapsed >= max_wait:
+                click.echo(f"⏱️  Task still running after {max_wait}s, stopped waiting")
+                
+        else:
+            click.echo("💡 Use 'ctutor worker status' to check progress")
+            click.echo("💡 Use '--wait' flag to wait for completion")
+        
+        # Show database info
+        click.echo(f"\n📊 Task data stored in PostgreSQL:")
+        click.echo(f"   Database: codeability")
+        click.echo(f"   Table: celery_taskmeta") 
+        if task_id:
+            click.echo(f"   Query: SELECT * FROM celery_taskmeta WHERE task_id = '{task_id}';")
+        
+    except Exception as e:
+        click.echo(f"✗ Error submitting test job: {str(e)}")
         raise click.ClickException(str(e))
 
 if __name__ == '__main__':

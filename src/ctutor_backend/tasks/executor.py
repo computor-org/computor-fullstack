@@ -333,3 +333,82 @@ def get_task_executor() -> TaskExecutor:
     if _task_executor is None:
         _task_executor = TaskExecutor()
     return _task_executor
+
+
+def _execute_task_with_celery(celery_task, task_class, **kwargs):
+    """
+    Execute a BaseTask implementation within Celery.
+    
+    This utility function bridges Celery's synchronous execution model
+    with the async BaseTask interface used throughout the framework.
+    
+    Args:
+        celery_task: The Celery task instance (self)
+        task_class: The BaseTask class to execute
+        **kwargs: Task parameters
+        
+    Returns:
+        Task execution result
+    """
+    # Create task instance
+    task_instance = task_class()
+    
+    # Update task state to STARTED
+    celery_task.update_state(
+        state=states.STARTED,
+        meta={
+            'started_at': datetime.utcnow().isoformat(),
+            'progress': {'status': 'started'}
+        }
+    )
+    
+    try:
+        # Execute task in asyncio event loop
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        try:
+            # Execute the task
+            result = loop.run_until_complete(task_instance.execute(**kwargs))
+            
+            # Call success hook
+            loop.run_until_complete(task_instance.on_success(result, **kwargs))
+            
+            # Update final state
+            celery_task.update_state(
+                state=states.SUCCESS,
+                meta={
+                    'started_at': datetime.utcnow().isoformat(),
+                    'finished_at': datetime.utcnow().isoformat(),
+                    'progress': {'status': 'completed'}
+                }
+            )
+            
+            return result
+            
+        except Exception as e:
+            # Call failure hook
+            try:
+                loop.run_until_complete(task_instance.on_failure(e, **kwargs))
+            except Exception:
+                pass  # Don't let failure hook errors mask the original error
+            
+            # Re-raise the original exception
+            raise e
+            
+    except Exception as e:
+        # Update error state
+        celery_task.update_state(
+            state=states.FAILURE,
+            meta={
+                'started_at': datetime.utcnow().isoformat(),
+                'finished_at': datetime.utcnow().isoformat(),
+                'error': str(e),
+                'progress': {'status': 'failed'}
+            }
+        )
+        raise e

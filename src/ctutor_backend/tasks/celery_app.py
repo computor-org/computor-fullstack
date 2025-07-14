@@ -7,17 +7,18 @@ from celery import Celery
 from kombu import Queue, Exchange
 
 # Get Redis configuration from environment
-REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PORT = int(os.environ.get('REDIS_PORT', '6379'))
 REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
 
-# Build Redis URL with password if provided
-if REDIS_PASSWORD and 'localhost' not in REDIS_URL:
-    # Insert password into Redis URL
-    BROKER_URL = REDIS_URL.replace('redis://', f'redis://:{REDIS_PASSWORD}@')
-    BACKEND_URL = BROKER_URL
+# Build Redis URL from components
+if REDIS_PASSWORD:
+    REDIS_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}'
 else:
-    BROKER_URL = REDIS_URL
-    BACKEND_URL = REDIS_URL
+    REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}'
+
+BROKER_URL = REDIS_URL
+BACKEND_URL = REDIS_URL
 
 # Create Celery application
 app = Celery(

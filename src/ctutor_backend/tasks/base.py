@@ -91,6 +91,21 @@ class BaseTask(ABC):
             **kwargs: Original task parameters
         """
         pass
+    
+    async def update_progress(self, percentage: int, metadata: Dict[str, Any] = None) -> None:
+        """
+        Update task progress.
+        
+        This method should be called during task execution to report progress.
+        The implementation depends on how the task is being executed (Celery, etc.).
+        
+        Args:
+            percentage: Progress percentage (0-100)
+            metadata: Additional progress metadata
+        """
+        # Default implementation does nothing
+        # This will be overridden by the Celery wrapper in executor.py
+        pass
 
 
 class TaskSubmission(BaseModel):

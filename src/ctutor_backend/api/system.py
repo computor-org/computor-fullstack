@@ -359,7 +359,7 @@ async def create_course_client(course_id: str | None, deployment: ComputorDeploy
         raise BadRequestException()
 
 class ReleaseCourseCreate(BaseModel):
-    course_id: Optional[UUID | str] = None
+    course_id: Optional[str] = None
     gitlab_url: Optional[str] = None
     descendants: Optional[bool] = False
     deployment: Optional[ComputorDeploymentConfig] = None
@@ -385,7 +385,7 @@ async def release_course(payload: ReleaseCourseCreate, permissions: Annotated[Pr
 
 class ReleaseCourseContentCreate(BaseModel):
     release_dir: Optional[str] = None
-    course_id: Optional[UUID | str] = None
+    course_id: Optional[str] = None
     gitlab_url: Optional[str] = None
     ascendants: bool = False
     descendants: bool = False

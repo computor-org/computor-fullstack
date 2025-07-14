@@ -90,6 +90,7 @@ keycloak:
 - `GET /auth/{provider}/callback` - Handle OAuth callback
 - `POST /auth/{provider}/logout` - Logout from provider
 - `GET /auth/me` - Get current user info (requires authentication)
+- `POST /auth/refresh` - Refresh access token using refresh token
 
 ### User Registration
 
@@ -253,9 +254,37 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### Token Lifecycle
 
-- Tokens are stored in Redis with a 24-hour TTL
+- Access tokens are stored in Redis with a 24-hour TTL
 - Each API call refreshes the token expiration
+- Refresh tokens are provided during login for obtaining new access tokens
 - Tokens are invalidated on logout
+
+### Token Refresh
+
+After login, you receive both an access token and a refresh token:
+
+```bash
+# Initial login response includes:
+# - token: Your API access token
+# - refresh_token: Token for refreshing access
+
+# Refresh your access token
+curl -X POST http://localhost:8000/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refresh_token": "YOUR_REFRESH_TOKEN",
+    "provider": "keycloak"
+  }'
+```
+
+Response:
+```json
+{
+  "access_token": "new-session-token",
+  "expires_in": 86400,
+  "refresh_token": "new-refresh-token-if-rotated"
+}
+```
 
 ### Testing Script
 

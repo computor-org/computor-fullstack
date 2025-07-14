@@ -78,6 +78,19 @@ class UserRegistrationResponse(BaseModel):
     message: str = Field(..., description="Success message")
 
 
+class TokenRefreshRequest(BaseModel):
+    """Token refresh request."""
+    refresh_token: str = Field(..., description="Refresh token from initial authentication")
+    provider: str = Field("keycloak", description="Authentication provider")
+
+
+class TokenRefreshResponse(BaseModel):
+    """Response after successful token refresh."""
+    access_token: str = Field(..., description="New access token")
+    expires_in: Optional[int] = Field(None, description="Token expiration time in seconds")
+    refresh_token: Optional[str] = Field(None, description="New refresh token if rotated")
+
+
 @sso_router.get("/providers", response_model=List[ProviderInfo])
 async def list_providers():
     """
@@ -335,7 +348,8 @@ async def handle_callback(
             "user_id": response_data.user_id,
             "account_id": response_data.account_id,
             "is_new_user": str(response_data.is_new_user).lower(),
-            "token": api_session_token  # Include token in redirect
+            "token": api_session_token,  # Include token in redirect
+            "refresh_token": auth_result.refresh_token if auth_result.refresh_token else ""  # Include refresh token
         }
         
         if "?" in redirect_uri:
@@ -631,3 +645,108 @@ async def register_user(
         if "already exists" in str(e).lower():
             raise BadRequestException(str(e))
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+
+@sso_router.post("/refresh", response_model=TokenRefreshResponse)
+async def refresh_token(
+    request: TokenRefreshRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh SSO access token using refresh token.
+    
+    This endpoint allows users to refresh their session token using
+    the refresh token obtained during initial authentication.
+    """
+    registry = get_plugin_registry()
+    redis_client = await get_redis_client()
+    
+    # Validate provider
+    if request.provider not in registry.get_enabled_plugins():
+        raise BadRequestException(f"Authentication provider not enabled: {request.provider}")
+    
+    # Get the plugin
+    plugin = registry.get_plugin(request.provider)
+    if not plugin:
+        raise NotFoundException(f"Authentication provider not found: {request.provider}")
+    
+    try:
+        # Use the plugin's refresh token method
+        if hasattr(plugin, 'refresh_token'):
+            auth_result = await plugin.refresh_token(request.refresh_token)
+            
+            if auth_result.status != AuthStatus.SUCCESS:
+                raise UnauthorizedException(f"Token refresh failed: {auth_result.error_message}")
+            
+            # Get user info from the refreshed token
+            user_info = auth_result.user_info
+            if not user_info:
+                raise BadRequestException("No user information received from provider")
+            
+            # Find the user account
+            account = db.query(Account).filter(
+                Account.provider == request.provider,
+                Account.provider_account_id == user_info.provider_id
+            ).first()
+            
+            if not account:
+                raise NotFoundException("User account not found")
+            
+            user = account.user
+            
+            # Generate new API session token
+            new_session_token = secrets.token_urlsafe(32)
+            session_data = {
+                "user_id": str(user.id),
+                "account_id": str(account.id),
+                "provider": request.provider,
+                "username": user.username,
+                "email": user.email,
+                "created_at": str(datetime.now(timezone.utc)),
+                "refreshed_at": str(datetime.now(timezone.utc))
+            }
+            
+            # Store new session in Redis
+            session_key = f"sso_session:{new_session_token}"
+            await redis_client.set(
+                session_key,
+                json.dumps(session_data),
+                ttl=86400  # 24 hours
+            )
+            
+            # Update stored provider tokens if available
+            if auth_result.access_token:
+                token_key = f"sso_token:{request.provider}:{user.id}"
+                token_data = {
+                    "access_token": auth_result.access_token,
+                    "refresh_token": auth_result.refresh_token,
+                    "expires_at": str(auth_result.expires_at) if auth_result.expires_at else None
+                }
+                
+                # Calculate expiration
+                expiration = 3600  # Default 1 hour
+                if auth_result.expires_at:
+                    now = datetime.now(timezone.utc)
+                    delta = auth_result.expires_at - now
+                    expiration = max(int(delta.total_seconds()), 60)
+                
+                await redis_client.set(
+                    token_key,
+                    json.dumps(token_data),
+                    ttl=expiration
+                )
+            
+            return TokenRefreshResponse(
+                access_token=new_session_token,
+                expires_in=86400,  # 24 hours for our session token
+                refresh_token=auth_result.refresh_token  # New refresh token if provider rotates them
+            )
+            
+        else:
+            raise BadRequestException(f"Token refresh not supported by provider: {request.provider}")
+            
+    except UnauthorizedException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to refresh token: {e}")
+        raise HTTPException(status_code=500, detail=f"Token refresh failed: {str(e)}")

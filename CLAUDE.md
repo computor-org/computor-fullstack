@@ -126,6 +126,7 @@ cd frontend && npm install   # Install dependencies
 ### Database
 - **PostgreSQL 16** for main data storage with comprehensive schema
 - **Redis** for caching and session management (using aiocache 0.12.3)
+- **Hybrid Task Storage**: Redis for message broker + PostgreSQL for task results (production-grade persistence)
 - **Redis Configuration**: Clean environment variable approach with `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
 - **Migration Strategy**: Pure SQLAlchemy/Alembic approach (✅ **Completed**)
   - SQLAlchemy models are the single source of truth
@@ -145,7 +146,8 @@ Comprehensive Celery-based system for handling long-running operations:
 - **CLI Tools**: Worker management commands (`ctutor worker start/status`) with Celery backend
 - **Flower UI**: Web-based monitoring and diagnostics interface with automatic configuration
 - **Docker Integration**: Complete Docker Compose setup with Redis broker and Celery workers
-- **Clean Configuration**: Structured Redis setup with `REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD` variables
+- **Hybrid Architecture**: Redis message broker + PostgreSQL result backend for optimal performance and persistence
+- **Clean Configuration**: Structured environment variables for both Redis and PostgreSQL
 - **Simplified Setup**: Environment variables with fallback defaults, no separate config files needed
 - **Comprehensive Testing**: 29 tests including unit tests and Docker integration tests
 - **Examples**: Ready-to-use Celery task implementations with async execution support

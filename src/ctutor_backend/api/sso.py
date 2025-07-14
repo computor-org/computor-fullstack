@@ -307,7 +307,6 @@ async def handle_callback(
             expiration = 3600  # Default 1 hour
             if auth_result.expires_at:
                 # Calculate seconds until expiration
-                from datetime import datetime, timezone
                 now = datetime.now(timezone.utc)
                 delta = auth_result.expires_at - now
                 expiration = max(int(delta.total_seconds()), 60)  # At least 1 minute

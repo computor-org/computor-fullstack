@@ -275,6 +275,25 @@ async def handle_callback(
         
         db.commit()
         
+        # Generate API session token for the user
+        api_session_token = secrets.token_urlsafe(32)
+        session_data = {
+            "user_id": str(user.id),
+            "account_id": str(account.id),
+            "provider": provider,
+            "username": user.username,
+            "email": user.email,
+            "created_at": str(datetime.now(timezone.utc))
+        }
+        
+        # Store session in Redis with TTL
+        session_key = f"sso_session:{api_session_token}"
+        await redis_client.set(
+            session_key,
+            json.dumps(session_data),
+            ttl=86400  # 24 hours
+        )
+        
         # Store tokens in Redis if available
         if auth_result.access_token:
             token_key = f"sso_token:{provider}:{user.id}"
@@ -308,7 +327,7 @@ async def handle_callback(
         response_data = SSOAuthResponse(
             user_id=str(user.id),
             account_id=str(account.id),
-            access_token=auth_result.access_token,
+            access_token=api_session_token,  # Use our API session token instead of provider token
             is_new_user=is_new_user
         )
         
@@ -316,7 +335,8 @@ async def handle_callback(
         params = {
             "user_id": response_data.user_id,
             "account_id": response_data.account_id,
-            "is_new_user": str(response_data.is_new_user).lower()
+            "is_new_user": str(response_data.is_new_user).lower(),
+            "token": api_session_token  # Include token in redirect
         }
         
         if "?" in redirect_uri:
@@ -339,6 +359,48 @@ async def handle_callback(
 async def sso_success():
     """Default success page after SSO authentication."""
     return {"message": "Authentication successful", "status": "success"}
+
+
+@sso_router.get("/me", dependencies=[Depends(get_current_permissions)])
+async def get_current_user_info(
+    principal: Principal = Depends(get_current_permissions),
+    db: Session = Depends(get_db)
+):
+    """
+    Get current authenticated user information.
+    
+    This endpoint can be used to test SSO authentication and retrieve
+    the current user's details and roles.
+    """
+    # Get user from database
+    user = db.query(User).filter(User.id == principal.user_id).first()
+    
+    if not user:
+        raise NotFoundException("User not found")
+    
+    # Get user's accounts
+    accounts = db.query(Account).filter(Account.user_id == user.id).all()
+    
+    return {
+        "user": {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "given_name": user.given_name,
+            "family_name": user.family_name,
+            "user_type": user.user_type
+        },
+        "roles": principal.roles,
+        "accounts": [
+            {
+                "provider": acc.provider,
+                "type": acc.type,
+                "provider_account_id": acc.provider_account_id
+            }
+            for acc in accounts
+        ],
+        "authenticated_via": "sso" if any(acc.provider in ["keycloak", "gitlab"] for acc in accounts) else "basic"
+    }
 
 
 @sso_router.post("/{provider}/logout")

@@ -85,7 +85,9 @@ class GitLabBuilderNew:
         # Initialize GitLab connection
         self.gitlab = Gitlab(url=gitlab_url, private_token=gitlab_token, keep_base_url=True)
         try:
-            self.gitlab.auth()
+            # For group tokens, gl.auth() doesn't work properly
+            # Test with a simple API call instead
+            version = self.gitlab.version()
             logger.info(f"Successfully authenticated with GitLab at {gitlab_url}")
         except Exception as e:
             logger.error(f"Failed to authenticate with GitLab: {e}")
@@ -205,6 +207,7 @@ class GitLabBuilderNew:
         }
         
         try:
+            logger.info(f"Creating organization with path: {deployment.organization.path}")
             # Check if organization already exists in database
             existing_org = self.org_repo.find_by_path(deployment.organization.path)
             
@@ -281,6 +284,7 @@ class GitLabBuilderNew:
             
             # Create new organization
             # First create GitLab group
+            logger.info(f"Creating new organization GitLab group with parent: {deployment.organization.gitlab.parent}")
             gitlab_group, gitlab_config = self._create_gitlab_group(
                 deployment.organization.name,
                 deployment.organization.path,
@@ -364,7 +368,11 @@ class GitLabBuilderNew:
                     result["error"] = "Parent organization missing GitLab group_id"
                     return result
                 
-                parent_group = self.gitlab.groups.get(parent_group_id)
+                try:
+                    parent_group = self.gitlab.groups.get(parent_group_id)
+                except GitlabGetError as e:
+                    result["error"] = f"Failed to retrieve parent group {parent_group_id}: {str(e)}"
+                    return result
                 
                 # Validate GitLab group if properties exist
                 if existing_family.properties and existing_family.properties.get("gitlab"):
@@ -443,7 +451,11 @@ class GitLabBuilderNew:
                 result["error"] = "Parent organization missing GitLab group_id"
                 return result
             
-            parent_group = self.gitlab.groups.get(parent_group_id)
+            try:
+                parent_group = self.gitlab.groups.get(parent_group_id)
+            except GitlabGetError as e:
+                result["error"] = f"Failed to retrieve parent group {parent_group_id}: {str(e)}"
+                return result
             
             # Create GitLab group
             gitlab_group, gitlab_config = self._create_gitlab_group(
@@ -532,7 +544,11 @@ class GitLabBuilderNew:
                     result["error"] = "Parent course family missing GitLab group_id"
                     return result
                 
-                parent_group = self.gitlab.groups.get(parent_group_id)
+                try:
+                    parent_group = self.gitlab.groups.get(parent_group_id)
+                except GitlabGetError as e:
+                    result["error"] = f"Failed to retrieve parent group {parent_group_id}: {str(e)}"
+                    return result
                 
                 # Validate GitLab group if properties exist
                 if existing_course.properties and existing_course.properties.get("gitlab"):
@@ -624,7 +640,11 @@ class GitLabBuilderNew:
                 result["error"] = "Parent course family missing GitLab group_id"
                 return result
             
-            parent_group = self.gitlab.groups.get(parent_group_id)
+            try:
+                parent_group = self.gitlab.groups.get(parent_group_id)
+            except GitlabGetError as e:
+                result["error"] = f"Failed to retrieve parent group {parent_group_id}: {str(e)}"
+                return result
             
             # Create GitLab group
             gitlab_group, gitlab_config = self._create_gitlab_group(
@@ -710,6 +730,7 @@ class GitLabBuilderNew:
         if parent_group:
             full_path = f"{parent_group.full_path}/{path}"
         elif parent_id:
+            logger.info(f"Looking up parent group with ID: {parent_id}")
             parent = self.gitlab.groups.get(parent_id)
             full_path = f"{parent.full_path}/{path}"
         else:
@@ -747,6 +768,7 @@ class GitLabBuilderNew:
             payload["parent_id"] = parent_id
         
         try:
+            logger.info(f"Creating GitLab group with payload: {payload}")
             group = self.gitlab.groups.create(payload)
             logger.info(f"Created new GitLab group: {group.full_path}")
             

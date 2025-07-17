@@ -9,6 +9,13 @@ from pathlib import Path
 # Add parent directories to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Load .env file from project root
+env_file = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_file)
+
 from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
@@ -39,9 +46,8 @@ def create_demo_deployment():
             path=f"demo_university_{suffix}",  # ltree doesn't allow hyphens
             description="Demo university for testing GitLab integration",
             gitlab=GitLabConfig(
-                parent=None,  # Create at root level
-                url="",
-                directory=""
+                parent=os.environ.get("TEST_GITLAB_GROUP_ID"),
+                token=os.environ.get("TEST_GITLAB_TOKEN")
             )
         ),
         courseFamily=CourseFamilyConfig(
@@ -87,13 +93,35 @@ async def main():
     
     gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)
     
-    try:
-        gl.auth()
-        logger.info("✅ GitLab authentication successful")
-        logger.info(f"Connected as: {gl.user.username}")
-    except Exception as e:
-        logger.error(f"GitLab authentication failed: {e}")
-        return
+    # try:
+    #     # Test authentication by making a simple API call
+    #     # For group tokens, gl.auth() doesn't work properly
+    #     version = gl.version()
+    #     logger.info("✅ GitLab authentication successful")
+    #     logger.info(f"Connected to GitLab version: {version}")
+        
+    #     # Try to get user info if it's a personal token
+    #     try:
+    #         user = gl.user
+    #         if user:
+    #             logger.info(f"Connected as user: {user.username}")
+    #         else:
+    #             logger.info("Connected with group/project token")
+    #     except:
+    #         logger.info("Connected with group/project token")
+        
+    #     # Test if we can create groups by trying to list groups
+    #     try:
+    #         groups = gl.groups.list(per_page=1)
+    #         logger.info(f"✅ Can access groups API (found {len(groups)} groups)")
+    #     except Exception as e:
+    #         logger.error(f"❌ Cannot access groups API: {e}")
+    #         logger.error("This token may not have 'api' scope or group creation permissions")
+    #         return
+            
+    # except Exception as e:
+    #     logger.error(f"GitLab authentication failed: {e}")
+    #     return
     
     # Create builder
     builder = GitLabBuilderNew(

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 from gitlab import Gitlab
 from gitlab.v4.objects import Group
-from gitlab.exceptions import GitlabCreateError, GitlabGetError
+from gitlab.exceptions import GitlabCreateError, GitlabGetError, GitlabDeleteError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -916,6 +916,158 @@ class GitLabBuilderNew:
             result["error"] = str(e)
         except Exception as e:
             logger.error(f"Unexpected error creating students group: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def add_member_to_group(
+        self,
+        group_id: int,
+        user_id: int,
+        access_level: int = 30  # Developer access by default
+    ) -> Dict[str, Any]:
+        """Add a member to a GitLab group.
+        
+        Access levels:
+        - 10: Guest
+        - 20: Reporter  
+        - 30: Developer
+        - 40: Maintainer
+        - 50: Owner
+        """
+        result = {
+            "success": False,
+            "member": None,
+            "error": None
+        }
+        
+        try:
+            group = self.gitlab.groups.get(group_id)
+            member = group.members.create({
+                'user_id': user_id,
+                'access_level': access_level
+            })
+            
+            logger.info(f"Added user {user_id} to group {group.full_path} with access level {access_level}")
+            
+            result["member"] = member
+            result["success"] = True
+            
+        except gitlab.exceptions.GitlabCreateError as e:
+            if "Member already exists" in str(e):
+                logger.warning(f"User {user_id} is already a member of group {group_id}")
+                result["error"] = "Member already exists"
+                # Still consider this a success
+                result["success"] = True
+            else:
+                logger.error(f"Failed to add member to group: {e}")
+                result["error"] = str(e)
+        except Exception as e:
+            logger.error(f"Unexpected error adding member to group: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def remove_member_from_group(
+        self,
+        group_id: int,
+        user_id: int
+    ) -> Dict[str, Any]:
+        """Remove a member from a GitLab group."""
+        result = {
+            "success": False,
+            "error": None
+        }
+        
+        try:
+            group = self.gitlab.groups.get(group_id)
+            group.members.delete(user_id)
+            
+            logger.info(f"Removed user {user_id} from group {group.full_path}")
+            
+            result["success"] = True
+            
+        except gitlab.exceptions.GitlabDeleteError as e:
+            logger.error(f"Failed to remove member from group: {e}")
+            result["error"] = str(e)
+        except Exception as e:
+            logger.error(f"Unexpected error removing member from group: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def add_student_to_course(
+        self,
+        course: Course,
+        gitlab_user_id: int
+    ) -> Dict[str, Any]:
+        """Add a student to a course by adding them to the students group."""
+        result = {
+            "success": False,
+            "error": None
+        }
+        
+        try:
+            # Get students group info from course properties
+            if not course.properties or not course.properties.get("gitlab", {}).get("students_group"):
+                result["error"] = "Course does not have a students group configured"
+                return result
+            
+            students_group_id = course.properties["gitlab"]["students_group"]["group_id"]
+            
+            # Add member to students group with Developer access
+            add_result = self.add_member_to_group(
+                group_id=students_group_id,
+                user_id=gitlab_user_id,
+                access_level=30  # Developer access for students
+            )
+            
+            if add_result["success"]:
+                logger.info(f"Added student {gitlab_user_id} to course {course.path}")
+                result["success"] = True
+            else:
+                result["error"] = add_result["error"]
+            
+        except Exception as e:
+            logger.error(f"Error adding student to course: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def add_lecturer_to_course(
+        self,
+        course: Course,
+        gitlab_user_id: int
+    ) -> Dict[str, Any]:
+        """Add a lecturer to a course by adding them to the main course group."""
+        result = {
+            "success": False,
+            "error": None
+        }
+        
+        try:
+            # Get course group info from properties
+            if not course.properties or not course.properties.get("gitlab", {}).get("group_id"):
+                result["error"] = "Course does not have a GitLab group configured"
+                return result
+            
+            course_group_id = course.properties["gitlab"]["group_id"]
+            
+            # Add member to course group with Maintainer access
+            add_result = self.add_member_to_group(
+                group_id=course_group_id,
+                user_id=gitlab_user_id,
+                access_level=40  # Maintainer access for lecturers
+            )
+            
+            if add_result["success"]:
+                logger.info(f"Added lecturer {gitlab_user_id} to course {course.path}")
+                result["success"] = True
+            else:
+                result["error"] = add_result["error"]
+            
+        except Exception as e:
+            logger.error(f"Error adding lecturer to course: {e}")
             result["error"] = str(e)
         
         return result

@@ -244,7 +244,7 @@ http://your-domain/flower
 # FLOWER_PASSWORD=your-secure-password
 
 # Using test script helper
-./test_celery_docker.sh ui  # Shows Flower UI access info
+./scripts/testing/test_celery_docker.sh ui  # Shows Flower UI access info
 ```
 
 ## Priority Queues

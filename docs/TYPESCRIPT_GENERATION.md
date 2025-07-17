@@ -22,7 +22,7 @@ Generate TypeScript interfaces:
 
 ```bash
 # From project root
-bash generate_types.sh
+bash scripts/utilities/generate_types.sh
 
 # Or using the CLI directly
 cd src && ctutor generate-types
@@ -162,7 +162,7 @@ class ExampleRequest(BaseModel):
 2. **Run Generator**:
 
 ```bash
-bash generate_types.sh
+bash scripts/utilities/generate_types.sh
 ```
 
 3. **Use in Frontend**:
@@ -253,7 +253,7 @@ jobs:
       
       - name: Generate types
         run: |
-          bash generate_types.sh
+          bash scripts/utilities/generate_types.sh
       
       - name: Check for changes
         run: |
@@ -299,7 +299,7 @@ generator.debug = True  # Add debug flag
 When adding new Pydantic models:
 
 1. Place them in `src/ctutor_backend/interface/` or `src/ctutor_backend/api/`
-2. Run `bash generate_types.sh`
+2. Run `bash scripts/utilities/generate_types.sh`
 3. Commit both Python models and generated TypeScript
 4. Update frontend code to use new types
 

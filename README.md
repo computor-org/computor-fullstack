@@ -52,13 +52,13 @@ sudo systemctl disable postgresql
 
 Start the migration with
 ```bash
-bash migrations.sh
+bash scripts/utilities/migrations.sh
 ```
 
 
 Start
 ```bash
-bash migrations.sh
+bash scripts/utilities/migrations.sh
 ```
 to migrate the schema to the current version.
 

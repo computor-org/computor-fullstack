@@ -6,14 +6,13 @@ of the assignments repository hierarchy:
 
 1. Root Level (Course): CodeAbilityCourseMeta - defines the overall course
 2. Unit Level: CodeAbilityUnitMeta - defines units or content kinds with ascends
-3. Assignment Level: CodeAbilityReleaseMeta - defines individual assignments/examples
+3. Assignment Level: CodeAbilityExampleMeta - defines individual assignments/examples
 
 Each level has its own meta.yaml file with specific fields appropriate for that level.
 """
 
-from abc import ABC
 from enum import Enum
-from typing import Any, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_yaml import to_yaml_str
 
@@ -231,7 +230,7 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         return value
 
 
-class CodeAbilityReleaseMeta(CodeAbilityBaseMeta):
+class CodeAbilityExampleMeta(CodeAbilityBaseMeta):
     """
     Meta information for assignment/release level directories.
     
@@ -263,22 +262,6 @@ class CodeAbilityUnitMeta(CodeAbilityBaseMeta):
     type: str = Field(
         description="Content type slug (e.g., 'chapter', 'module', 'week')"
     )
-    contentOrder: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Ordered list of content items within this unit"
-    )
-    prerequisites: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Prerequisites for this unit"
-    )
-    learningObjectives: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Learning objectives for this unit"
-    )
-    estimatedDuration: Optional[str] = Field(
-        None,
-        description="Estimated time to complete this unit"
-    )
 
 
 class CodeAbilityCourseMeta(CodeAbilityBaseMeta):
@@ -300,43 +283,14 @@ class CodeAbilityCourseMeta(CodeAbilityBaseMeta):
         default_factory=list,
         description="Available execution backends for this course"
     )
-    courseStructure: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Ordered list of top-level units/modules"
-    )
-    semester: Optional[str] = Field(
-        None,
-        description="Semester/term information"
-    )
-    academicYear: Optional[str] = Field(
-        None,
-        description="Academic year"
-    )
-    instructor: Optional[CodeAbilityPerson] = Field(
-        None,
-        description="Primary instructor information"
-    )
-    credits: Optional[int] = Field(
-        None,
-        ge=0,
-        description="Number of credits/ECTS"
-    )
-    prerequisites: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Course prerequisites"
-    )
-    learningOutcomes: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Expected learning outcomes"
-    )
 
 
 # Legacy compatibility - keep the old CodeAbilityMeta for backward compatibility
-class CodeAbilityMeta(CodeAbilityReleaseMeta):
+class CodeAbilityMeta(CodeAbilityExampleMeta):
     """
     Legacy meta model for backward compatibility.
     
-    This extends CodeAbilityReleaseMeta with additional fields that were
+    This extends CodeAbilityExampleMeta with additional fields that were
     used in the original implementation.
     """
     type: str = Field(description="Content type (legacy field)")
@@ -344,44 +298,3 @@ class CodeAbilityMeta(CodeAbilityReleaseMeta):
         default_factory=list,
         description="Test dependencies (legacy field)"
     )
-
-
-# Default configurations for different meta types
-DEFAULT_COURSE_META = CodeAbilityCourseMeta(
-    kind=MetaTypeEnum.Course,
-    title="Course Title",
-    description="Course description",
-    language=LanguageEnum.en,
-    contentTypes=[
-        TypeConfig(
-            kind="assignment",
-            slug="assignment",
-            title="Assignment",
-            color="#007bff",
-            description="Programming assignment"
-        ),
-        TypeConfig(
-            kind="unit",
-            slug="unit",
-            title="Unit",
-            color="#28a745",
-            description="Learning unit"
-        )
-    ]
-)
-
-DEFAULT_UNIT_META = CodeAbilityUnitMeta(
-    kind=MetaTypeEnum.Unit,
-    type="unit",
-    title="Unit Title",
-    description="Unit description",
-    language=LanguageEnum.en
-)
-
-DEFAULT_ASSIGNMENT_META = CodeAbilityReleaseMeta(
-    kind=MetaTypeEnum.Assignment,
-    title="Assignment Title",
-    description="Assignment description",
-    language=LanguageEnum.en,
-    properties=CodeAbilityMetaProperties()
-)

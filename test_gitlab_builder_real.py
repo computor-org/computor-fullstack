@@ -151,8 +151,8 @@ def main():
             
             # Show detailed results
             org = result["organization"]
-            family = result["course_family"]
-            course = result["course"]
+            family = result.get("course_family")
+            course = result.get("course")
             
             print("\n📊 Created hierarchy details:")
             print(f"\n🏢 Organization: {org.title or org.path}")
@@ -168,23 +168,31 @@ def main():
             print(f"   Database ID: {family.id}")
             print(f"   Path: {family.path}")
             print(f"   Organization ID: {family.organization_id}")
-            if family.properties and family.properties.get("gitlab"):
-                gitlab_props = family.properties["gitlab"]
-                print(f"   GitLab Group ID: {gitlab_props.get('group_id')}")
-                print(f"   GitLab Full Path: {gitlab_props.get('full_path')}")
-                print(f"   GitLab Web URL: {gitlab_props.get('web_url')}")
+            if family:
+                if family.properties and family.properties.get("gitlab"):
+                    gitlab_props = family.properties["gitlab"]
+                    print(f"   GitLab Group ID: {gitlab_props.get('group_id')}")
+                    print(f"   GitLab Full Path: {gitlab_props.get('full_path')}")
+                    print(f"   GitLab Web URL: {gitlab_props.get('web_url')}")
+                else:
+                    print(f"   ❌ No GitLab properties found!")
             
-            print(f"\n📖 Course: {course.title or course.path}")
-            print(f"   Database ID: {course.id}")
-            print(f"   Path: {course.path}")
-            print(f"   Course Family ID: {course.course_family_id}")
-            print(f"   Organization ID: {course.organization_id}")
-            if course.properties and course.properties.get("gitlab"):
-                gitlab_props = course.properties["gitlab"]
-                print(f"   GitLab Group ID: {gitlab_props.get('group_id')}")
-                print(f"   GitLab Full Path: {gitlab_props.get('full_path')}")
-                print(f"   GitLab Web URL: {gitlab_props.get('web_url')}")
-                print(f"   Last Synced: {gitlab_props.get('last_synced_at')}")
+            if course:
+                print(f"\n📖 Course: {course.title or course.path}")
+                print(f"   Database ID: {course.id}")
+                print(f"   Path: {course.path}")
+                print(f"   Course Family ID: {course.course_family_id}")
+                print(f"   Organization ID: {course.organization_id}")
+                if course.properties and course.properties.get("gitlab"):
+                    gitlab_props = course.properties["gitlab"]
+                    print(f"   GitLab Group ID: {gitlab_props.get('group_id')}")
+                    print(f"   GitLab Full Path: {gitlab_props.get('full_path')}")
+                    print(f"   GitLab Web URL: {gitlab_props.get('web_url')}")
+                    print(f"   Last Synced: {gitlab_props.get('last_synced_at')}")
+                else:
+                    print(f"   ❌ No GitLab properties found!")
+            else:
+                print(f"\n📖 Course: ❌ Not created")
             
             # Test idempotency
             print("\n5️⃣ Testing idempotency (running again)...")

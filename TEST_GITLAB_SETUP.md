@@ -32,9 +32,9 @@ python delete_test_gitlab_groups.py
 
 ## Example .env File
 
-Copy `.env.example` and set your actual GitLab token:
+Copy `.env.dev` and set your actual GitLab token:
 
 ```bash
-cp .env.example .env
+cp .env.dev .env
 # Edit .env and set TEST_GITLAB_TOKEN
 ```

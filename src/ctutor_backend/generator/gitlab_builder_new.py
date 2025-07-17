@@ -953,7 +953,7 @@ class GitLabBuilderNew:
             result["member"] = member
             result["success"] = True
             
-        except gitlab.exceptions.GitlabCreateError as e:
+        except GitlabCreateError as e:
             if "Member already exists" in str(e):
                 logger.warning(f"User {user_id} is already a member of group {group_id}")
                 result["error"] = "Member already exists"
@@ -987,7 +987,7 @@ class GitLabBuilderNew:
             
             result["success"] = True
             
-        except gitlab.exceptions.GitlabDeleteError as e:
+        except GitlabDeleteError as e:
             logger.error(f"Failed to remove member from group: {e}")
             result["error"] = str(e)
         except Exception as e:

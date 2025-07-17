@@ -291,6 +291,7 @@ class GitLabBuilderNew:
             result["gitlab_created"] = True
             
             # Create organization in database
+            logger.info(f"Creating organization with gitlab_config: {gitlab_config}")
             org_data = OrganizationCreate(
                 title=deployment.organization.name,
                 description=deployment.organization.description,
@@ -780,6 +781,9 @@ class GitLabBuilderNew:
         organization.properties["gitlab"] = gitlab_config
         self.db.flush()
         
+        # Refresh the object to ensure in-memory state matches database
+        self.db.refresh(organization)
+        
         logger.info(f"Updated organization {organization.path} with GitLab properties")
     
     def _update_course_family_gitlab_properties(
@@ -795,6 +799,9 @@ class GitLabBuilderNew:
         course_family.properties["gitlab"] = gitlab_config
         self.db.flush()
         
+        # Refresh the object to ensure in-memory state matches database
+        self.db.refresh(course_family)
+        
         logger.info(f"Updated course family {course_family.path} with GitLab properties")
     
     def _update_course_gitlab_properties(
@@ -809,5 +816,8 @@ class GitLabBuilderNew:
         
         course.properties["gitlab"] = gitlab_config
         self.db.flush()
+        
+        # Refresh the object to ensure in-memory state matches database
+        self.db.refresh(course)
         
         logger.info(f"Updated course {course.path} with GitLab properties")

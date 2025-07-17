@@ -84,9 +84,17 @@ class GitLabConfigGet(RepositoryConfig):
   directory: Optional[str] = None
   registry: Optional[str] = None
   parent: Optional[int] = None
+  # Enhanced GitLab properties
+  group_id: Optional[int] = None
+  parent_id: Optional[int] = None
+  namespace_id: Optional[int] = None
+  namespace_path: Optional[str] = None
+  web_url: Optional[str] = None
+  visibility: Optional[str] = None
+  last_synced_at: Optional[str] = None
 
   @property
-  def web_url(self) -> str:
+  def web_url_computed(self) -> str:
     return f"{self.url}/{self.full_path}"
 
 class GitLabConfig(GitLabConfigGet):

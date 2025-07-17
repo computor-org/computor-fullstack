@@ -9,6 +9,13 @@ from pathlib import Path
 # Add parent directories to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Load .env file from project root
+env_file = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_file)
+
 from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
 from ctutor_backend.database import get_db
 from ctutor_backend.model.course import Course
@@ -39,8 +46,11 @@ async def main():
     gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)
     
     try:
-        gl.auth()
-        logger.info("GitLab authentication successful")
+        # Test authentication by making a simple API call
+        # For group tokens, gl.auth() doesn't work properly
+        version = gl.version()
+        logger.info("✅ GitLab authentication successful")
+        logger.info(f"Connected to GitLab version: {version}")
     except Exception as e:
         logger.error(f"GitLab authentication failed: {e}")
         return

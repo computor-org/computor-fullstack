@@ -45,15 +45,15 @@ class ExampleRepository(Base):
     )
     organization_id = Column(
         UUID(as_uuid=True), 
-        ForeignKey("organizations.id"),
+        ForeignKey("organization.id"),
         comment="Organization that owns this repository"
     )
     
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), comment="User who created this repository")
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), comment="User who last updated this repository")
+    created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this repository")
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who last updated this repository")
     
     # Relationships
     examples = relationship("Example", back_populates="repository", cascade="all, delete-orphan")
@@ -138,8 +138,8 @@ class Example(Base):
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), comment="User who created this example record")
-    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), comment="User who last updated this example record")
+    created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this example record")
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who last updated this example record")
     
     # Relationships
     repository = relationship("ExampleRepository", back_populates="examples")

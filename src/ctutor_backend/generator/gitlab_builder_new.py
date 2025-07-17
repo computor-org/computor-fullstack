@@ -1,0 +1,813 @@
+"""
+New GitLab builder with integrated database operations and enhanced property storage.
+
+This module provides a clean implementation of GitLab group creation with:
+- Direct database access via repositories
+- Enhanced GitLab property storage
+- Proper error handling for both GitLab and database operations
+- Validation and synchronization of GitLab metadata
+"""
+
+import logging
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, Tuple
+from gitlab import Gitlab
+from gitlab.v4.objects import Group
+from gitlab.exceptions import GitlabCreateError, GitlabGetError
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+
+from ctutor_backend.interface.deployments import (
+    ComputorDeploymentConfig,
+    GitLabConfig
+)
+from ctutor_backend.interface.organizations import (
+    OrganizationCreate,
+    OrganizationProperties
+)
+from ctutor_backend.interface.course_families import (
+    CourseFamilyCreate,
+    CourseFamilyProperties
+)
+from ctutor_backend.interface.courses import (
+    CourseCreate,
+    CourseProperties
+)
+from ctutor_backend.model.organization import Organization
+from ctutor_backend.model.course import CourseFamily, Course
+from ctutor_backend.repositories.organization import OrganizationRepository
+from ctutor_backend.services.git_service import GitService
+from sqlalchemy_utils import Ltree
+
+
+logger = logging.getLogger(__name__)
+
+
+class EnhancedGitLabConfig(GitLabConfig):
+    """Enhanced GitLab configuration with complete metadata."""
+    group_id: Optional[int] = None
+    namespace_id: Optional[int] = None
+    namespace_path: Optional[str] = None
+    # web_url is already defined in parent GitLabConfigGet
+    visibility: Optional[str] = None
+    last_synced_at: Optional[datetime] = None
+
+
+class GitLabBuilderNew:
+    """
+    New GitLab builder with integrated database operations.
+    
+    This builder creates GitLab groups and corresponding database entries
+    with enhanced property storage and proper error handling.
+    """
+    
+    def __init__(
+        self,
+        db_session: Session,
+        gitlab_url: str,
+        gitlab_token: str,
+        git_service: Optional[GitService] = None
+    ):
+        """
+        Initialize the GitLab builder.
+        
+        Args:
+            db_session: SQLAlchemy database session
+            gitlab_url: GitLab instance URL
+            gitlab_token: GitLab access token
+            git_service: Optional GitService for repository operations
+        """
+        self.db = db_session
+        self.gitlab_url = gitlab_url
+        self.gitlab_token = gitlab_token
+        self.git_service = git_service
+        
+        # Initialize GitLab connection
+        self.gitlab = Gitlab(url=gitlab_url, private_token=gitlab_token, keep_base_url=True)
+        try:
+            self.gitlab.auth()
+            logger.info(f"Successfully authenticated with GitLab at {gitlab_url}")
+        except Exception as e:
+            logger.error(f"Failed to authenticate with GitLab: {e}")
+            raise
+        
+        # Initialize repositories
+        self.org_repo = OrganizationRepository(db_session)
+    
+    def create_deployment_hierarchy(
+        self,
+        deployment: ComputorDeploymentConfig,
+        created_by_user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create the complete deployment hierarchy with GitLab groups and database entries.
+        
+        Args:
+            deployment: Deployment configuration
+            created_by_user_id: ID of the user creating the deployment
+            
+        Returns:
+            Dictionary with created entities and status
+        """
+        results = {
+            "organization": None,
+            "course_family": None,
+            "course": None,
+            "gitlab_groups_created": [],
+            "database_entries_created": [],
+            "errors": [],
+            "success": False
+        }
+        
+        try:
+            # Start database transaction
+            logger.info("Starting deployment hierarchy creation")
+            
+            # Phase 1: Create Organization
+            org_result = self._create_organization(
+                deployment,
+                created_by_user_id
+            )
+            
+            if not org_result["success"]:
+                results["errors"].append(org_result["error"])
+                self.db.rollback()
+                return results
+            
+            results["organization"] = org_result["organization"]
+            if org_result.get("gitlab_created"):
+                results["gitlab_groups_created"].append(f"Organization: {org_result['gitlab_group'].full_path}")
+            if org_result.get("db_created"):
+                results["database_entries_created"].append(f"Organization: {org_result['organization'].path}")
+            
+            # Phase 2: Create CourseFamily
+            family_result = self._create_course_family(
+                deployment,
+                results["organization"],
+                created_by_user_id
+            )
+            
+            if not family_result["success"]:
+                results["errors"].append(family_result["error"])
+                self.db.rollback()
+                return results
+            
+            results["course_family"] = family_result["course_family"]
+            if family_result.get("gitlab_created"):
+                results["gitlab_groups_created"].append(f"CourseFamily: {family_result['gitlab_group'].full_path}")
+            if family_result.get("db_created"):
+                results["database_entries_created"].append(f"CourseFamily: {family_result['course_family'].path}")
+            
+            # Phase 3: Create Course
+            course_result = self._create_course(
+                deployment,
+                results["organization"],
+                results["course_family"],
+                created_by_user_id
+            )
+            
+            if not course_result["success"]:
+                results["errors"].append(course_result["error"])
+                self.db.rollback()
+                return results
+            
+            results["course"] = course_result["course"]
+            if course_result.get("gitlab_created"):
+                results["gitlab_groups_created"].append(f"Course: {course_result['gitlab_group'].full_path}")
+            if course_result.get("db_created"):
+                results["database_entries_created"].append(f"Course: {course_result['course'].path}")
+            
+            # Commit all changes
+            self.db.commit()
+            results["success"] = True
+            logger.info("Successfully created deployment hierarchy")
+            
+        except Exception as e:
+            logger.error(f"Unexpected error creating deployment hierarchy: {e}")
+            results["errors"].append(f"Unexpected error: {str(e)}")
+            self.db.rollback()
+        
+        return results
+    
+    def _create_organization(
+        self,
+        deployment: ComputorDeploymentConfig,
+        created_by_user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create organization with GitLab group and database entry."""
+        result = {
+            "success": False,
+            "organization": None,
+            "gitlab_group": None,
+            "gitlab_created": False,
+            "db_created": False,
+            "error": None
+        }
+        
+        try:
+            # Check if organization already exists in database
+            existing_org = self.org_repo.find_by_path(deployment.organization.path)
+            
+            if existing_org:
+                logger.info(f"Organization already exists: {existing_org.path}")
+                result["organization"] = existing_org
+                
+                # Validate GitLab group if properties exist
+                if existing_org.properties and existing_org.properties.get("gitlab"):
+                    gitlab_config = existing_org.properties["gitlab"]
+                    if gitlab_config.get("group_id"):
+                        # Validate the GitLab group still exists
+                        is_valid = self._validate_gitlab_group(
+                            gitlab_config["group_id"],
+                            deployment.organization.path
+                        )
+                        if not is_valid:
+                            # Need to recreate GitLab group
+                            logger.warning(f"GitLab group for organization {existing_org.path} no longer exists")
+                            gitlab_group, gitlab_config = self._create_gitlab_group(
+                                deployment.organization.name,
+                                deployment.organization.path,
+                                deployment.organization.gitlab.parent,
+                                deployment.organization.description
+                            )
+                            result["gitlab_group"] = gitlab_group
+                            result["gitlab_created"] = True
+                            
+                            # Update organization properties
+                            self._update_organization_gitlab_properties(
+                                existing_org,
+                                gitlab_group,
+                                gitlab_config
+                            )
+                        else:
+                            result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
+                    else:
+                        # No group_id stored, create GitLab group
+                        gitlab_group, gitlab_config = self._create_gitlab_group(
+                            deployment.organization.name,
+                            deployment.organization.path,
+                            deployment.organization.gitlab.parent,
+                            deployment.organization.description
+                        )
+                        result["gitlab_group"] = gitlab_group
+                        result["gitlab_created"] = True
+                        
+                        # Update organization properties
+                        self._update_organization_gitlab_properties(
+                            existing_org,
+                            gitlab_group,
+                            gitlab_config
+                        )
+                else:
+                    # No GitLab properties, create GitLab group
+                    gitlab_group, gitlab_config = self._create_gitlab_group(
+                        deployment.organization.name,
+                        deployment.organization.path,
+                        deployment.organization.gitlab.parent,
+                        deployment.organization.description
+                    )
+                    result["gitlab_group"] = gitlab_group
+                    result["gitlab_created"] = True
+                    
+                    # Update organization properties
+                    self._update_organization_gitlab_properties(
+                        existing_org,
+                        gitlab_group,
+                        gitlab_config
+                    )
+                
+                result["success"] = True
+                return result
+            
+            # Create new organization
+            # First create GitLab group
+            gitlab_group, gitlab_config = self._create_gitlab_group(
+                deployment.organization.name,
+                deployment.organization.path,
+                deployment.organization.gitlab.parent,
+                deployment.organization.description
+            )
+            result["gitlab_group"] = gitlab_group
+            result["gitlab_created"] = True
+            
+            # Create organization in database
+            org_data = OrganizationCreate(
+                title=deployment.organization.name,
+                description=deployment.organization.description,
+                path=deployment.organization.path,
+                organization_type="organization",
+                properties=OrganizationProperties(gitlab=gitlab_config)
+            )
+            
+            new_org = Organization(
+                title=org_data.title,
+                description=org_data.description,
+                path=Ltree(org_data.path),  # Convert to Ltree
+                organization_type=org_data.organization_type,
+                properties=org_data.properties.model_dump() if org_data.properties else {},
+                created_by=created_by_user_id,
+                updated_by=created_by_user_id
+            )
+            
+            created_org = self.org_repo.create(new_org)
+            result["organization"] = created_org
+            result["db_created"] = True
+            result["success"] = True
+            
+            logger.info(f"Created organization: {created_org.path} (ID: {created_org.id})")
+            
+        except GitlabCreateError as e:
+            logger.error(f"GitLab error creating organization: {e}")
+            result["error"] = f"GitLab error: {str(e)}"
+        except IntegrityError as e:
+            logger.error(f"Database integrity error creating organization: {e}")
+            result["error"] = f"Database integrity error: {str(e)}"
+        except Exception as e:
+            logger.error(f"Unexpected error creating organization: {e}")
+            result["error"] = f"Unexpected error: {str(e)}"
+        
+        return result
+    
+    def _create_course_family(
+        self,
+        deployment: ComputorDeploymentConfig,
+        organization: Organization,
+        created_by_user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create course family with GitLab group and database entry."""
+        result = {
+            "success": False,
+            "course_family": None,
+            "gitlab_group": None,
+            "gitlab_created": False,
+            "db_created": False,
+            "error": None
+        }
+        
+        try:
+            # Check if course family already exists
+            existing_family = self.db.query(CourseFamily).filter(
+                CourseFamily.organization_id == organization.id,
+                CourseFamily.path == Ltree(deployment.courseFamily.path)
+            ).first()
+            
+            if existing_family:
+                logger.info(f"CourseFamily already exists: {existing_family.path}")
+                result["course_family"] = existing_family
+                
+                # Get parent GitLab group
+                parent_gitlab_config = organization.properties.get("gitlab", {})
+                parent_group_id = parent_gitlab_config.get("group_id")
+                
+                if not parent_group_id:
+                    result["error"] = "Parent organization missing GitLab group_id"
+                    return result
+                
+                parent_group = self.gitlab.groups.get(parent_group_id)
+                
+                # Validate GitLab group if properties exist
+                if existing_family.properties and existing_family.properties.get("gitlab"):
+                    gitlab_config = existing_family.properties["gitlab"]
+                    if gitlab_config.get("group_id"):
+                        is_valid = self._validate_gitlab_group(
+                            gitlab_config["group_id"],
+                            f"{parent_group.full_path}/{deployment.courseFamily.path}"
+                        )
+                        if not is_valid:
+                            # Recreate GitLab group
+                            gitlab_group, gitlab_config = self._create_gitlab_group(
+                                deployment.courseFamily.name,
+                                deployment.courseFamily.path,
+                                parent_group_id,
+                                deployment.courseFamily.description,
+                                parent_group
+                            )
+                            result["gitlab_group"] = gitlab_group
+                            result["gitlab_created"] = True
+                            
+                            # Update properties
+                            self._update_course_family_gitlab_properties(
+                                existing_family,
+                                gitlab_group,
+                                gitlab_config
+                            )
+                        else:
+                            result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
+                    else:
+                        # Create GitLab group
+                        gitlab_group, gitlab_config = self._create_gitlab_group(
+                            deployment.courseFamily.name,
+                            deployment.courseFamily.path,
+                            parent_group_id,
+                            deployment.courseFamily.description,
+                            parent_group
+                        )
+                        result["gitlab_group"] = gitlab_group
+                        result["gitlab_created"] = True
+                        
+                        # Update properties
+                        self._update_course_family_gitlab_properties(
+                            existing_family,
+                            gitlab_group,
+                            gitlab_config
+                        )
+                else:
+                    # Create GitLab group
+                    gitlab_group, gitlab_config = self._create_gitlab_group(
+                        deployment.courseFamily.name,
+                        deployment.courseFamily.path,
+                        parent_group_id,
+                        deployment.courseFamily.description,
+                        parent_group
+                    )
+                    result["gitlab_group"] = gitlab_group
+                    result["gitlab_created"] = True
+                    
+                    # Update properties
+                    self._update_course_family_gitlab_properties(
+                        existing_family,
+                        gitlab_group,
+                        gitlab_config
+                    )
+                
+                result["success"] = True
+                return result
+            
+            # Create new course family
+            # Get parent GitLab group
+            parent_gitlab_config = organization.properties.get("gitlab", {})
+            parent_group_id = parent_gitlab_config.get("group_id")
+            
+            if not parent_group_id:
+                result["error"] = "Parent organization missing GitLab group_id"
+                return result
+            
+            parent_group = self.gitlab.groups.get(parent_group_id)
+            
+            # Create GitLab group
+            gitlab_group, gitlab_config = self._create_gitlab_group(
+                deployment.courseFamily.name,
+                deployment.courseFamily.path,
+                parent_group_id,
+                deployment.courseFamily.description,
+                parent_group
+            )
+            result["gitlab_group"] = gitlab_group
+            result["gitlab_created"] = True
+            
+            # Create course family in database
+            family_data = CourseFamilyCreate(
+                title=deployment.courseFamily.name,
+                description=deployment.courseFamily.description,
+                path=deployment.courseFamily.path,
+                organization_id=str(organization.id),
+                properties=CourseFamilyProperties(gitlab=gitlab_config)
+            )
+            
+            new_family = CourseFamily(
+                title=family_data.title,
+                description=family_data.description,
+                path=Ltree(family_data.path),  # Convert to Ltree
+                organization_id=organization.id,
+                properties=family_data.properties.model_dump() if family_data.properties else {},
+                created_by=created_by_user_id,
+                updated_by=created_by_user_id
+            )
+            
+            self.db.add(new_family)
+            self.db.flush()  # Get the ID
+            
+            result["course_family"] = new_family
+            result["db_created"] = True
+            result["success"] = True
+            
+            logger.info(f"Created course family: {new_family.path} (ID: {new_family.id})")
+            
+        except GitlabCreateError as e:
+            logger.error(f"GitLab error creating course family: {e}")
+            result["error"] = f"GitLab error: {str(e)}"
+        except IntegrityError as e:
+            logger.error(f"Database integrity error creating course family: {e}")
+            result["error"] = f"Database integrity error: {str(e)}"
+        except Exception as e:
+            logger.error(f"Unexpected error creating course family: {e}")
+            result["error"] = f"Unexpected error: {str(e)}"
+        
+        return result
+    
+    def _create_course(
+        self,
+        deployment: ComputorDeploymentConfig,
+        organization: Organization,
+        course_family: CourseFamily,
+        created_by_user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create course with GitLab group and database entry."""
+        result = {
+            "success": False,
+            "course": None,
+            "gitlab_group": None,
+            "gitlab_created": False,
+            "db_created": False,
+            "error": None
+        }
+        
+        try:
+            # Check if course already exists
+            existing_course = self.db.query(Course).filter(
+                Course.course_family_id == course_family.id,
+                Course.path == Ltree(deployment.course.path)
+            ).first()
+            
+            if existing_course:
+                logger.info(f"Course already exists: {existing_course.path}")
+                result["course"] = existing_course
+                
+                # Get parent GitLab group
+                parent_gitlab_config = course_family.properties.get("gitlab", {})
+                parent_group_id = parent_gitlab_config.get("group_id")
+                
+                if not parent_group_id:
+                    result["error"] = "Parent course family missing GitLab group_id"
+                    return result
+                
+                parent_group = self.gitlab.groups.get(parent_group_id)
+                
+                # Validate GitLab group if properties exist
+                if existing_course.properties and existing_course.properties.get("gitlab"):
+                    gitlab_config = existing_course.properties["gitlab"]
+                    if gitlab_config.get("group_id"):
+                        is_valid = self._validate_gitlab_group(
+                            gitlab_config["group_id"],
+                            f"{parent_group.full_path}/{deployment.course.path}"
+                        )
+                        if not is_valid:
+                            # Recreate GitLab group
+                            gitlab_group, gitlab_config = self._create_gitlab_group(
+                                deployment.course.name,
+                                deployment.course.path,
+                                parent_group_id,
+                                deployment.course.description,
+                                parent_group
+                            )
+                            result["gitlab_group"] = gitlab_group
+                            result["gitlab_created"] = True
+                            
+                            # Update properties
+                            self._update_course_gitlab_properties(
+                                existing_course,
+                                gitlab_group,
+                                gitlab_config
+                            )
+                        else:
+                            result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
+                    else:
+                        # Create GitLab group
+                        gitlab_group, gitlab_config = self._create_gitlab_group(
+                            deployment.course.name,
+                            deployment.course.path,
+                            parent_group_id,
+                            deployment.course.description,
+                            parent_group
+                        )
+                        result["gitlab_group"] = gitlab_group
+                        result["gitlab_created"] = True
+                        
+                        # Update properties
+                        self._update_course_gitlab_properties(
+                            existing_course,
+                            gitlab_group,
+                            gitlab_config
+                        )
+                else:
+                    # Create GitLab group
+                    gitlab_group, gitlab_config = self._create_gitlab_group(
+                        deployment.course.name,
+                        deployment.course.path,
+                        parent_group_id,
+                        deployment.course.description,
+                        parent_group
+                    )
+                    result["gitlab_group"] = gitlab_group
+                    result["gitlab_created"] = True
+                    
+                    # Update properties
+                    self._update_course_gitlab_properties(
+                        existing_course,
+                        gitlab_group,
+                        gitlab_config
+                    )
+                
+                result["success"] = True
+                return result
+            
+            # Create new course
+            # Get parent GitLab group
+            parent_gitlab_config = course_family.properties.get("gitlab", {})
+            parent_group_id = parent_gitlab_config.get("group_id")
+            
+            if not parent_group_id:
+                result["error"] = "Parent course family missing GitLab group_id"
+                return result
+            
+            parent_group = self.gitlab.groups.get(parent_group_id)
+            
+            # Create GitLab group
+            gitlab_group, gitlab_config = self._create_gitlab_group(
+                deployment.course.name,
+                deployment.course.path,
+                parent_group_id,
+                deployment.course.description,
+                parent_group
+            )
+            result["gitlab_group"] = gitlab_group
+            result["gitlab_created"] = True
+            
+            # Create course in database
+            course_data = CourseCreate(
+                title=deployment.course.name,
+                description=deployment.course.description,
+                path=deployment.course.path,
+                course_family_id=str(course_family.id),
+                properties=CourseProperties(gitlab=gitlab_config)
+            )
+            
+            new_course = Course(
+                title=course_data.title,
+                description=course_data.description,
+                path=Ltree(course_data.path),  # Convert to Ltree
+                course_family_id=course_family.id,
+                organization_id=organization.id,
+                properties=course_data.properties.model_dump() if course_data.properties else {},
+                created_by=created_by_user_id,
+                updated_by=created_by_user_id
+            )
+            
+            self.db.add(new_course)
+            self.db.flush()  # Get the ID
+            
+            result["course"] = new_course
+            result["db_created"] = True
+            result["success"] = True
+            
+            logger.info(f"Created course: {new_course.path} (ID: {new_course.id})")
+            
+        except GitlabCreateError as e:
+            logger.error(f"GitLab error creating course: {e}")
+            result["error"] = f"GitLab error: {str(e)}"
+        except IntegrityError as e:
+            logger.error(f"Database integrity error creating course: {e}")
+            result["error"] = f"Database integrity error: {str(e)}"
+        except Exception as e:
+            logger.error(f"Unexpected error creating course: {e}")
+            result["error"] = f"Unexpected error: {str(e)}"
+        
+        return result
+    
+    def _create_gitlab_group(
+        self,
+        name: str,
+        path: str,
+        parent_id: Optional[int],
+        description: str = "",
+        parent_group: Optional[Group] = None
+    ) -> Tuple[Group, Dict[str, Any]]:
+        """
+        Create or get GitLab group with enhanced metadata.
+        
+        Returns:
+            Tuple of (Group, enhanced_config_dict)
+        """
+        # Construct full path
+        if parent_group:
+            full_path = f"{parent_group.full_path}/{path}"
+        elif parent_id:
+            parent = self.gitlab.groups.get(parent_id)
+            full_path = f"{parent.full_path}/{path}"
+        else:
+            full_path = path
+        
+        # Search for existing group
+        try:
+            groups = self.gitlab.groups.list(all=True)
+            existing_groups = [g for g in groups if g.full_path == full_path]
+            
+            if existing_groups:
+                group = self.gitlab.groups.get(existing_groups[0].id)
+                logger.info(f"Found existing GitLab group: {group.full_path}")
+                
+                # Update description if needed
+                if description and group.description != description:
+                    group.description = description
+                    group.save()
+                
+                # Return group with enhanced config
+                enhanced_config = self._create_enhanced_config(group)
+                return group, enhanced_config
+                
+        except Exception as e:
+            logger.warning(f"Error searching for group: {e}")
+        
+        # Create new group
+        payload = {
+            "path": path,
+            "name": name,
+            "description": description
+        }
+        
+        if parent_id:
+            payload["parent_id"] = parent_id
+        
+        try:
+            group = self.gitlab.groups.create(payload)
+            logger.info(f"Created new GitLab group: {group.full_path}")
+            
+            # Return group with enhanced config
+            enhanced_config = self._create_enhanced_config(group)
+            return group, enhanced_config
+            
+        except GitlabCreateError as e:
+            # Check if it's a duplicate error
+            if "has already been taken" in str(e):
+                # Try to find the existing group
+                groups = self.gitlab.groups.list(all=True)
+                existing_groups = [g for g in groups if g.full_path == full_path]
+                if existing_groups:
+                    group = self.gitlab.groups.get(existing_groups[0].id)
+                    logger.info(f"Found existing GitLab group after create error: {group.full_path}")
+                    enhanced_config = self._create_enhanced_config(group)
+                    return group, enhanced_config
+            raise
+    
+    def _create_enhanced_config(self, group: Group) -> Dict[str, Any]:
+        """Create enhanced GitLab configuration from group."""
+        config = {
+            "url": self.gitlab_url,
+            "token": self.gitlab_token,
+            "group_id": int(group.id) if group.id is not None else None,
+            "full_path": group.full_path,
+            "parent": int(group.parent_id) if group.parent_id is not None else None,  # Use 'parent' for compatibility
+            "parent_id": int(group.parent_id) if group.parent_id is not None else None,
+            "namespace_id": group.namespace.get('id') if hasattr(group, 'namespace') else None,
+            "namespace_path": group.namespace.get('path') if hasattr(group, 'namespace') else None,
+            "web_url": group.web_url,
+            "visibility": group.visibility,
+            "last_synced_at": datetime.now(timezone.utc).isoformat()
+        }
+        return config
+    
+    def _validate_gitlab_group(self, group_id: int, expected_path: str) -> bool:
+        """Validate if GitLab group exists and matches expected path."""
+        try:
+            group = self.gitlab.groups.get(group_id)
+            return group.full_path == expected_path
+        except GitlabGetError:
+            return False
+        except Exception as e:
+            logger.warning(f"Error validating GitLab group {group_id}: {e}")
+            return False
+    
+    def _update_organization_gitlab_properties(
+        self,
+        organization: Organization,
+        gitlab_group: Group,
+        gitlab_config: Dict[str, Any]
+    ):
+        """Update organization with enhanced GitLab properties."""
+        if not organization.properties:
+            organization.properties = {}
+        
+        organization.properties["gitlab"] = gitlab_config
+        self.db.flush()
+        
+        logger.info(f"Updated organization {organization.path} with GitLab properties")
+    
+    def _update_course_family_gitlab_properties(
+        self,
+        course_family: CourseFamily,
+        gitlab_group: Group,
+        gitlab_config: Dict[str, Any]
+    ):
+        """Update course family with enhanced GitLab properties."""
+        if not course_family.properties:
+            course_family.properties = {}
+        
+        course_family.properties["gitlab"] = gitlab_config
+        self.db.flush()
+        
+        logger.info(f"Updated course family {course_family.path} with GitLab properties")
+    
+    def _update_course_gitlab_properties(
+        self,
+        course: Course,
+        gitlab_group: Group,
+        gitlab_config: Dict[str, Any]
+    ):
+        """Update course with enhanced GitLab properties."""
+        if not course.properties:
+            course.properties = {}
+        
+        course.properties["gitlab"] = gitlab_config
+        self.db.flush()
+        
+        logger.info(f"Updated course {course.path} with GitLab properties")

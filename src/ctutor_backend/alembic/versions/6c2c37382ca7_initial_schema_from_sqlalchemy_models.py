@@ -173,7 +173,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_organization_path'), 'organization', ['path'], unique=False)
     op.create_index('organization_number_key', 'organization', ['organization_type', 'number'], unique=True)
     op.create_index('organization_path_key', 'organization', ['organization_type', 'path'], unique=True)
-    op.create_table('example_repositories',
+    op.create_table('example_repository',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False, comment='Human-readable name of the repository'),
     sa.Column('description', sa.Text(), nullable=True, comment='Description of the repository and its contents'),
@@ -193,7 +193,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('source_url')
     )
-    op.create_table('examples',
+    op.create_table('example',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_repository_id', postgresql.UUID(), nullable=False, comment='Reference to the repository containing this example'),
     sa.Column('directory', sa.String(length=255), nullable=False, comment="Name of the directory containing this example (e.g., 'hello-world')"),
@@ -210,7 +210,7 @@ def upgrade() -> None:
     sa.Column('updated_by', postgresql.UUID(), nullable=True, comment='User who last updated this example record'),
     sa.CheckConstraint("directory ~ '^[a-zA-Z0-9_-]+$'", name='check_directory_format'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
-    sa.ForeignKeyConstraint(['example_repository_id'], ['example_repositories.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['example_repository_id'], ['example_repository.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('example_repository_id', 'directory', name='unique_example_per_directory')
@@ -637,8 +637,8 @@ def downgrade() -> None:
     op.drop_table('session')
     op.drop_table('role_claim')
     op.drop_table('profile')
-    op.drop_table('examples')
-    op.drop_table('example_repositories')
+    op.drop_table('example')
+    op.drop_table('example_repository')
     op.drop_index('organization_path_key', table_name='organization')
     op.drop_index('organization_number_key', table_name='organization')
     op.drop_index(op.f('ix_organization_path'), table_name='organization')

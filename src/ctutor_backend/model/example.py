@@ -22,7 +22,7 @@ class ExampleRepository(Base):
     The repository can be public, private, or restricted to specific organizations.
     """
     
-    __tablename__ = "example_repositories"
+    __tablename__ = "example_repository"
     
     # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -101,7 +101,7 @@ class Example(Base):
     Contains educational metadata and file structure information.
     """
     
-    __tablename__ = "examples"
+    __tablename__ = "example"
     
     # Primary key
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -109,7 +109,7 @@ class Example(Base):
     # Repository relationship
     example_repository_id = Column(
         UUID(as_uuid=True), 
-        ForeignKey("example_repositories.id", ondelete="CASCADE"), 
+        ForeignKey("example_repository.id", ondelete="CASCADE"), 
         nullable=False,
         comment="Reference to the repository containing this example"
     )

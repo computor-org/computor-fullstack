@@ -93,35 +93,35 @@ async def main():
     
     gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)
     
-    # try:
-    #     # Test authentication by making a simple API call
-    #     # For group tokens, gl.auth() doesn't work properly
-    #     version = gl.version()
-    #     logger.info("✅ GitLab authentication successful")
-    #     logger.info(f"Connected to GitLab version: {version}")
+    try:
+        # Test authentication by making a simple API call
+        # For group tokens, gl.auth() doesn't work properly
+        version = gl.version()
+        logger.info("✅ GitLab authentication successful")
+        logger.info(f"Connected to GitLab version: {version}")
         
-    #     # Try to get user info if it's a personal token
-    #     try:
-    #         user = gl.user
-    #         if user:
-    #             logger.info(f"Connected as user: {user.username}")
-    #         else:
-    #             logger.info("Connected with group/project token")
-    #     except:
-    #         logger.info("Connected with group/project token")
+        # Try to get user info if it's a personal token
+        try:
+            user = gl.user
+            if user:
+                logger.info(f"Connected as user: {user.username}")
+            else:
+                logger.info("Connected with group/project token")
+        except:
+            logger.info("Connected with group/project token")
         
-    #     # Test if we can create groups by trying to list groups
-    #     try:
-    #         groups = gl.groups.list(per_page=1)
-    #         logger.info(f"✅ Can access groups API (found {len(groups)} groups)")
-    #     except Exception as e:
-    #         logger.error(f"❌ Cannot access groups API: {e}")
-    #         logger.error("This token may not have 'api' scope or group creation permissions")
-    #         return
+        # Test if we can create groups by trying to list groups
+        try:
+            groups = gl.groups.list(per_page=1)
+            logger.info(f"✅ Can access groups API (found {len(groups)} groups)")
+        except Exception as e:
+            logger.error(f"❌ Cannot access groups API: {e}")
+            logger.error("This token may not have 'api' scope or group creation permissions")
+            return
             
-    # except Exception as e:
-    #     logger.error(f"GitLab authentication failed: {e}")
-    #     return
+    except Exception as e:
+        logger.error(f"GitLab authentication failed: {e}")
+        return
     
     # Create builder
     builder = GitLabBuilderNew(

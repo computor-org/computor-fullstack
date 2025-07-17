@@ -93,10 +93,6 @@ class GitLabConfigGet(RepositoryConfig):
   visibility: Optional[str] = None
   last_synced_at: Optional[str] = None
 
-  @property
-  def web_url_computed(self) -> str:
-    return f"{self.url}/{self.full_path}"
-
 class GitLabConfig(GitLabConfigGet):
   token: Optional[str] = None
 

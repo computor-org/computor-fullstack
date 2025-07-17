@@ -627,6 +627,18 @@ class GitLabBuilderNew:
                         logger.warning(f"Failed to create students group: {students_group_result['error']}")
                     else:
                         logger.info(f"Ensured students group exists: {students_group_result['gitlab_group'].full_path}")
+                    
+                    # Ensure course projects exist for existing course
+                    projects_result = self._create_course_projects(
+                        course=existing_course,
+                        parent_group=result["gitlab_group"],
+                        deployment=deployment
+                    )
+                    
+                    if not projects_result["success"]:
+                        logger.warning(f"Failed to create course projects: {projects_result['error']}")
+                    else:
+                        logger.info(f"Ensured course projects exist: {', '.join(projects_result['created_projects'])}")
                 
                 result["success"] = True
                 return result
@@ -695,6 +707,19 @@ class GitLabBuilderNew:
                 # Don't fail the entire course creation, just log the warning
             else:
                 logger.info(f"Created students group: {students_group_result['gitlab_group'].full_path}")
+            
+            # Create course projects (assignments, student-template, reference)
+            projects_result = self._create_course_projects(
+                course=new_course,
+                parent_group=gitlab_group,
+                deployment=deployment
+            )
+            
+            if not projects_result["success"]:
+                logger.warning(f"Failed to create course projects: {projects_result['error']}")
+                # Don't fail the entire course creation, just log the warning
+            else:
+                logger.info(f"Created course projects: {', '.join(projects_result['created_projects'])}")
             
             result["success"] = True
             
@@ -938,6 +963,117 @@ class GitLabBuilderNew:
             result["error"] = str(e)
         except Exception as e:
             logger.error(f"Unexpected error creating students group: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def _create_course_projects(
+        self,
+        course: Course,
+        parent_group: Group,
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Create course projects (assignments, student-template, reference) under a course."""
+        result = {
+            "success": False,
+            "created_projects": [],
+            "existing_projects": [],
+            "error": None
+        }
+        
+        # Standard course projects
+        project_configs = [
+            {
+                "name": "Assignments",
+                "path": "assignments",
+                "description": f"Assignment templates and grading scripts for {course.title}",
+                "visibility": "private"
+            },
+            {
+                "name": "Student Template",
+                "path": "student-template",
+                "description": f"Template repository for students in {course.title}",
+                "visibility": "private"
+            },
+            {
+                "name": "Reference",
+                "path": "reference",
+                "description": f"Reference solutions and instructor materials for {course.title}",
+                "visibility": "private"
+            }
+        ]
+        
+        try:
+            for project_config in project_configs:
+                project_path = project_config["path"]
+                full_path = f"{parent_group.full_path}/{project_path}"
+                
+                # Check if project already exists
+                existing_projects = self.gitlab.projects.list(
+                    search=project_path,
+                    namespace_id=parent_group.id
+                )
+                
+                project_exists = False
+                for existing in existing_projects:
+                    if existing.path == project_path and existing.namespace.id == parent_group.id:
+                        logger.info(f"Project already exists: {existing.path_with_namespace}")
+                        result["existing_projects"].append(project_path)
+                        project_exists = True
+                        break
+                
+                if not project_exists:
+                    # Create project
+                    project_data = {
+                        'name': project_config["name"],
+                        'path': project_path,
+                        'namespace_id': parent_group.id,
+                        'description': project_config["description"],
+                        'visibility': project_config["visibility"],
+                        'initialize_with_readme': True,
+                        'default_branch': 'main'
+                    }
+                    
+                    project = self.gitlab.projects.create(project_data)
+                    logger.info(f"Created project: {project.path_with_namespace}")
+                    result["created_projects"].append(project_path)
+            
+            # Update course properties to include projects info
+            if not course.properties:
+                course.properties = {}
+            
+            if "gitlab" not in course.properties:
+                course.properties["gitlab"] = {}
+            
+            course.properties["gitlab"]["projects"] = {
+                "assignments": {
+                    "path": "assignments",
+                    "full_path": f"{parent_group.full_path}/assignments",
+                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/assignments",
+                    "description": "Assignment templates and grading scripts"
+                },
+                "student_template": {
+                    "path": "student-template",
+                    "full_path": f"{parent_group.full_path}/student-template",
+                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/student-template",
+                    "description": "Template repository for students"
+                },
+                "reference": {
+                    "path": "reference",
+                    "full_path": f"{parent_group.full_path}/reference",
+                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/reference",
+                    "description": "Reference solutions and instructor materials"
+                },
+                "created_at": datetime.now().isoformat()
+            }
+            
+            self.db.flush()
+            self.db.refresh(course)
+            
+            result["success"] = True
+            
+        except Exception as e:
+            logger.error(f"Failed to create course projects: {e}")
             result["error"] = str(e)
         
         return result

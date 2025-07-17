@@ -54,3 +54,4 @@ class Organization(Base):
     user = relationship('User', foreign_keys=[user_id], back_populates='organization')
     course_families = relationship('CourseFamily', back_populates='organization', uselist=True, lazy='select')
     courses = relationship('Course', back_populates='organization', uselist=True, lazy='select')
+    example_repositories = relationship('ExampleRepository', back_populates='organization', uselist=True, lazy='select')

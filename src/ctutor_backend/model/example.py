@@ -11,7 +11,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
 
-from ctutor_backend.model.base import Base
+from .base import Base
 
 
 class ExampleRepository(Base):
@@ -57,7 +57,7 @@ class ExampleRepository(Base):
     
     # Relationships
     examples = relationship("Example", back_populates="repository", cascade="all, delete-orphan")
-    organization = relationship("Organization", foreign_keys=[organization_id])
+    organization = relationship("Organization", back_populates="example_repositories")
     created_by_user = relationship("User", foreign_keys=[created_by])
     updated_by_user = relationship("User", foreign_keys=[updated_by])
     
@@ -66,7 +66,7 @@ class ExampleRepository(Base):
         CheckConstraint(
             "visibility IN ('public', 'private', 'restricted')",
             name="check_visibility"
-        )
+        ),
     )
     
     def __repr__(self):

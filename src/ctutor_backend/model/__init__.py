@@ -20,9 +20,10 @@ from .result import Result
 from .role import Role, RoleClaim, UserRole
 from .group import Group, GroupClaim, UserGroup
 from .message import Message, MessageRead
+from .example import Example, ExampleRepository
 
 # Import all models to ensure relationships are properly set up
-from . import auth, organization, role, group, execution, course, result, message
+from . import auth, organization, role, group, execution, course, result, message, example
 
 __all__ = [
     'Base',
@@ -62,5 +63,8 @@ __all__ = [
     'UserGroup',
     # Message models
     'Message',
-    'MessageRead'
+    'MessageRead',
+    # Example models
+    'ExampleRepository',
+    'Example'
 ]

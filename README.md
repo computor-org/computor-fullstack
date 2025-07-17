@@ -27,10 +27,22 @@ pip install -r src/requirements.txt
 
 Make sure that Docker (or orbstack on MacOS) are running. Start the development environment with
 ```bash
-cd execution-backend-stub
-bash startup_dev.sh
+bash startup.sh
 ```
-This will start all services, except the Python FastAPI. This Python service already needs an existing database. For development this process is done manually. In the productive mode, `startup_prod.sh` handles the database setup already.
+
+You can also pass additional docker-compose arguments:
+```bash
+# Rebuild containers
+bash startup.sh dev --build
+
+# Production mode with rebuild
+bash startup.sh prod --build
+
+# Force recreate containers
+bash startup.sh dev --build --force-recreate
+```
+
+This will start all services, except the Python FastAPI. This Python service already needs an existing database. For development this process is done manually.
 
 Be sure that the local PostgreSQL server is disabled, so the one exposed by Docker is used! E.g. on Ubuntu
 ```

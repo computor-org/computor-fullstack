@@ -69,11 +69,11 @@ async def main():
     
     # Get GitLab connection
     gitlab_url = os.getenv("GITLAB_URL", "http://localhost:8084")
-    gitlab_token = os.getenv("GITLAB_TOKEN")
+    gitlab_token = os.getenv("TEST_GITLAB_TOKEN")
     
     if not gitlab_token:
-        logger.error("GITLAB_TOKEN environment variable not set")
-        logger.info("Please run with: GITLAB_TOKEN='your-token' python test_students_group.py")
+        logger.error("TEST_GITLAB_TOKEN environment variable not set")
+        logger.info("Please run with: TEST_GITLAB_TOKEN='your-token' python test_students_group.py")
         return
     
     gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)

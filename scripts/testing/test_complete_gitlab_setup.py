@@ -29,20 +29,24 @@ logger = logging.getLogger(__name__)
 
 def create_demo_deployment():
     """Create a demo deployment configuration."""
+    import random
+    import string
+    suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+    
     return ComputorDeploymentConfig(
         organization=OrganizationConfig(
-            name="Demo University",
-            path="demo-university",
+            name=f"Demo University {suffix}",
+            path=f"demo_university_{suffix}",  # ltree doesn't allow hyphens
             description="Demo university for testing GitLab integration",
             gitlab=GitLabConfig(
-                parent=1,  # Root namespace
+                parent=None,  # Create at root level
                 url="",
                 directory=""
             )
         ),
         courseFamily=CourseFamilyConfig(
-            name="Computer Science 2024",
-            path="cs-2024",
+            name=f"Computer Science 2024 {suffix}",
+            path=f"cs_2024_{suffix}",  # ltree doesn't allow hyphens
             description="Computer Science courses for 2024",
             gitlab=GitLabConfig(
                 parent=None,
@@ -51,8 +55,8 @@ def create_demo_deployment():
             )
         ),
         course=CourseConfig(
-            name="Introduction to Programming",
-            path="intro-programming",
+            name=f"Introduction to Programming {suffix}",
+            path=f"intro_programming_{suffix}",  # ltree doesn't allow hyphens
             description="Learn programming fundamentals with Python",
             gitlab=GitLabConfig(
                 parent=None,
@@ -68,8 +72,8 @@ async def main():
     db = next(get_db())
     
     # Get GitLab connection
-    gitlab_url = os.getenv("GITLAB_URL", "http://localhost:8084")
-    gitlab_token = os.getenv("GITLAB_TOKEN")
+    gitlab_url = os.getenv("TEST_GITLAB_URL", os.getenv("GITLAB_URL", "http://localhost:8084"))
+    gitlab_token = os.getenv("TEST_GITLAB_TOKEN")
     
     if not gitlab_token:
         logger.error("GITLAB_TOKEN environment variable not set")
@@ -92,7 +96,11 @@ async def main():
         return
     
     # Create builder
-    builder = GitLabBuilderNew(db=db, gitlab=gl, user_id="demo-user")
+    builder = GitLabBuilderNew(
+        db_session=db,
+        gitlab_url=gitlab_url,
+        gitlab_token=gitlab_token
+    )
     
     # Create deployment config
     deployment = create_demo_deployment()
@@ -104,7 +112,7 @@ async def main():
         
         # Create organization
         logger.info("\n1. Creating Organization...")
-        org_result = builder._create_organization(deployment, created_by_user_id="demo-user")
+        org_result = builder._create_organization(deployment, created_by_user_id=None)
         
         if not org_result["success"]:
             logger.error(f"❌ Failed to create organization: {org_result['error']}")
@@ -119,7 +127,7 @@ async def main():
         family_result = builder._create_course_family(
             deployment, 
             organization, 
-            created_by_user_id="demo-user"
+            created_by_user_id=None
         )
         
         if not family_result["success"]:
@@ -136,7 +144,7 @@ async def main():
             deployment,
             organization,
             course_family,
-            created_by_user_id="demo-user"
+            created_by_user_id=None
         )
         
         if not course_result["success"]:

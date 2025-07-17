@@ -778,7 +778,7 @@ class GitLabBuilderNew:
             "parent_id": int(group.parent_id) if group.parent_id is not None else None,
             "namespace_id": group.namespace.get('id') if hasattr(group, 'namespace') else None,
             "namespace_path": group.namespace.get('path') if hasattr(group, 'namespace') else None,
-            "web_url": group.web_url,
+            "web_url": f"{self.gitlab_url}/groups/{group.full_path}",
             "visibility": group.visibility,
             "last_synced_at": datetime.now(timezone.utc).isoformat()
         }
@@ -901,7 +901,7 @@ class GitLabBuilderNew:
             course.properties["gitlab"]["students_group"] = {
                 "group_id": students_group.id,
                 "full_path": students_group.full_path,
-                "web_url": students_group.web_url,
+                "web_url": f"{self.gitlab_url}/groups/{students_group.full_path}",
                 "created_at": datetime.now().isoformat()
             }
             

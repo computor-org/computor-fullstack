@@ -10,6 +10,14 @@ set +a
 
 ENVIRONMENT=${1:-dev}
 
+# Shift the first argument if it's an environment (dev/prod)
+if [[ "$1" == "dev" ]] || [[ "$1" == "prod" ]]; then
+    shift
+fi
+
+# Capture any additional docker-compose arguments (like --build)
+DOCKER_ARGS="$@"
+
 DOCKERCFILE="docker-compose-${ENVIRONMENT}.yaml"
 
 destination="${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
@@ -56,4 +64,4 @@ fi
 
 echo "[Starting ${SYSTEM_TITLE} Server]"
 
-docker-compose -f $DOCKERCFILE up --build
+docker-compose -f $DOCKERCFILE up $DOCKER_ARGS

@@ -29,8 +29,8 @@ docker-compose -f docker-compose-dev.yaml up -d     # Development with workers
 docker-compose -f docker-compose-prod.yaml up -d    # Production with scaling
 
 # Database operations
-bash migrations.sh          # Alembic migrations
-bash initialize_system.sh   # Initialize system data (roles, admin user)
+bash scripts/utilities/migrations.sh          # Alembic migrations
+bash scripts/utilities/initialize_system.sh   # Initialize system data (roles, admin user)
 cd src && python seeder.py  # Seed development test data
 alembic revision --autogenerate -m "description"  # Generate new migration
 alembic upgrade head        # Apply all pending migrations
@@ -49,12 +49,12 @@ python -m celery -A ctutor_backend.tasks.celery_app worker --loglevel=info
 python -m celery -A ctutor_backend.tasks.celery_app flower  # Start Flower UI
 
 # Docker Celery testing and monitoring
-./test_celery_docker.sh start   # Start Docker services including Flower
-./test_celery_docker.sh ui      # Show Flower UI access information
-./test_celery_docker.sh all     # Full test cycle with Docker
+./scripts/testing/test_celery_docker.sh start   # Start Docker services including Flower
+./scripts/testing/test_celery_docker.sh ui      # Show Flower UI access information
+./scripts/testing/test_celery_docker.sh all     # Full test cycle with Docker
 
 # TypeScript Generation
-bash generate_types.sh          # Generate TypeScript interfaces
+bash scripts/utilities/generate_types.sh          # Generate TypeScript interfaces
 ctutor generate-types           # Generate with CLI
 ctutor generate-types --watch   # Watch mode for auto-regeneration
 ```
@@ -206,7 +206,7 @@ Automatic TypeScript interface generation from Pydantic models:
 - `/docker-compose-prod.yaml`: Production environment with Celery scaling
 - `/src/ctutor_backend/tasks/`: Celery task executor framework implementation
 - `/src/ctutor_backend/tasks/celery_app.py`: Celery application configuration and setup
-- `/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
+- `/scripts/testing/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration

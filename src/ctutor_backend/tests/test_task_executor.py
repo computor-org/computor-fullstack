@@ -24,7 +24,7 @@ docker-compose -f docker-compose-dev.yaml up -d redis celery-worker-high celery-
 pytest ctutor_backend/tests/test_task_executor.py -m docker
 
 # Or use the helper script for full automation
-./test_celery_docker.sh all
+./scripts/testing/test_celery_docker.sh all
 ```
 
 ### Test Categories

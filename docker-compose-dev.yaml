@@ -192,11 +192,11 @@ services:
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
       KC_HOSTNAME: localhost
       KC_HOSTNAME_PORT: 8180
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: 8080
-      KC_HEALTH_ENABLED: true
+      KC_HEALTH_ENABLED: "true"
     ports:
       - "8180:8080"
     command:

@@ -599,6 +599,19 @@ class GitLabBuilderNew:
                         gitlab_config
                     )
                 
+                # Ensure students group exists for existing course
+                if result.get("gitlab_group"):
+                    students_group_result = self._create_students_group(
+                        course=existing_course,
+                        parent_group=result["gitlab_group"],
+                        deployment=deployment
+                    )
+                    
+                    if not students_group_result["success"]:
+                        logger.warning(f"Failed to create students group: {students_group_result['error']}")
+                    else:
+                        logger.info(f"Ensured students group exists: {students_group_result['gitlab_group'].full_path}")
+                
                 result["success"] = True
                 return result
             
@@ -649,6 +662,20 @@ class GitLabBuilderNew:
             
             result["course"] = new_course
             result["db_created"] = True
+            
+            # Create students group under the course
+            students_group_result = self._create_students_group(
+                course=new_course,
+                parent_group=gitlab_group,
+                deployment=deployment
+            )
+            
+            if not students_group_result["success"]:
+                logger.warning(f"Failed to create students group: {students_group_result['error']}")
+                # Don't fail the entire course creation, just log the warning
+            else:
+                logger.info(f"Created students group: {students_group_result['gitlab_group'].full_path}")
+            
             result["success"] = True
             
             logger.info(f"Created course: {new_course.path} (ID: {new_course.id})")
@@ -821,3 +848,74 @@ class GitLabBuilderNew:
         self.db.refresh(course)
         
         logger.info(f"Updated course {course.path} with GitLab properties")
+    
+    def _create_students_group(
+        self,
+        course: Course,
+        parent_group: Group,
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Create students group under a course."""
+        result = {
+            "success": False,
+            "gitlab_group": None,
+            "error": None
+        }
+        
+        try:
+            # Check if students group already exists
+            students_path = "students"
+            full_path = f"{parent_group.full_path}/{students_path}"
+            
+            # Try to find existing students group
+            existing_groups = parent_group.subgroups.list(search=students_path)
+            students_group = None
+            
+            for group in existing_groups:
+                if group.path == students_path:
+                    students_group = self.gitlab.groups.get(group.id)
+                    logger.info(f"Students group already exists: {students_group.full_path}")
+                    result["gitlab_group"] = students_group
+                    result["success"] = True
+                    return result
+            
+            # Create students group
+            group_data = {
+                'name': 'Students',
+                'path': students_path,
+                'parent_id': parent_group.id,
+                'description': f'Students group for {course.title}',
+                'visibility': 'private'  # Students group should be private
+            }
+            
+            students_group = self.gitlab.groups.create(group_data)
+            logger.info(f"Created students group: {students_group.full_path}")
+            
+            # Update course properties to include students group info
+            if not course.properties:
+                course.properties = {}
+            
+            if "gitlab" not in course.properties:
+                course.properties["gitlab"] = {}
+            
+            course.properties["gitlab"]["students_group"] = {
+                "group_id": students_group.id,
+                "full_path": students_group.full_path,
+                "web_url": students_group.web_url,
+                "created_at": datetime.now().isoformat()
+            }
+            
+            self.db.flush()
+            self.db.refresh(course)
+            
+            result["gitlab_group"] = students_group
+            result["success"] = True
+            
+        except GitlabCreateError as e:
+            logger.error(f"Failed to create students group: {e}")
+            result["error"] = str(e)
+        except Exception as e:
+            logger.error(f"Unexpected error creating students group: {e}")
+            result["error"] = str(e)
+        
+        return result

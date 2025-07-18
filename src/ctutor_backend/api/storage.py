@@ -26,6 +26,8 @@ from ..services.storage_service import get_storage_service
 from ..api.auth import get_current_permissions
 from ..api.exceptions import BadRequestException, NotFoundException, ForbiddenException
 from ..redis_cache import get_redis_client
+from ..storage_security import sanitize_filename, perform_full_file_validation
+from ..storage_config import format_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -42,25 +44,58 @@ async def upload_file(
     permissions: Principal = Depends(get_current_permissions),
     storage_service = Depends(get_storage_service)
 ):
-    """Upload a file to storage"""
+    """Upload a file to storage with security validation"""
     # Check permissions
     if not permissions.permitted("storage", "create"):
         raise ForbiddenException("You don't have permission to upload files")
     
-    # Use filename as object key if not provided
+    # Read file content once for validation
+    file_content = await file.read()
+    file_size = len(file_content)
+    
+    # Perform comprehensive file validation
+    file_data = io.BytesIO(file_content)
+    perform_full_file_validation(
+        filename=file.filename,
+        content_type=file.content_type or "application/octet-stream",
+        file_size=file_size,
+        file_data=file_data
+    )
+    
+    # Sanitize filename
+    safe_filename = sanitize_filename(file.filename)
+    
+    # Use sanitized filename as object key if not provided
     if not object_key:
-        object_key = file.filename
+        object_key = f"uploads/{permissions.user_id}/{safe_filename}"
+    else:
+        # Sanitize the provided object key
+        object_key = object_key.replace('..', '').lstrip('/')
     
     # Parse metadata if provided
     custom_metadata = None
     if metadata:
         try:
-            custom_metadata = eval(metadata)  # Simple parsing for demo, use json.loads in production
-        except:
-            raise BadRequestException("Invalid metadata format")
+            import json
+            custom_metadata = json.loads(metadata)
+        except json.JSONDecodeError:
+            raise BadRequestException("Invalid metadata format. Must be valid JSON")
+    
+    # Add security metadata
+    if custom_metadata is None:
+        custom_metadata = {}
+    custom_metadata.update({
+        'original_filename': file.filename,
+        'uploaded_by': permissions.user_id,
+        'content_type': file.content_type,
+        'file_size': str(file_size)
+    })
+    
+    # Reset file data position for upload
+    file_data.seek(0)
     
     # Upload file
-    file_data = io.BytesIO(await file.read())
+    logger.info(f"Uploading file: {object_key} ({format_bytes(file_size)})")
     storage_metadata = await storage_service.upload_file(
         file_data=file_data,
         object_key=object_key,

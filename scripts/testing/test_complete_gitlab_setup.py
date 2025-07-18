@@ -36,14 +36,12 @@ logger = logging.getLogger(__name__)
 
 def create_demo_deployment():
     """Create a demo deployment configuration."""
-    import random
-    import string
-    suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
+    # Use fixed names instead of random suffix to avoid creating multiple instances
     
     return ComputorDeploymentConfig(
         organization=OrganizationConfig(
-            name=f"Demo University {suffix}",
-            path=f"demo_university_{suffix}",  # ltree doesn't allow hyphens
+            name="Demo University",
+            path="demo_university",  # Fixed name - no random suffix
             description="Demo university for testing GitLab integration",
             gitlab=GitLabConfig(
                 parent=os.environ.get("TEST_GITLAB_GROUP_ID"),
@@ -51,8 +49,8 @@ def create_demo_deployment():
             )
         ),
         courseFamily=CourseFamilyConfig(
-            name=f"Computer Science 2024 {suffix}",
-            path=f"cs_2024_{suffix}",  # ltree doesn't allow hyphens
+            name="Computer Science 2024",
+            path="cs_2024",  # Fixed name - no random suffix
             description="Computer Science courses for 2024",
             gitlab=GitLabConfig(
                 parent=None,
@@ -61,8 +59,8 @@ def create_demo_deployment():
             )
         ),
         course=CourseConfig(
-            name=f"Introduction to Programming {suffix}",
-            path=f"intro_programming_{suffix}",  # ltree doesn't allow hyphens
+            name="Introduction to Programming",
+            path="intro_programming",  # Fixed name - no random suffix
             description="Learn programming fundamentals with Python",
             gitlab=GitLabConfig(
                 parent=None,

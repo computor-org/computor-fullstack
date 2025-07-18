@@ -1326,17 +1326,18 @@ class GitLabBuilderNew:
                 repo_path = os.path.join(temp_dir, "assignments")
                 os.makedirs(repo_path, exist_ok=True)
                 
-                # Create course-level meta.yaml
+                # Create course-level meta.yaml (matching gitlab_builder.py format)
                 course_meta = CodeAbilityCourseMeta(
-                    title=course.title,
-                    description=course.description or f"Assignments for {course.title}",
-                    subject=deployment.course.subject if hasattr(deployment.course, 'subject') else "programming",
-                    level="university"
+                    title=deployment.course.name,
+                    description=course.description or "",
+                    version="0.1"
                 )
                 
                 meta_path = os.path.join(repo_path, "meta.yaml")
+                # Exclude contentTypes and executionBackends as requested
+                meta_content = course_meta.model_dump(exclude_none=True, exclude={'contentTypes', 'executionBackends'})
                 with open(meta_path, 'w') as f:
-                    yaml.dump(course_meta.model_dump(exclude_none=True), f, default_flow_style=False)
+                    yaml.dump(meta_content, f, default_flow_style=False)
                 
                 # Create example structure
                 examples_dir = os.path.join(repo_path, "examples")

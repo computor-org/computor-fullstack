@@ -241,3 +241,33 @@ services:
   #     - prefect
   #   labels:
   #   - traefik.enable=false
+
+  # MinIO Object Storage Service
+  minio:
+    image: minio/minio:latest
+    container_name: computor-minio
+    restart: unless-stopped
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/minio/data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio-api.rule=PathPrefix(`/minio`)
+      - traefik.http.routers.minio-api.entrypoints=web
+      - traefik.http.routers.minio-api.service=minio-api
+      - traefik.http.services.minio-api.loadbalancer.server.port=9000
+      - traefik.http.middlewares.minio-api-stripprefix.stripprefix.prefixes=/minio
+      - traefik.http.routers.minio-api.middlewares=minio-api-stripprefix
+      - traefik.http.routers.minio-console.rule=PathPrefix(`/minio-console`)
+      - traefik.http.routers.minio-console.entrypoints=web
+      - traefik.http.routers.minio-console.service=minio-console
+      - traefik.http.services.minio-console.loadbalancer.server.port=9001

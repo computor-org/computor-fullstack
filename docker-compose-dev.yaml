@@ -105,36 +105,43 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       DEBUG_MODE: development
       TOKEN_SECRET: ${TOKEN_SECRET}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_SECURE: "false"
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
     depends_on:
       - postgres
       - redis
+      - minio
     labels:
       - traefik.enable=false
 
   # Flower - Celery Monitoring UI
-  flower:
-    build:
-      context: ./
-      dockerfile: ./docker/api/Dockerfile
-    restart: unless-stopped
-    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
-    ports:
-      - "5555:5555"
-    volumes:
-      - ./src:/home/uvicorn/src
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: ${REDIS_PORT}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
-      FLOWER_URL_PREFIX: flower
-    depends_on:
-      - redis
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
-      - "traefik.http.routers.flower.entrypoints=web"
-      - "traefik.http.services.flower.loadbalancer.server.port=5555"
+  # flower:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./docker/api/Dockerfile
+  #   restart: unless-stopped
+  #   command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
+  #   ports:
+  #     - "5555:5555"
+  #   volumes:
+  #     - ./src:/home/uvicorn/src
+  #   environment:
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: ${REDIS_PORT}
+  #     REDIS_PASSWORD: ${REDIS_PASSWORD}
+  #     FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
+  #     FLOWER_URL_PREFIX: flower
+  #   depends_on:
+  #     - redis
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
+  #     - "traefik.http.routers.flower.entrypoints=web"
+  #     - "traefik.http.services.flower.loadbalancer.server.port=5555"
 
   # backup:
   #   build:
@@ -160,60 +167,91 @@ services:
   #     - traefik.enable=false
   
   # Dedicated PostgreSQL for Keycloak
-  keycloak-db:
-    image: postgres:16
-    container_name: computor-keycloak-db
-    restart: unless-stopped
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak-db:/var/lib/postgresql/data
-    ports:
-      - 5434:5438
-    environment:
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
-      POSTGRES_DB: keycloak
-      PGPORT: 5438
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+  # keycloak-db:
+  #   image: postgres:16
+  #   container_name: computor-keycloak-db
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ${SYSTEM_DEPLOYMENT_PATH}/keycloak-db:/var/lib/postgresql/data
+  #   ports:
+  #     - 5434:5438
+  #   environment:
+  #     POSTGRES_USER: keycloak
+  #     POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+  #     POSTGRES_DB: keycloak
+  #     PGPORT: 5438
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U keycloak"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:25.0.6
-    container_name: computor-keycloak
+  # keycloak:
+  #   image: quay.io/keycloak/keycloak:25.0.6
+  #   container_name: computor-keycloak
+  #   restart: unless-stopped
+  #   environment:
+  #     KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+  #     KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+  #     KC_DB: postgres
+  #     KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
+  #     KC_DB_USERNAME: keycloak
+  #     KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+  #     KC_HOSTNAME: localhost
+  #     KC_HOSTNAME_PORT: 8180
+  #     KC_HOSTNAME_STRICT: "false"
+  #     KC_HOSTNAME_STRICT_HTTPS: "false"
+  #     KC_HTTP_ENABLED: "true"
+  #     KC_HTTP_PORT: 8080
+  #     KC_HEALTH_ENABLED: "true"
+  #   ports:
+  #     - "8180:8080"
+  #   command:
+  #     - start-dev
+  #     - --import-realm
+  #   volumes:
+  #     - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
+  #     - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
+  #   depends_on:
+  #     - keycloak-db
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   labels:
+  #     - traefik.enable=true
+  #     - traefik.http.routers.keycloak.rule=PathPrefix(`/auth`)
+  #     - traefik.http.routers.keycloak.entrypoints=web
+  #     - traefik.http.services.keycloak.loadbalancer.server.port=8080
+
+  # MinIO Object Storage Service
+  minio:
+    image: minio/minio:latest
+    container_name: computor-minio
     restart: unless-stopped
-    environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
-      KC_HOSTNAME: localhost
-      KC_HOSTNAME_PORT: 8180
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
-      KC_HTTP_ENABLED: "true"
-      KC_HTTP_PORT: 8080
-      KC_HEALTH_ENABLED: "true"
     ports:
-      - "8180:8080"
-    command:
-      - start-dev
-      - --import-realm
+      - "9000:9000"
+      - "9001:9001"
     volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
-      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
-    depends_on:
-      - keycloak-db
+      - ${SYSTEM_DEPLOYMENT_PATH}/minio/data:/data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
+    command: server /data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
-      interval: 10s
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
       timeout: 5s
       retries: 5
     labels:
       - traefik.enable=true
-      - traefik.http.routers.keycloak.rule=PathPrefix(`/auth`)
-      - traefik.http.routers.keycloak.entrypoints=web
-      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+      - traefik.http.routers.minio-api.rule=Host(`minio.localhost`)
+      - traefik.http.routers.minio-api.entrypoints=web
+      - traefik.http.routers.minio-api.service=minio-api
+      - traefik.http.services.minio-api.loadbalancer.server.port=9000
+      - traefik.http.routers.minio-console.rule=Host(`minio-console.localhost`)
+      - traefik.http.routers.minio-console.entrypoints=web
+      - traefik.http.routers.minio-console.service=minio-console
+      - traefik.http.services.minio-console.loadbalancer.server.port=9001

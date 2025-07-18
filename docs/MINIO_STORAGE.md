@@ -49,6 +49,9 @@ MINIO_DEFAULT_BUCKETS=computor-storage  # Default bucket name
 MINIO_REGION=us-east-1             # AWS region (for compatibility)
 MINIO_ENDPOINT=minio:9000          # MinIO endpoint (internal to Docker)
 MINIO_SECURE=false                 # Use HTTPS (false for local dev)
+
+# Storage Security Configuration
+MINIO_MAX_UPLOAD_SIZE=20971520     # Maximum file size (20MB default)
 ```
 
 ### Docker Compose
@@ -97,6 +100,33 @@ Storage operations are protected by the permission system:
 - `storage:list` - List objects in buckets
 - `storage:delete` - Delete objects, generate delete URLs
 - `storage:admin` - Manage buckets (create, delete, list)
+
+## Security Features
+
+### File Upload Security
+
+1. **File Size Limits** - Maximum upload size enforced (20MB default)
+2. **File Type Whitelist** - Only allowed educational file types:
+   - Documents: PDF, DOC, DOCX, TXT, MD
+   - Spreadsheets: XLS, XLSX, CSV
+   - Images: JPG, PNG, GIF, SVG
+   - Code files: PY, JAVA, C, CPP, JS, HTML, CSS
+   - Archives: ZIP, TAR, GZ (with content inspection)
+3. **Filename Sanitization** - Prevents path traversal and special characters
+4. **Content Validation** - Blocks executables and dangerous file types
+5. **Metadata Tracking** - Records uploader, timestamp, and original filename
+
+### Allowed File Extensions
+
+The system uses a whitelist approach for maximum security. See `storage_config.py` for the complete list of allowed extensions and MIME types.
+
+### Future Security Enhancements
+
+- **Rate Limiting** - Prevent abuse with per-IP limits (using slowapi)
+- **Virus Scanning** - Integration with ClamAV or similar
+- **Storage Quotas** - Per-user and per-course limits
+- **Encryption** - Server-side encryption at rest
+- **Access Logs** - Detailed audit trail of all operations
 
 ## Usage Examples
 

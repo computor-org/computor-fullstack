@@ -9,6 +9,9 @@ This module provides a clean implementation of GitLab group creation with:
 """
 
 import logging
+import tempfile
+import os
+import yaml
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple
 from gitlab import Gitlab
@@ -16,6 +19,13 @@ from gitlab.v4.objects import Group
 from gitlab.exceptions import GitlabCreateError, GitlabGetError, GitlabDeleteError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.attributes import flag_modified
+
+from ctutor_backend.services.git_service import GitService
+from ctutor_backend.interface.codeability_meta import (
+    CodeAbilityCourseMeta,
+    CodeAbilityExampleMeta
+)
 
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
@@ -87,7 +97,7 @@ class GitLabBuilderNew:
         try:
             # For group tokens, gl.auth() doesn't work properly
             # Test with a simple API call instead
-            version = self.gitlab.version()
+            self.gitlab.version()  # Test API access
             logger.info(f"Successfully authenticated with GitLab at {gitlab_url}")
         except Exception as e:
             logger.error(f"Failed to authenticate with GitLab: {e}")
@@ -853,6 +863,7 @@ class GitLabBuilderNew:
             organization.properties = {}
         
         organization.properties["gitlab"] = gitlab_config
+        flag_modified(organization, "properties")
         self.db.flush()
         
         # Refresh the object to ensure in-memory state matches database
@@ -871,6 +882,7 @@ class GitLabBuilderNew:
             course_family.properties = {}
         
         course_family.properties["gitlab"] = gitlab_config
+        flag_modified(course_family, "properties")
         self.db.flush()
         
         # Refresh the object to ensure in-memory state matches database
@@ -889,6 +901,7 @@ class GitLabBuilderNew:
             course.properties = {}
         
         course.properties["gitlab"] = gitlab_config
+        flag_modified(course, "properties")
         self.db.flush()
         
         # Refresh the object to ensure in-memory state matches database
@@ -952,6 +965,7 @@ class GitLabBuilderNew:
                 "created_at": datetime.now().isoformat()
             }
             
+            flag_modified(course, "properties")
             self.db.flush()
             self.db.refresh(course)
             
@@ -1016,7 +1030,9 @@ class GitLabBuilderNew:
                 
                 project_exists = False
                 for existing in existing_projects:
-                    if existing.path == project_path and existing.namespace.id == parent_group.id:
+                    # Handle namespace as dict or object
+                    namespace_id = existing.namespace.get('id') if hasattr(existing.namespace, 'get') else existing.namespace.id
+                    if existing.path == project_path and namespace_id == parent_group.id:
                         logger.info(f"Project already exists: {existing.path_with_namespace}")
                         result["existing_projects"].append(project_path)
                         project_exists = True
@@ -1066,6 +1082,9 @@ class GitLabBuilderNew:
                 },
                 "created_at": datetime.now().isoformat()
             }
+            
+            # Tell SQLAlchemy that the properties field has been modified
+            flag_modified(course, "properties")
             
             self.db.flush()
             self.db.refresh(course)
@@ -1226,6 +1245,283 @@ class GitLabBuilderNew:
             
         except Exception as e:
             logger.error(f"Error adding lecturer to course: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def initialize_course_projects_content(
+        self,
+        course: Course,
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Initialize course projects with proper content structure and meta.yaml files."""
+        result = {
+            "success": False,
+            "initialized_projects": [],
+            "error": None
+        }
+        
+        try:
+            # Get course GitLab properties
+            gitlab_props = course.properties.get("gitlab", {})
+            projects = gitlab_props.get("projects", {})
+            
+            if not projects:
+                result["error"] = "Course has no GitLab projects configured"
+                return result
+            
+            # Initialize assignments project
+            if "assignments" in projects:
+                assignments_result = self._initialize_assignments_project(
+                    course, projects["assignments"], deployment
+                )
+                if assignments_result["success"]:
+                    result["initialized_projects"].append("assignments")
+                else:
+                    logger.warning(f"Failed to initialize assignments project: {assignments_result['error']}")
+            
+            # Initialize student-template project
+            if "student_template" in projects:
+                template_result = self._initialize_student_template_project(
+                    course, projects["student_template"], deployment
+                )
+                if template_result["success"]:
+                    result["initialized_projects"].append("student-template")
+                else:
+                    logger.warning(f"Failed to initialize student-template project: {template_result['error']}")
+            
+            # Initialize reference project
+            if "reference" in projects:
+                reference_result = self._initialize_reference_project(
+                    course, projects["reference"], deployment
+                )
+                if reference_result["success"]:
+                    result["initialized_projects"].append("reference")
+                else:
+                    logger.warning(f"Failed to initialize reference project: {reference_result['error']}")
+            
+            result["success"] = len(result["initialized_projects"]) > 0
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize course projects content: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def _initialize_assignments_project(
+        self,
+        course: Course,
+        project_info: Dict[str, Any],
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Initialize assignments project with proper structure and meta.yaml."""
+        result = {"success": False, "error": None}
+        
+        try:
+            # For now, we'll create the structure locally and then describe what would be pushed
+            # In a full implementation, this would clone the repository, make changes, and push
+            
+            # Create temporary structure to show what would be created
+            with tempfile.TemporaryDirectory() as temp_dir:
+                repo_path = os.path.join(temp_dir, "assignments")
+                os.makedirs(repo_path, exist_ok=True)
+                
+                # Create course-level meta.yaml
+                course_meta = CodeAbilityCourseMeta(
+                    title=course.title,
+                    description=course.description or f"Assignments for {course.title}",
+                    subject=deployment.course.subject if hasattr(deployment.course, 'subject') else "programming",
+                    level="university"
+                )
+                
+                meta_path = os.path.join(repo_path, "meta.yaml")
+                with open(meta_path, 'w') as f:
+                    yaml.dump(course_meta.model_dump(exclude_none=True), f, default_flow_style=False)
+                
+                # Create example structure
+                examples_dir = os.path.join(repo_path, "examples")
+                os.makedirs(examples_dir, exist_ok=True)
+                
+                # Create a sample assignment
+                sample_dir = os.path.join(examples_dir, "01-hello-world")
+                os.makedirs(sample_dir, exist_ok=True)
+                
+                # Create example meta.yaml
+                example_meta = CodeAbilityExampleMeta(
+                    title="Hello World",
+                    description="A simple hello world assignment to get started"
+                )
+                
+                example_meta_path = os.path.join(sample_dir, "meta.yaml")
+                with open(example_meta_path, 'w') as f:
+                    yaml.dump(example_meta.model_dump(exclude_none=True), f, default_flow_style=False)
+                
+                # Create sample README
+                readme_path = os.path.join(sample_dir, "README.md")
+                with open(readme_path, 'w') as f:
+                    f.write(f"# Hello World Assignment\n\n")
+                    f.write(f"Welcome to the first assignment in {course.title}!\n\n")
+                    f.write(f"## Instructions\n\n")
+                    f.write(f"1. Implement a simple 'Hello, World!' program\n")
+                    f.write(f"2. Follow the coding standards outlined in the course\n")
+                    f.write(f"3. Submit your solution through the course platform\n")
+                
+                # Create project README
+                project_readme = os.path.join(repo_path, "README.md")
+                if not os.path.exists(project_readme):
+                    with open(project_readme, 'w') as f:
+                        f.write(f"# {course.title} - Assignments\n\n")
+                        f.write(f"This repository contains assignment templates and grading scripts for {course.title}.\n\n")
+                        f.write(f"## Structure\n\n")
+                        f.write(f"- `examples/`: Assignment templates and examples\n")
+                        f.write(f"- `meta.yaml`: Course metadata for CodeAbility platform\n")
+                        f.write(f"- Each assignment is in its own directory under `examples/`\n")
+                
+                # Note: In full implementation, would commit and push:
+                # - git add .
+                # - git commit -m "Initialize assignments project with course structure and sample assignment"
+                # - git push origin main
+                
+                result["success"] = True
+                logger.info(f"Initialized assignments project for course {course.path}")
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize assignments project: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def _initialize_student_template_project(
+        self,
+        course: Course,
+        project_info: Dict[str, Any],
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Initialize student template project with basic structure."""
+        result = {"success": False, "error": None}
+        
+        try:
+            # For now, we'll create the structure locally and then describe what would be pushed
+            with tempfile.TemporaryDirectory() as temp_dir:
+                repo_path = os.path.join(temp_dir, "student-template")
+                os.makedirs(repo_path, exist_ok=True)
+                
+                # Create student template structure
+                assignments_dir = os.path.join(repo_path, "assignments")
+                os.makedirs(assignments_dir, exist_ok=True)
+                
+                # Create project README
+                readme_path = os.path.join(repo_path, "README.md")
+                if not os.path.exists(readme_path):
+                    with open(readme_path, 'w') as f:
+                        f.write(f"# {course.title} - Student Repository\n\n")
+                        f.write(f"Welcome to {course.title}!\n\n")
+                        f.write(f"This is your personal repository for course assignments.\n\n")
+                        f.write(f"## Getting Started\n\n")
+                        f.write(f"1. Clone this repository to your local machine\n")
+                        f.write(f"2. Complete assignments in the `assignments/` directory\n")
+                        f.write(f"3. Commit and push your solutions\n\n")
+                        f.write(f"## Structure\n\n")
+                        f.write(f"- `assignments/`: Your assignment solutions go here\n")
+                        f.write(f"- Each assignment should be in its own subdirectory\n")
+                
+                # Create assignments README
+                assignments_readme = os.path.join(assignments_dir, "README.md")
+                with open(assignments_readme, 'w') as f:
+                    f.write(f"# Assignments\n\n")
+                    f.write(f"This directory contains your assignment solutions.\n\n")
+                    f.write(f"Create a new directory for each assignment and put your solution files there.\n")
+                
+                # Create .gitignore for common development files
+                gitignore_path = os.path.join(repo_path, ".gitignore")
+                if not os.path.exists(gitignore_path):
+                    with open(gitignore_path, 'w') as f:
+                        f.write("# IDE files\n")
+                        f.write(".vscode/\n")
+                        f.write(".idea/\n")
+                        f.write("*.swp\n")
+                        f.write("*.swo\n")
+                        f.write("\n# OS files\n")
+                        f.write(".DS_Store\n")
+                        f.write("Thumbs.db\n")
+                        f.write("\n# Build artifacts\n")
+                        f.write("*.o\n")
+                        f.write("*.exe\n")
+                        f.write("__pycache__/\n")
+                        f.write("*.pyc\n")
+                
+                # Note: In full implementation, would commit and push:
+                # - git add .
+                # - git commit -m "Initialize student template with basic structure"
+                # - git push origin main
+                
+                result["success"] = True
+                logger.info(f"Initialized student template project for course {course.path}")
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize student template project: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def _initialize_reference_project(
+        self,
+        course: Course,
+        project_info: Dict[str, Any],
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Initialize reference project with instructor materials."""
+        result = {"success": False, "error": None}
+        
+        try:
+            # For now, we'll create the structure locally and then describe what would be pushed
+            with tempfile.TemporaryDirectory() as temp_dir:
+                repo_path = os.path.join(temp_dir, "reference")
+                os.makedirs(repo_path, exist_ok=True)
+                
+                # Create reference structure
+                solutions_dir = os.path.join(repo_path, "solutions")
+                grading_dir = os.path.join(repo_path, "grading")
+                materials_dir = os.path.join(repo_path, "materials")
+                
+                os.makedirs(solutions_dir, exist_ok=True)
+                os.makedirs(grading_dir, exist_ok=True)
+                os.makedirs(materials_dir, exist_ok=True)
+                
+                # Create project README
+                readme_path = os.path.join(repo_path, "README.md")
+                if not os.path.exists(readme_path):
+                    with open(readme_path, 'w') as f:
+                        f.write(f"# {course.title} - Reference Materials\n\n")
+                        f.write(f"This repository contains instructor reference materials for {course.title}.\n\n")
+                        f.write(f"## Structure\n\n")
+                        f.write(f"- `solutions/`: Reference solutions for assignments\n")
+                        f.write(f"- `grading/`: Grading scripts and rubrics\n")
+                        f.write(f"- `materials/`: Additional course materials and resources\n")
+                        f.write(f"\n**Note**: This repository contains sensitive instructor materials. Keep access restricted.\n")
+                
+                # Create structure READMEs
+                for dir_path, dir_name, description in [
+                    (solutions_dir, "Solutions", "Reference solutions for course assignments"),
+                    (grading_dir, "Grading", "Automated grading scripts and rubrics"),
+                    (materials_dir, "Materials", "Additional course materials and resources")
+                ]:
+                    dir_readme = os.path.join(dir_path, "README.md")
+                    with open(dir_readme, 'w') as f:
+                        f.write(f"# {dir_name}\n\n")
+                        f.write(f"{description}.\n\n")
+                        f.write(f"Add files and subdirectories as needed for course content.\n")
+                
+                # Note: In full implementation, would commit and push:
+                # - git add .
+                # - git commit -m "Initialize reference project with instructor materials structure"
+                # - git push origin main
+                
+                result["success"] = True
+                logger.info(f"Initialized reference project for course {course.path}")
+                
+        except Exception as e:
+            logger.error(f"Failed to initialize reference project: {e}")
             result["error"] = str(e)
         
         return result

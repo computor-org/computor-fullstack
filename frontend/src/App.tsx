@@ -20,6 +20,7 @@ import CoursesPage from './pages/CoursesPage';
 import SSODebug from './pages/SSODebug';
 import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
+import UsersPage from './pages/UsersPage';
 import Sidebar from './components/Sidebar';
 import SSOLoginModal from './components/SSOLoginModal';
 import SSOCallback from './components/SSOCallback';
@@ -206,8 +207,9 @@ function AuthenticatedAppContent() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/students" element={<StudentsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
-          <Route path="/tasks" element={<Tasks />} />
-          <Route path="/tasks/:taskId" element={<TaskDetail />} />
+          <Route path="/admin/tasks" element={<Tasks />} />
+          <Route path="/admin/tasks/:taskId" element={<TaskDetail />} />
+          <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/course/:courseId" element={<Dashboard />} />
           <Route path="/course/:courseId/students" element={<StudentsPage />} />
           <Route path="/admin/*" element={<Dashboard />} />

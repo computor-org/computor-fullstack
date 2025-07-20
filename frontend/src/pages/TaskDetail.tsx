@@ -187,7 +187,7 @@ const TaskDetail: React.FC = () => {
     try {
       await apiClient.deleteTask(taskId!);
       // Navigate back to the task list
-      navigate('/tasks');
+      navigate('/admin/tasks');
     } catch (err) {
       console.error('Error deleting task:', err);
       setError('Failed to delete task. Please try again.');
@@ -207,7 +207,7 @@ const TaskDetail: React.FC = () => {
       <Box>
         <Button
           startIcon={<BackIcon />}
-          onClick={() => navigate('/tasks')}
+          onClick={() => navigate('/admin/tasks')}
           sx={{ mb: 2 }}
         >
           Back to Tasks
@@ -225,7 +225,7 @@ const TaskDetail: React.FC = () => {
         <Stack direction="row" spacing={2} alignItems="center">
           <Button
             startIcon={<BackIcon />}
-            onClick={() => navigate('/tasks')}
+            onClick={() => navigate('/admin/tasks')}
           >
             Back to Tasks
           </Button>

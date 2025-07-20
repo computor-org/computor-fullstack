@@ -51,7 +51,6 @@ services:
       API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_URL: ${POSTGRES_URL}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -121,7 +120,6 @@ services:
       # Database configuration
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_URL: ${POSTGRES_URL}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -149,33 +147,6 @@ services:
     labels:
       - traefik.enable=false
 
-  # Flower - Celery Monitoring UI
-  flower:
-    build:
-      context: ./
-      dockerfile: ./docker/api/Dockerfile
-    restart: unless-stopped
-    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-    environment:
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
-      FLOWER_URL_PREFIX: flower
-      DEBUG_MODE: ${DEBUG_MODE}
-      TOKEN_SECRET: ${TOKEN_SECRET}
-    depends_on:
-      redis:
-        condition: service_started
-      uvicorn:
-        condition: service_started
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
-      - "traefik.http.routers.flower.entrypoints=web"
-      - "traefik.http.services.flower.loadbalancer.server.port=5555"
 
   # MinIO Object Storage Service
   minio:
@@ -195,14 +166,4 @@ services:
       timeout: 5s
       retries: 5
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.minio-api.rule=PathPrefix(`/minio`)
-      - traefik.http.routers.minio-api.entrypoints=web
-      - traefik.http.routers.minio-api.service=minio-api
-      - traefik.http.services.minio-api.loadbalancer.server.port=9000
-      - traefik.http.middlewares.minio-api-stripprefix.stripprefix.prefixes=/minio
-      - traefik.http.routers.minio-api.middlewares=minio-api-stripprefix
-      - traefik.http.routers.minio-console.rule=PathPrefix(`/minio-console`)
-      - traefik.http.routers.minio-console.entrypoints=web
-      - traefik.http.routers.minio-console.service=minio-console
-      - traefik.http.services.minio-console.loadbalancer.server.port=9001
+      - traefik.enable=false

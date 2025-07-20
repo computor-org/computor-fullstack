@@ -136,6 +136,7 @@ Based on code analysis, Prefect is used for:
 - Mixed Dockerfile naming (Dockerfile vs dockerfile)
 - Prefect directory still exists
 - Backup service unclear status
+- Note: docker/postgres/init-keycloak-schema.sql requires root permissions to remove
 
 ### 4. Security Concerns
 - Flower has basic auth but needs better integration

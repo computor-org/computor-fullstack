@@ -38,7 +38,7 @@ def get_user_id_from_basic(username: str, password: str, db: Session):
         )
         .outerjoin(UserRole, UserRole.user_id == User.id)
         .filter(
-            User.username == username
+            or_(User.username == username,User.email == username)
         ).all()
     )
     

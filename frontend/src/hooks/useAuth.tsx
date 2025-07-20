@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import { AuthState, AuthContextType, LoginCredentials } from '../types/auth';
 import { AuthService } from '../services/authService';
 import { SSOAuthService } from '../services/ssoAuthService';
+import { BasicAuthService } from '../services/basicAuthService';
 
 // Auth state reducer
 type AuthAction =
@@ -88,7 +89,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      // First check for SSO auth
+      // First check for basic auth
+      const basicAuth = BasicAuthService.getStoredAuth();
+      if (basicAuth) {
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: {
+            user: basicAuth.user,
+            token: basicAuth.token,
+          },
+        });
+        return;
+      }
+
+      // Then check for SSO auth
       const ssoAuth = SSOAuthService.getStoredAuth();
       if (ssoAuth) {
         dispatch({
@@ -130,7 +144,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'LOGIN_START' });
 
     try {
-      const result = await AuthService.login(credentials);
+      // Try basic auth first (since it's what the user explicitly chose)
+      const result = await BasicAuthService.login(credentials);
 
       if (result.success && result.user && result.token) {
         dispatch({
@@ -163,9 +178,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Check if we have SSO auth
-      const ssoAuth = SSOAuthService.getStoredAuth();
-      if (ssoAuth) {
+      // Check which auth type we're using
+      if (BasicAuthService.isBasicAuth()) {
+        await BasicAuthService.logout();
+      } else if (SSOAuthService.getStoredAuth()) {
         await SSOAuthService.logout();
       } else {
         await AuthService.logout();

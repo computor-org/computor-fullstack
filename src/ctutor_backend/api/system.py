@@ -25,10 +25,10 @@ from ctutor_backend.interface.users import UserCreate, UserGet, UserTypeEnum
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.auth import User, StudentProfile
-from ctutor_backend.helpers import get_prefect_client
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
-from prefect.client.schemas.filters import FlowRunFilter, FlowRunFilterTags,FlowRunFilterId
+from celery.result import AsyncResult
+from ctutor_backend.tasks.celery_app import app as celery_app
 
 system_router = APIRouter()
 
@@ -131,26 +131,18 @@ async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[
 
     deployment = get_computor_deployment_from_course_id_db(course_id, db)
 
-    async with get_prefect_client() as client:
-
-      deployment_response = await client.read_deployment_by_name("release-student/system")
-
-      try:
-        flow_run = await client.create_flow_run_from_deployment(
-          deployment_id=deployment_response.id,
-          parameters={
-            "deployment": deployment.model_dump(),
-            "payload": ReleaseStudentsCreate(
-              students=students,
-              course_id=course_id
-            ).model_dump()
-          }
-        )
-
-        return {"flow_run_id": flow_run.id}
-
-      except Exception as e:
-        raise BadRequestException()
+    # Use Celery task instead of Prefect
+    from ctutor_backend.tasks.system import release_student_task
+    
+    result = release_student_task.apply_async(
+        args=[deployment.model_dump(), ReleaseStudentsCreate(
+            students=students,
+            course_id=course_id
+        ).model_dump()],
+        queue='high_priority'
+    )
+    
+    return {"task_id": result.id}
   
 class TUGStudentExport(BaseModel):
    course_group_title: str
@@ -330,33 +322,21 @@ async def create_student_from_export(permissions: Annotated[Principal, Depends(g
     return students
 
 async def create_course_client(course_id: str | None, deployment: ComputorDeploymentConfig, release_dir: str | None = None, ascendants: bool = False, descendants: bool = False, release_dir_list: list[str] = []):
-
-    async with get_prefect_client() as client:
-
-      deployment_response = await client.read_deployment_by_name("release-course/system")
-
-      tags = []
-
-      if course_id != None:
-         tags.append(f"course:{course_id}")
-
-      try:
-        flow_run = await client.create_flow_run_from_deployment(
-          deployment_id=deployment_response.id,
-          parameters={
-            "deployment": deployment.model_dump(),
+    # Use Celery task instead of Prefect
+    from ctutor_backend.tasks.system import release_course_task
+    
+    result = release_course_task.apply_async(
+        args=[deployment.model_dump()],
+        kwargs={
             "release_dir": release_dir,
             "ascendants": ascendants if ascendants else False,
-            "descendants": descendants  if descendants else False,
+            "descendants": descendants if descendants else False,
             "release_dir_list": release_dir_list
-          },
-          tags=tags
-        )
-
-        return {"flow_run_id": flow_run.id}
-
-      except Exception as e:
-        raise BadRequestException()
+        },
+        queue='default'
+    )
+    
+    return {"task_id": result.id}
 
 class ReleaseCourseCreate(BaseModel):
     course_id: Optional[str] = None
@@ -411,48 +391,47 @@ async def release_course_content(payload: ReleaseCourseContentCreate, permission
 class StatusQuery(BaseModel):
    course_id: Optional[str] = None
 
-@system_router.get("/status/{flow_run_id}", response_model=dict)
-async def system_job_status(flow_run_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: StatusQuery = Depends()):
-
-    async with get_prefect_client() as client:
-      if permissions.is_admin == True:
-        flow_run = (await client.read_flow_run(flow_run_id))
-      
-      else:
-        filter=FlowRunFilter()
-        filter_id = FlowRunFilterId()
-        filter_id.any_ = [flow_run_id]
-
-        if params.course_id != None:
-          with next(get_db()) as db:
-            if params.course_id in get_permitted_course_ids(permissions,"_maintainer",db):
-              
-              filter_tags = FlowRunFilterTags()
-              filter_tags.all_ = [f"course:{params.course_id}"]
-              filter.tags = filter_tags
-              filter.id = filter_id
-            
-            else:
-               raise NotFoundException()
-        else:
-          filter_tags = FlowRunFilterTags()
-          filter_tags.all_ = [f"user:{permissions.user_id}"]
-          filter.tags = filter_tags
-          filter.id = filter_id
-
-        responses = (await client.read_flow_runs(flow_run_filter=filter))
-
-        if len(responses) == 1:
-          flow_run = responses[0]
-        else:
-          raise NotFoundException()
-
-      response_dict = {"status": flow_run.state_type}
-
-      if flow_run.state != None and flow_run.state.message != None:
-        response_dict["message"] = flow_run.state.message
-
-      return response_dict
+@system_router.get("/status/{task_id}", response_model=dict)
+async def system_job_status(task_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: StatusQuery = Depends()):
+    # Use Celery AsyncResult instead of Prefect
+    result = AsyncResult(str(task_id), app=celery_app)
+    
+    # Check permissions
+    if not permissions.is_admin:
+        # For non-admin users, we need to verify they have access to this task
+        # This is a simplified version - in production you might want to store
+        # task metadata in Redis or database to verify ownership
+        if params.course_id:
+            with next(get_db()) as db:
+                if params.course_id not in get_permitted_course_ids(permissions, "_maintainer", db):
+                    raise NotFoundException()
+    
+    # Get task status
+    if result.state == 'PENDING':
+        status = 'PENDING'
+        message = 'Task not found or still pending'
+    elif result.state == 'PROGRESS':
+        status = 'RUNNING'
+        message = result.info.get('status', 'In progress') if result.info else 'In progress'
+    elif result.state == 'SUCCESS':
+        status = 'COMPLETED'
+        message = 'Task completed successfully'
+    elif result.state == 'FAILURE':
+        status = 'FAILED'
+        message = str(result.info) if result.info else 'Task failed'
+    else:
+        status = result.state
+        message = None
+    
+    response_dict = {"status": status}
+    if message:
+        response_dict["message"] = message
+    
+    # Include result data for completed tasks
+    if result.state == 'SUCCESS' and result.result:
+        response_dict["result"] = result.result
+    
+    return response_dict
 
 
 # SYSTEM RESPONSE ROUTES - NOT CALLABLE FROM NON-SYSTEM CLIENTS

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -28,6 +28,7 @@ import {
   PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
 import { User, Account } from '../types';
+import { apiClient } from '../services/apiClient';
 
 interface UsersPageProps {}
 
@@ -46,114 +47,77 @@ interface UserWithAccounts extends User {
   };
 }
 
-// Mock users data for development
-const mockUsers: UserWithAccounts[] = [
-  {
-    id: '1',
-    given_name: 'John',
-    family_name: 'Doe',
-    email: 'john.doe@university.edu',
-    username: 'johndoe',
-    user_type: 'user',
-    fs_number: 1001,
-    created_at: '2024-01-15T10:30:00Z',
-    updated_at: '2024-01-15T10:30:00Z',
-    archived_at: null,
-    accounts: [
-      {
-        id: 'acc1',
-        provider: 'keycloak',
-        type: 'oidc',
-        provider_account_id: 'kc_john_123',
-        user_id: '1',
-        created_at: '2024-01-15T10:30:00Z',
-        updated_at: '2024-01-15T10:30:00Z',
-      }
-    ],
-    profile: {
-      nickname: 'Johnny',
-      bio: 'Computer Science student',
-      avatar_color: 1,
-    },
-    student_profile: {
-      student_id: 'CS-2024-001',
-      student_email: 'john.doe@student.university.edu',
-    }
-  },
-  {
-    id: '2',
-    given_name: 'Jane',
-    family_name: 'Smith',
-    email: 'jane.smith@university.edu',
-    username: 'janesmith',
-    user_type: 'user',
-    fs_number: 1002,
-    created_at: '2024-01-16T14:20:00Z',
-    updated_at: '2024-01-16T14:20:00Z',
-    archived_at: null,
-    accounts: [
-      {
-        id: 'acc2',
-        provider: 'keycloak',
-        type: 'oidc',
-        provider_account_id: 'kc_jane_456',
-        user_id: '2',
-        created_at: '2024-01-16T14:20:00Z',
-        updated_at: '2024-01-16T14:20:00Z',
-      }
-    ],
-    profile: {
-      nickname: 'Jane',
-      bio: 'Mathematics professor',
-      avatar_color: 2,
-    }
-  },
-  {
-    id: '3',
-    given_name: 'Admin',
-    family_name: 'User',
-    email: 'admin@university.edu',
-    username: 'admin',
-    user_type: 'user',
-    fs_number: 1000,
-    created_at: '2024-01-01T00:00:00Z',
-    updated_at: '2024-01-01T00:00:00Z',
-    archived_at: null,
-    accounts: [
-      {
-        id: 'acc3',
-        provider: 'basic',
-        type: 'local',
-        provider_account_id: 'admin_local',
-        user_id: '3',
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z',
-      }
-    ],
-    profile: {
-      nickname: 'Admin',
-      bio: 'System Administrator',
-      avatar_color: 3,
-    }
-  }
-];
 
 const UsersPage: React.FC<UsersPageProps> = () => {
-  const [users] = useState<UserWithAccounts[]>(mockUsers);
-  const [loading] = useState(false);
-  const [error] = useState<string | null>(null);
+  const [users, setUsers] = useState<UserWithAccounts[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [totalUsers, setTotalUsers] = useState(0);
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(user =>
-    user.given_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.family_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.student_profile?.student_id?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Load users from API
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await apiClient.listUsers({
+        limit: rowsPerPage,
+        offset: page * rowsPerPage,
+        search: searchTerm || undefined,
+        archived: false
+      });
+      
+      // Transform API response to match our interface
+      const transformedUsers = response.map((user: any) => ({
+        id: user.id,
+        given_name: user.given_name || '',
+        family_name: user.family_name || '',
+        email: user.email || '',
+        username: user.username,
+        user_type: user.user_type || 'user',
+        fs_number: user.fs_number || 0,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: user.updated_at || new Date().toISOString(),
+        archived_at: user.archived_at,
+        accounts: user.accounts || [],
+        profile: user.profile,
+        student_profile: user.student_profiles?.[0] ? {
+          student_id: user.student_profiles[0].student_id,
+          student_email: user.student_profiles[0].student_email
+        } : undefined
+      }));
+      
+      setUsers(transformedUsers);
+      setTotalUsers(response.length); // Note: This might need to be adjusted based on actual API response
+    } catch (err) {
+      console.error('Error loading users:', err);
+      setError('Failed to load users. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSearchTerm(searchInput);
+      setPage(0); // Reset to first page when searching
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  // Load users on component mount and when dependencies change
+  useEffect(() => {
+    loadUsers();
+  }, [page, rowsPerPage, searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // For display purposes, we show all loaded users (no client-side filtering since server handles search)
+  const displayUsers = users;
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -259,8 +223,8 @@ const UsersPage: React.FC<UsersPageProps> = () => {
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
             placeholder="Search users by name, email, username, or student ID..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             variant="outlined"
             size="small"
             sx={{ flexGrow: 1 }}
@@ -275,7 +239,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
             }}
           />
           <Typography variant="body2" color="text.secondary">
-            {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} found
+            {displayUsers.length} user{displayUsers.length !== 1 ? 's' : ''} found
           </Typography>
         </Stack>
       </Paper>
@@ -297,9 +261,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredUsers
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((user) => (
+              {displayUsers.map((user) => (
                   <TableRow key={user.id} hover>
                     <TableCell>
                       <Stack direction="row" spacing={2} alignItems="center">
@@ -406,7 +368,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
         <TablePagination
           rowsPerPageOptions={[10, 25, 50, 100]}
           component="div"
-          count={filteredUsers.length}
+          count={totalUsers}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}

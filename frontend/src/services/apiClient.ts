@@ -154,6 +154,49 @@ class APIClient {
   async deleteTask(taskId: string): Promise<{ task_id: string; status: string; message: string }> {
     return this.delete<{ task_id: string; status: string; message: string }>(`/tasks/${taskId}`);
   }
+
+  // User Management API Methods
+
+  /**
+   * List users with pagination, search, and filtering
+   * Uses the CrudRouter /users endpoint
+   */
+  async listUsers(params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    user_type?: string;
+    archived?: boolean;
+  }): Promise<any[]> {
+    const searchParams = new URLSearchParams();
+    
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.offset) searchParams.append('offset', params.offset.toString());
+    if (params?.search) searchParams.append('search', params.search);
+    if (params?.user_type) searchParams.append('user_type', params.user_type);
+    if (params?.archived !== undefined) searchParams.append('archived', params.archived.toString());
+
+    const queryString = searchParams.toString();
+    const endpoint = `/users${queryString ? `?${queryString}` : ''}`;
+    
+    return this.get(endpoint);
+  }
+
+  /**
+   * Get a specific user by ID
+   * Uses the CrudRouter /users/{id} endpoint
+   */
+  async getUserById(userId: string): Promise<any> {
+    return this.get(`/users/${userId}`);
+  }
+
+  /**
+   * Get current authenticated user
+   * Uses the /user endpoint (current user only)
+   */
+  async getCurrentUser(): Promise<any> {
+    return this.get('/user');
+  }
 }
 
 // Export singleton instance

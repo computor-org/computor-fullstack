@@ -7,7 +7,7 @@ WORKDIR /home/uvicorn
 
 # Copy source code and installation files as root, then change ownership
 ADD src /home/uvicorn/src
-ADD scripts/utilities/migrations.sh /home/uvicorn/migrations.sh
+ADD migrations.sh /home/uvicorn/migrations.sh
 ADD docker/api/startup.bash startup.bash
 
 # Change ownership of files to uvicorn user

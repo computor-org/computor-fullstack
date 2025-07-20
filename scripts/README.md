@@ -17,19 +17,24 @@ Testing and validation scripts:
 ### `/utilities/`
 General utility scripts for development:
 - `generate_types.sh` - Generate TypeScript interfaces from Pydantic models
-- `initialize_system.sh` - Initialize system data (roles, admin user)
-- `migrations.sh` - Alembic database migrations
+- `setup_env.sh` - Set up environment file based on mode (dev/prod)
 
 ## 🚀 Usage
 
 All scripts should be run from the project root directory:
 
 ```bash
+# Set up environment file
+bash scripts/utilities/setup_env.sh dev
+
 # Generate TypeScript types
 bash scripts/utilities/generate_types.sh
 
-# Run database migrations
-bash scripts/utilities/migrations.sh
+# Run database migrations (from root)
+bash migrations.sh
+
+# Initialize system data (from root)
+bash initialize_system.sh
 
 # Test GitLab authentication
 python scripts/debug/debug_gitlab_auth.py

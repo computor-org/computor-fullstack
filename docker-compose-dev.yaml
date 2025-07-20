@@ -55,7 +55,6 @@ services:
       # Database configuration
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5437
-      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5437/${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
@@ -80,31 +79,26 @@ services:
     labels:
       - traefik.enable=false
 
-  # Flower - Celery Monitoring UI
-  flower:
-    build:
-      context: ./
-      dockerfile: ./docker/api/Dockerfile
+  # Simple static file server (replaces nginx)
+  static-server:
+    image: halverneus/static-file-server:latest
     restart: unless-stopped
-    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
-    ports:
-      - "5555:5555"
     volumes:
-      - ./src:/home/uvicorn/src
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/web:ro
     environment:
-      REDIS_HOST: redis
-      REDIS_PORT: ${REDIS_PORT}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
-      FLOWER_URL_PREFIX: flower
-    depends_on:
-      - redis
+      - FOLDER=/web
+      - PORT=8080
+      - SHOW_LISTING=true
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
-      - "traefik.http.routers.flower.entrypoints=web"
-      - "traefik.http.services.flower.loadbalancer.server.port=5555"
-  
+      - "traefik.http.routers.static.rule=PathPrefix(`/docs`)"
+      - "traefik.http.routers.static.entrypoints=web"
+      - "traefik.http.middlewares.static-stripprefix.stripprefix.prefixes=/docs"
+      - "traefik.http.routers.static.middlewares=static-stripprefix"
+      - "traefik.http.services.static.loadbalancer.server.port=8080"
+    depends_on:
+      - traefik
+
   # Keycloak SSO (Development Only)
   keycloak-db:
     image: postgres:16
@@ -159,10 +153,7 @@ services:
       timeout: 5s
       retries: 5
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.keycloak.rule=PathPrefix(`/auth`)
-      - traefik.http.routers.keycloak.entrypoints=web
-      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+      - traefik.enable=false
 
   # MinIO Object Storage Service
   minio:
@@ -185,12 +176,4 @@ services:
       timeout: 5s
       retries: 5
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.minio-api.rule=Host(`minio.localhost`)
-      - traefik.http.routers.minio-api.entrypoints=web
-      - traefik.http.routers.minio-api.service=minio-api
-      - traefik.http.services.minio-api.loadbalancer.server.port=9000
-      - traefik.http.routers.minio-console.rule=Host(`minio-console.localhost`)
-      - traefik.http.routers.minio-console.entrypoints=web
-      - traefik.http.routers.minio-console.service=minio-console
-      - traefik.http.services.minio-console.loadbalancer.server.port=9001
+      - traefik.enable=false

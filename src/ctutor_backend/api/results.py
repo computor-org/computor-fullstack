@@ -8,21 +8,36 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.results import ResultInterface, ResultStatus
 from ctutor_backend.model.result import Result
-from ctutor_backend.helpers import get_prefect_client
+from celery.result import AsyncResult
+from ctutor_backend.tasks.celery_app import app as celery_app
 from sqlalchemy.orm import Session
 
 # TODO: if result status is missing, ResultStatus.NOT_AVAILABLE should be returned
 async def get_result_status(result: Result):
-   async with get_prefect_client() as client:
-      response = (await client.read_flow_run(result.test_system_id)).dict()
-     
-      return ResultStatus[response["state_type"]]
+    # Use Celery AsyncResult instead of Prefect
+    task_result = AsyncResult(result.test_system_id, app=celery_app)
+    
+    if task_result.state == 'PENDING':
+        return ResultStatus.PENDING
+    elif task_result.state == 'PROGRESS':
+        return ResultStatus.RUNNING
+    elif task_result.state == 'SUCCESS':
+        return ResultStatus.COMPLETED
+    elif task_result.state == 'FAILURE':
+        return ResultStatus.FAILED
+    else:
+        return ResultStatus.NOT_AVAILABLE
 
 async def get_result(result: Result):
-   async with get_prefect_client() as client:
-      response = (await client.read_flow_run(result.test_system_id)).dict()
-     
-      return response
+    # Use Celery AsyncResult instead of Prefect
+    task_result = AsyncResult(result.test_system_id, app=celery_app)
+    
+    return {
+        "state": task_result.state,
+        "result": task_result.result if task_result.successful() else None,
+        "info": task_result.info,
+        "task_id": result.test_system_id
+    }
 
 result_router = CrudRouter(ResultInterface)
 

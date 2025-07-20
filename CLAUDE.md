@@ -29,8 +29,8 @@ docker-compose -f docker-compose-dev.yaml up -d     # Development with workers
 docker-compose -f docker-compose-prod.yaml up -d    # Production with scaling
 
 # Database operations
-bash scripts/utilities/migrations.sh          # Alembic migrations
-bash scripts/utilities/initialize_system.sh   # Initialize system data (roles, admin user)
+bash migrations.sh                            # Alembic migrations
+bash initialize_system.sh                     # Initialize system data (roles, admin user)
 cd src && python seeder.py  # Seed development test data
 alembic revision --autogenerate -m "description"  # Generate new migration
 alembic upgrade head        # Apply all pending migrations

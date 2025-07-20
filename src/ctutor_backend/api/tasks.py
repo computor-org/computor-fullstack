@@ -206,6 +206,51 @@ async def cancel_task(task_id: str):
         )
 
 
+@tasks_router.delete("/{task_id}")
+async def delete_task(task_id: str):
+    """
+    Delete a task from the database.
+    
+    This permanently removes the task record from the celery_taskmeta table.
+    Note: This does not cancel a running task, it only removes the database record.
+    
+    Args:
+        task_id: Task ID to delete
+        
+    Returns:
+        Deletion confirmation
+        
+    Raises:
+        HTTPException: If task not found or deletion fails
+    """
+    try:
+        task_executor = get_task_executor()
+        deleted = await task_executor.delete_task(task_id)
+        
+        if deleted:
+            return {
+                "task_id": task_id,
+                "status": "deleted",
+                "message": "Task deleted successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Task with ID {task_id} not found"
+            )
+    
+    except KeyError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Task with ID {task_id} not found"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete task: {str(e)}"
+        )
+
+
 @tasks_router.get("/types", response_model=List[str])
 async def list_task_types():
     """

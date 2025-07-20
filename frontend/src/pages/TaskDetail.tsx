@@ -23,6 +23,7 @@ import {
   Schedule as PendingIcon,
   PlayArrow as RunningIcon,
   Cancel as CancelledIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { apiClient } from '../services/apiClient';
 
@@ -178,6 +179,21 @@ const TaskDetail: React.FC = () => {
     }
   };
 
+  const handleDeleteTask = async () => {
+    if (!window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await apiClient.deleteTask(taskId!);
+      // Navigate back to the task list
+      navigate('/tasks');
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      setError('Failed to delete task. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -230,6 +246,11 @@ const TaskDetail: React.FC = () => {
           <Tooltip title="Refresh">
             <IconButton onClick={fetchTaskInfo}>
               <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Delete Task">
+            <IconButton color="error" onClick={handleDeleteTask}>
+              <DeleteIcon />
             </IconButton>
           </Tooltip>
         </Stack>

@@ -147,6 +147,13 @@ class APIClient {
       method: 'DELETE',
     });
   }
+
+  /**
+   * Delete a task from the database
+   */
+  async deleteTask(taskId: string): Promise<{ task_id: string; status: string; message: string }> {
+    return this.delete<{ task_id: string; status: string; message: string }>(`/tasks/${taskId}`);
+  }
 }
 
 // Export singleton instance

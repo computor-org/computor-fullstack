@@ -3,7 +3,6 @@ from fastapi import Depends
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from fastapi import APIRouter
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.database import get_db
@@ -19,6 +18,7 @@ def get_current_user(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
+    """Get the current authenticated user"""
     try:
         return db.query(User).filter(User.id == permissions.user_id).first()
     except Exception as e:

@@ -29,54 +29,6 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
       - PGPORT=5437
-  # prefect_db:
-  #   image: postgres:15.2-alpine
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ${SYSTEM_DEPLOYMENT_PATH}/prefect_db:/var/lib/postgresql/data
-  #   ports:
-  #     - 5437:5432
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "PGUSER=postgres", "pg_isready"]
-  #     interval: 1s
-  #     timeout: 10s
-  #     retries: 5
-  #   environment:
-  #     POSTGRES_USER: ${PREFECT_POSTGRES_USER}
-  #     POSTGRES_PASSWORD: ${PREFECT_POSTGRES_PASSWORD}
-  #     POSTGRES_DB: ${PREFECT_POSTGRES_DB}
-  # prefect:
-  #   image: prefecthq/prefect:2.20.3-python3.10
-  #   depends_on:
-  #     - prefect_db
-  #   restart: unless-stopped
-  #   environment:
-  #     PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_POSTGRES_USER}:${PREFECT_POSTGRES_PASSWORD}@prefect_db:5432/${PREFECT_POSTGRES_DB}
-  #     PREFECT_AGENT_QUERY_INTERVAL: 1
-  #     PREFECT_AGENT_PREFETCH_SECONDS: 1
-  #     PREFECT_WORKER_HEARTBEAT_SECONDS: 5
-  #     PREFECT_WORKER_QUERY_SECONDS: 1
-  #     PREFECT_WORKER_PREFETCH_SECONDS: 1
-  #   entrypoint: ["prefect", "server", "start", "--host", "0.0.0.0", "--log-level", "WARNING",]
-  #   volumes:
-  #     - ${SYSTEM_DEPLOYMENT_PATH}/prefect:/root/.prefect
-  #   ports:
-  #     - 4200:4200
-  # nginx:
-  #   image: nginx:1.27.3
-  #   ports:
-  #     - 8081:80
-  #   volumes:
-  #     - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/usr/share/nginx/html:ro
-  #     - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf
-  #   labels:
-  #   - "traefik.enable=true"
-  #   - "traefik.http.routers.nginx.rule=PathPrefix(`/docs`)"
-  #   - "traefik.http.routers.nginx.entrypoints=web"
-  #   - "traefik.http.middlewares.nginx-stripprefix.stripprefix.prefixes=/docs"
-  #   - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
-  #   depends_on:
-  #     - traefik
   # Celery System Worker - Handles all system-dependent tasks
   celery-system-worker:
     build:
@@ -118,111 +70,88 @@ services:
       - traefik.enable=false
 
   # Flower - Celery Monitoring UI
-  # flower:
-  #   build:
-  #     context: ./
-  #     dockerfile: ./docker/api/Dockerfile
-  #   restart: unless-stopped
-  #   command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
-  #   ports:
-  #     - "5555:5555"
-  #   volumes:
-  #     - ./src:/home/uvicorn/src
-  #   environment:
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: ${REDIS_PORT}
-  #     REDIS_PASSWORD: ${REDIS_PASSWORD}
-  #     FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
-  #     FLOWER_URL_PREFIX: flower
-  #   depends_on:
-  #     - redis
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
-  #     - "traefik.http.routers.flower.entrypoints=web"
-  #     - "traefik.http.services.flower.loadbalancer.server.port=5555"
-
-  # backup:
-  #   build:
-  #     context: ./
-  #     dockerfile: ./docker/backup/Dockerfile
-  #   command: ["/backup.sh"]
-  #   environment:
-  #     # - BACKUP_CRON=0 3 * * *
-  #     BACKUP_CRON: "* * * * *"
-  #     POSTGRES_HOST: postgres
-  #     POSTGRES_USER: ${POSTGRES_USER}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #     POSTGRES_DB: ${POSTGRES_DB}
-  #     BACKUP_PATH: /backups
-  #     FOLDERS_TO_ZIP: /data/prefect
-  #     # - FOLDERS_TO_ZIP=/data/files,/data/images
-  #   volumes:
-  #     - ${SYSTEM_DEPLOYMENT_PATH}:/backups
-  #     - ${SYSTEM_DEPLOYMENT_PATH}:/data
-  #   depends_on:
-  #     - postgres
-  #   labels:
-  #     - traefik.enable=false
+  flower:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "celery", "-A", "ctutor_backend.tasks.celery_app", "flower", "--port=5555"]
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./src:/home/uvicorn/src
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      FLOWER_BASIC_AUTH: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
+      FLOWER_URL_PREFIX: flower
+    depends_on:
+      - redis
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
+      - "traefik.http.routers.flower.entrypoints=web"
+      - "traefik.http.services.flower.loadbalancer.server.port=5555"
   
-  # Dedicated PostgreSQL for Keycloak
-  # keycloak-db:
-  #   image: postgres:16
-  #   container_name: computor-keycloak-db
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ${SYSTEM_DEPLOYMENT_PATH}/keycloak-db:/var/lib/postgresql/data
-  #   ports:
-  #     - 5434:5438
-  #   environment:
-  #     POSTGRES_USER: keycloak
-  #     POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
-  #     POSTGRES_DB: keycloak
-  #     PGPORT: 5438
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U keycloak"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
+  # Keycloak SSO (Development Only)
+  keycloak-db:
+    image: postgres:16
+    container_name: computor-keycloak-db
+    restart: unless-stopped
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak-db:/var/lib/postgresql/data
+    ports:
+      - 5434:5438
+    environment:
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+      POSTGRES_DB: keycloak
+      PGPORT: 5438
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # keycloak:
-  #   image: quay.io/keycloak/keycloak:25.0.6
-  #   container_name: computor-keycloak
-  #   restart: unless-stopped
-  #   environment:
-  #     KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-  #     KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-  #     KC_DB: postgres
-  #     KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
-  #     KC_DB_USERNAME: keycloak
-  #     KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
-  #     KC_HOSTNAME: localhost
-  #     KC_HOSTNAME_PORT: 8180
-  #     KC_HOSTNAME_STRICT: "false"
-  #     KC_HOSTNAME_STRICT_HTTPS: "false"
-  #     KC_HTTP_ENABLED: "true"
-  #     KC_HTTP_PORT: 8080
-  #     KC_HEALTH_ENABLED: "true"
-  #   ports:
-  #     - "8180:8080"
-  #   command:
-  #     - start-dev
-  #     - --import-realm
-  #   volumes:
-  #     - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
-  #     - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
-  #   depends_on:
-  #     - keycloak-db
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   labels:
-  #     - traefik.enable=true
-  #     - traefik.http.routers.keycloak.rule=PathPrefix(`/auth`)
-  #     - traefik.http.routers.keycloak.entrypoints=web
-  #     - traefik.http.services.keycloak.loadbalancer.server.port=8080
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    container_name: computor-keycloak
+    restart: unless-stopped
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_secret}
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8180
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8180:8080"
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
+    depends_on:
+      - keycloak-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.keycloak.rule=PathPrefix(`/auth`)
+      - traefik.http.routers.keycloak.entrypoints=web
+      - traefik.http.services.keycloak.loadbalancer.server.port=8080
 
   # MinIO Object Storage Service
   minio:

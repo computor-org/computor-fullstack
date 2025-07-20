@@ -17,6 +17,7 @@ services:
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
+      - ${SYSTEM_DEPLOYMENT_PATH}/redis-data:/data
   postgres:
     image: postgres:16
     ports:
@@ -33,43 +34,6 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
       - PGPORT=${POSTGRES_PORT}
-  prefect_db:
-    image: postgres:15.2-alpine
-    restart: unless-stopped
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/prefect_db:/var/lib/postgresql/data
-    # ports:
-    #   - ${POSTGRES_PORT}:5432
-    healthcheck:
-      test: ["CMD-SHELL", "PGUSER=${PREFECT_POSTGRES_USER}", "pg_isready"]
-      interval: 1s
-      timeout: 10s
-      retries: 5
-    environment:
-      POSTGRES_USER: ${PREFECT_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${PREFECT_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${PREFECT_POSTGRES_DB}
-    labels:
-      - traefik.enable=false
-  prefect:
-    image: prefecthq/prefect:2.20.3-python3.10
-    depends_on:
-      - prefect_db
-    restart: on-failure
-    environment:
-      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_POSTGRES_USER}:${PREFECT_POSTGRES_PASSWORD}@prefect_db:5432/${PREFECT_POSTGRES_DB}
-      PREFECT_AGENT_QUERY_INTERVAL: 1
-      PREFECT_AGENT_PREFETCH_SECONDS: 1
-      PREFECT_WORKER_HEARTBEAT_SECONDS: 5
-      PREFECT_WORKER_QUERY_SECONDS: 1
-      PREFECT_WORKER_PREFETCH_SECONDS: 1
-    entrypoint: ["prefect", "server", "start", "--host", "0.0.0.0", "--log-level", "WARNING",]
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/prefect:/root/.prefect
-    # ports:
-    #   - 4200:4200
-    labels:
-      - traefik.enable=false
   uvicorn:
     build:
       context: ./
@@ -84,7 +48,6 @@ services:
     environment:
       EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
       EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
-      PREFECT_API_URL: http://prefect:4200/api
       API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_PORT}
@@ -122,34 +85,6 @@ services:
     - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
     depends_on:
       - traefik
-  system-agent:
-    deploy:
-      mode: replicated
-      replicas: ${SYSTEM_WORKER_REPLICAS}
-    build:
-      context: ./
-      dockerfile: ./docker/system-agent/Dockerfile
-      args:
-        SYSTEM_GIT_NAME: ${SYSTEM_GIT_NAME}
-        SYSTEM_GIT_EMAIL: ${SYSTEM_GIT_EMAIL}
-    restart: unless-stopped
-    command:
-      ["sh", "startup.bash"]
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-    environment:
-      EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
-      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
-      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
-      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
-      PREFECT_API_URL: http://prefect:4200/api
-      PREFECT_WORK_POOL: default-agent-pool
-      PREFECT_WORK_QUEUE: system-queue
-      TOKEN_SECRET: ${TOKEN_SECRET}
-    depends_on:
-      - prefect
-    labels:
-      - traefik.enable=false
 
   # Celery System Worker - Handles all system-dependent tasks (releases, filesystem operations)
   celery-system-worker:
@@ -217,30 +152,6 @@ services:
       - "traefik.http.routers.flower.rule=PathPrefix(`/flower`)"
       - "traefik.http.routers.flower.entrypoints=web"
       - "traefik.http.services.flower.loadbalancer.server.port=5555"
-
-  # python-agent:
-  #   deploy:
-  #     mode: replicated
-  #     replicas: ${PYTHON_WORKER_REPLICAS}
-  #   build:
-  #     context: ./
-  #     dockerfile: ./docker/python-agent/Dockerfile
-  #   restart: unless-stopped
-  #   command:
-  #     ["sh", "startup.bash"]
-  #   environment:
-  #     EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
-  #     EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
-  #     EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
-  #     PREFECT_API_URL: http://prefect:4200/api
-  #     PREFECT_WORK_POOL: default-agent-pool
-  #     PREFECT_WORK_QUEUE: itp-python-queue
-  #     RUNTIME_ENVIRONMENT: ${PYTHON_RUNTIME_ENVIRONMENT}
-  #     TESTING_EXECUTABLE: ${PYTHON_TESTING_EXECUTABLE}
-  #   depends_on:
-  #     - prefect
-  #   labels:
-  #   - traefik.enable=false
 
   # MinIO Object Storage Service
   minio:

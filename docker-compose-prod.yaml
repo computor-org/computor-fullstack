@@ -72,17 +72,24 @@ services:
     - "traefik.http.routers.uvicorn.entrypoints=web"
     - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
     - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
-  nginx:
-    image: nginx:1.27.3
+  
+  # Simple static file server (replaces nginx)
+  static-server:
+    image: halverneus/static-file-server:latest
+    restart: unless-stopped
     volumes:
-    - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/usr/share/nginx/html:ro
-    - ${NGINX_CONFIG}:/etc/nginx/conf.d/default.conf
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared/documents:/web:ro
+    environment:
+      - FOLDER=/web
+      - PORT=8080
+      - SHOW_LISTING=true
     labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.nginx.rule=PathPrefix(`/docs`)"
-    - "traefik.http.routers.nginx.entrypoints=web"
-    - "traefik.http.middlewares.nginx-stripprefix.stripprefix.prefixes=/docs"
-    - "traefik.http.routers.nginx.middlewares=nginx-stripprefix"
+      - "traefik.enable=true"
+      - "traefik.http.routers.static.rule=PathPrefix(`/docs`)"
+      - "traefik.http.routers.static.entrypoints=web"
+      - "traefik.http.middlewares.static-stripprefix.stripprefix.prefixes=/docs"
+      - "traefik.http.routers.static.middlewares=static-stripprefix"
+      - "traefik.http.services.static.loadbalancer.server.port=8080"
     depends_on:
       - traefik
 

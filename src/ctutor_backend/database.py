@@ -4,7 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker, Session
 
-POSTGRES_URL = os.environ.get("POSTGRES_URL")
+POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = os.environ.get("POSTGRES_PORT", "5432")
 POSTGRES_USER = os.environ.get("POSTGRES_USER")
 POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
 POSTGRES_DB = os.environ.get("POSTGRES_DB")
@@ -17,7 +18,7 @@ _database_options = {
     "pool_recycle": 300
 }
 
-_engine = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_URL}/{POSTGRES_DB}", **_database_options)
+_engine = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}", **_database_options)
 _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
 def get_db() -> Generator[Session, None, None]:

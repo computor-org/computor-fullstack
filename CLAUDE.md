@@ -29,8 +29,8 @@ docker-compose -f docker-compose-dev.yaml up -d     # Development with workers
 docker-compose -f docker-compose-prod.yaml up -d    # Production with scaling
 
 # Database operations
-bash migrations.sh          # Alembic migrations
-bash initialize_system.sh   # Initialize system data (roles, admin user)
+bash scripts/utilities/migrations.sh          # Alembic migrations
+bash scripts/utilities/initialize_system.sh   # Initialize system data (roles, admin user)
 cd src && python seeder.py  # Seed development test data
 alembic revision --autogenerate -m "description"  # Generate new migration
 alembic upgrade head        # Apply all pending migrations
@@ -49,12 +49,12 @@ python -m celery -A ctutor_backend.tasks.celery_app worker --loglevel=info
 python -m celery -A ctutor_backend.tasks.celery_app flower  # Start Flower UI
 
 # Docker Celery testing and monitoring
-./test_celery_docker.sh start   # Start Docker services including Flower
-./test_celery_docker.sh ui      # Show Flower UI access information
-./test_celery_docker.sh all     # Full test cycle with Docker
+./scripts/testing/test_celery_docker.sh start   # Start Docker services including Flower
+./scripts/testing/test_celery_docker.sh ui      # Show Flower UI access information
+./scripts/testing/test_celery_docker.sh all     # Full test cycle with Docker
 
 # TypeScript Generation
-bash generate_types.sh          # Generate TypeScript interfaces
+bash scripts/utilities/generate_types.sh          # Generate TypeScript interfaces
 ctutor generate-types           # Generate with CLI
 ctutor generate-types --watch   # Watch mode for auto-regeneration
 ```
@@ -229,7 +229,7 @@ S3-compatible object storage system with comprehensive security features:
 - `/docker-compose-prod.yaml`: Production environment with Celery scaling
 - `/src/ctutor_backend/tasks/`: Celery task executor framework implementation
 - `/src/ctutor_backend/tasks/celery_app.py`: Celery application configuration and setup
-- `/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
+- `/scripts/testing/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration
@@ -357,6 +357,17 @@ Complete Pydantic v1 to v2 migration with enhanced API infrastructure:
 - **Datetime Serialization**: Fixed JSON serialization issues for proper API responses
 - **Interface Coverage**: All core entities (Users, Accounts, Organizations, Roles) and course-dependent entities refactored
 - **Current State**: All 148 tests passing, all API endpoints functional, Redis caching operational
+
+### ✅ GitLab Integration & Project Initialization (Completed)
+Complete GitLab integration with automated project setup and content generation:
+- **Full Hierarchy Creation**: Organization → Course Family → Course → Projects structure
+- **Project Types**: Automated creation of assignments, student-template, and reference repositories
+- **Content Initialization**: README.md files, directory structures, and CodeAbility meta.yaml generation
+- **Students Group Management**: Automatic students subgroups with proper member management
+- **Database Integration**: SQLAlchemy JSONB property persistence with flag_modified fixes
+- **Security Enhancements**: Pre-commit hooks preventing secret commits, enhanced authentication
+- **Test Configuration**: Fixed test setup for single hierarchy without random suffixes
+- **CodeAbility Integration**: Meta.yaml generation matching gitlab_builder.py format
 
 ## Notes
 - The web UI is in early development stages

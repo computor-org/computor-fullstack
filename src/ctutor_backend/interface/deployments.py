@@ -84,10 +84,14 @@ class GitLabConfigGet(RepositoryConfig):
   directory: Optional[str] = None
   registry: Optional[str] = None
   parent: Optional[int] = None
-
-  @property
-  def web_url(self) -> str:
-    return f"{self.url}/{self.full_path}"
+  # Enhanced GitLab properties
+  group_id: Optional[int] = None
+  parent_id: Optional[int] = None
+  namespace_id: Optional[int] = None
+  namespace_path: Optional[str] = None
+  web_url: Optional[str] = None
+  visibility: Optional[str] = None
+  last_synced_at: Optional[str] = None
 
 class GitLabConfig(GitLabConfigGet):
   token: Optional[str] = None

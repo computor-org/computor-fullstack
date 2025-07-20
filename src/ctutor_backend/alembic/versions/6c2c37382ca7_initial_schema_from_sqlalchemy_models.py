@@ -173,6 +173,48 @@ def upgrade() -> None:
     op.create_index(op.f('ix_organization_path'), 'organization', ['path'], unique=False)
     op.create_index('organization_number_key', 'organization', ['organization_type', 'number'], unique=True)
     op.create_index('organization_path_key', 'organization', ['organization_type', 'path'], unique=True)
+    op.create_table('example_repository',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False, comment='Human-readable name of the repository'),
+    sa.Column('description', sa.Text(), nullable=True, comment='Description of the repository and its contents'),
+    sa.Column('source_url', sa.Text(), nullable=False, comment='Git repository URL'),
+    sa.Column('access_token', sa.Text(), nullable=True, comment='Encrypted token for accessing private repositories'),
+    sa.Column('default_branch', sa.String(length=100), nullable=False, server_default='main', comment='Default branch to sync from'),
+    sa.Column('visibility', sa.String(length=20), nullable=False, server_default='private', comment='Repository visibility: public, private, or restricted'),
+    sa.Column('organization_id', postgresql.UUID(), nullable=True, comment='Organization that owns this repository'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this repository'),
+    sa.Column('updated_by', postgresql.UUID(), nullable=True, comment='User who last updated this repository'),
+    sa.CheckConstraint("visibility IN ('public', 'private', 'restricted')", name='check_visibility'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
+    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('source_url')
+    )
+    op.create_table('example',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('example_repository_id', postgresql.UUID(), nullable=False, comment='Reference to the repository containing this example'),
+    sa.Column('directory', sa.String(length=255), nullable=False, comment="Name of the directory containing this example (e.g., 'hello-world')"),
+    sa.Column('title', sa.String(length=255), nullable=False, comment='Human-readable title of the example'),
+    sa.Column('description', sa.Text(), nullable=True, comment='Detailed description of the example'),
+    sa.Column('subject', sa.String(length=50), nullable=True, comment="Primary programming language (e.g., 'python', 'java')"),
+    sa.Column('category', sa.String(length=100), nullable=True, comment='Category for grouping examples'),
+    sa.Column('tags', postgresql.ARRAY(sa.String()), nullable=False, server_default='{}', comment='Tags for searching and filtering'),
+    sa.Column('version_identifier', sa.String(length=64), nullable=True, comment='Version Identifier (e.g. hash) of example directory contents for change detection'),
+    sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true', comment='Whether the example is active'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this example record'),
+    sa.Column('updated_by', postgresql.UUID(), nullable=True, comment='User who last updated this example record'),
+    sa.CheckConstraint("directory ~ '^[a-zA-Z0-9_-]+$'", name='check_directory_format'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['example_repository_id'], ['example_repository.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('example_repository_id', 'directory', name='unique_example_per_directory')
+    )
     op.create_table('profile',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -595,6 +637,8 @@ def downgrade() -> None:
     op.drop_table('session')
     op.drop_table('role_claim')
     op.drop_table('profile')
+    op.drop_table('example')
+    op.drop_table('example_repository')
     op.drop_index('organization_path_key', table_name='organization')
     op.drop_index('organization_number_key', table_name='organization')
     op.drop_index(op.f('ix_organization_path'), table_name='organization')

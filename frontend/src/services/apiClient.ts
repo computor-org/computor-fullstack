@@ -197,6 +197,43 @@ class APIClient {
   async getCurrentUser(): Promise<any> {
     return this.get('/user');
   }
+
+  /**
+   * Create a new user
+   * Uses the CrudRouter POST /users endpoint
+   */
+  async createUser(userData: {
+    given_name?: string;
+    family_name?: string;
+    email?: string;
+    username?: string;
+    user_type?: 'user' | 'token';
+    properties?: any;
+  }): Promise<any> {
+    return this.post('/users', userData);
+  }
+
+  /**
+   * Update an existing user
+   * Uses the CrudRouter PATCH /users/{id} endpoint
+   */
+  async updateUser(userId: string, userData: {
+    given_name?: string;
+    family_name?: string;
+    email?: string;
+    username?: string;
+    properties?: any;
+  }): Promise<any> {
+    return this.patch(`/users/${userId}`, userData);
+  }
+
+  /**
+   * Delete a user
+   * Uses the CrudRouter DELETE /users/{id} endpoint
+   */
+  async deleteUser(userId: string): Promise<void> {
+    return this.delete(`/users/${userId}`);
+  }
 }
 
 // Export singleton instance

@@ -29,6 +29,8 @@ import {
 } from '@mui/icons-material';
 import { User, Account } from '../types';
 import { apiClient } from '../services/apiClient';
+import UserDialog from '../components/UserDialog';
+import DeleteUserDialog from '../components/DeleteUserDialog';
 
 interface UsersPageProps {}
 
@@ -57,6 +59,12 @@ const UsersPage: React.FC<UsersPageProps> = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalUsers, setTotalUsers] = useState(0);
+  
+  // Dialog states
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserWithAccounts | null>(null);
+  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
 
   // Load users from API
   const loadUsers = async () => {
@@ -129,18 +137,41 @@ const UsersPage: React.FC<UsersPageProps> = () => {
   };
 
   const handleEditUser = (userId: string) => {
-    console.log('Edit user:', userId);
-    // TODO: Implement edit user functionality
+    const user = displayUsers.find(u => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setDialogMode('edit');
+      setUserDialogOpen(true);
+    }
   };
 
   const handleDeleteUser = (userId: string) => {
-    console.log('Delete user:', userId);
-    // TODO: Implement delete user functionality with confirmation
+    const user = displayUsers.find(u => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setDeleteDialogOpen(true);
+    }
   };
 
   const handleCreateUser = () => {
-    console.log('Create new user');
-    // TODO: Implement create user functionality
+    setSelectedUser(null);
+    setDialogMode('create');
+    setUserDialogOpen(true);
+  };
+
+  const handleDialogSuccess = () => {
+    // Reload users after successful create/update/delete
+    loadUsers();
+  };
+
+  const handleCloseUserDialog = () => {
+    setUserDialogOpen(false);
+    setSelectedUser(null);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setSelectedUser(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -416,6 +447,23 @@ const UsersPage: React.FC<UsersPageProps> = () => {
           </Box>
         </Stack>
       </Paper>
+
+      {/* User Create/Edit Dialog */}
+      <UserDialog
+        open={userDialogOpen}
+        onClose={handleCloseUserDialog}
+        onSuccess={handleDialogSuccess}
+        user={selectedUser}
+        mode={dialogMode}
+      />
+
+      {/* Delete User Dialog */}
+      <DeleteUserDialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        onSuccess={handleDialogSuccess}
+        user={selectedUser}
+      />
     </Box>
   );
 };

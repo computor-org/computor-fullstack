@@ -14,6 +14,7 @@ The main task list page displays all tasks stored in the PostgreSQL `celery_task
 - **Filtering**: Filter tasks by status (PENDING, STARTED, SUCCESS, FAILURE, RETRY, REVOKED)
 - **Pagination**: Configurable rows per page (5, 10, 25, 50) with server-side pagination
 - **Task Submission**: "New Task" button to create and submit tasks with parameters
+- **Task Deletion**: Delete button for each task with confirmation dialog
 
 #### Table Columns
 
@@ -29,7 +30,7 @@ The table displays the following columns from the database:
 | Completed At | Task completion timestamp | `date_done` |
 | Retries | Number of retry attempts | `retries` |
 | Result | Indicates if task has result/error | `has_result`/`has_error` |
-| Actions | View details button | - |
+| Actions | View details and delete buttons | - |
 
 ### Task Detail Page (`/tasks/:taskId`)
 
@@ -42,6 +43,7 @@ Detailed view of individual tasks showing:
 - **Progress Information**: Real-time progress updates (if available)
 - **Results**: Task execution results in JSON format
 - **Error Details**: Error messages and tracebacks for failed tasks
+- **Task Actions**: Delete button with confirmation dialog
 
 ### Task Submission Dialog
 
@@ -92,6 +94,10 @@ POST /tasks/submit
 
 DELETE /tasks/{task_id}/cancel
   Returns: Cancellation status
+
+DELETE /tasks/{task_id}
+  Returns: Deletion confirmation
+  Note: Permanently removes task from database
 ```
 
 #### Database Queries
@@ -192,6 +198,8 @@ const taskTemplates = {
 - Task parameters are validated on submission
 - Binary data is safely handled to prevent injection
 - Result data is escaped when displayed
+- Delete operations require user confirmation
+- No cascade delete - only removes database record
 
 ## Testing
 

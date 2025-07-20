@@ -312,6 +312,47 @@ class TaskExecutor:
         except Exception:
             return False
     
+    async def delete_task(self, task_id: str) -> bool:
+        """
+        Delete a task from the database.
+        
+        This permanently removes the task record from celery_taskmeta table.
+        Note: This does not cancel a running task, only removes the database record.
+        
+        Args:
+            task_id: Task ID
+            
+        Returns:
+            True if task was deleted, False if not found
+            
+        Raises:
+            Exception: If database operation fails
+        """
+        # Get database session
+        db_gen = get_db()
+        db = next(db_gen)
+        
+        try:
+            # Check if task exists first
+            check_query = text("SELECT 1 FROM celery_taskmeta WHERE task_id = :task_id")
+            result = db.execute(check_query, {"task_id": task_id}).fetchone()
+            
+            if not result:
+                return False
+            
+            # Delete the task
+            delete_query = text("DELETE FROM celery_taskmeta WHERE task_id = :task_id")
+            db.execute(delete_query, {"task_id": task_id})
+            db.commit()
+            
+            return True
+            
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db_gen.close()
+    
     def start_worker(self, queues: Optional[list] = None, burst: bool = False) -> None:
         """
         Start a Celery worker to process tasks.

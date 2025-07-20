@@ -37,6 +37,7 @@ import {
   PlayArrow as RunningIcon,
   Cancel as CancelledIcon,
   Add as AddIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { apiClient } from '../services/apiClient';
 import { useNavigate } from 'react-router-dom';
@@ -284,6 +285,23 @@ const Tasks: React.FC = () => {
     }
   };
 
+  const handleDeleteTask = async (taskId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    
+    if (!window.confirm('Are you sure you want to delete this task? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await apiClient.deleteTask(taskId);
+      // Refresh the task list
+      fetchTasks();
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      alert('Failed to delete task. Please try again.');
+    }
+  };
+
   return (
     <Box>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -419,14 +437,25 @@ const Tasks: React.FC = () => {
                       )}
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleTaskClick(task.task_id)}
-                        >
-                          <InfoIcon />
-                        </IconButton>
-                      </Tooltip>
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleTaskClick(task.task_id)}
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Task">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => handleDeleteTask(task.task_id, e)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))

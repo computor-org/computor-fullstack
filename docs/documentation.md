@@ -23,7 +23,10 @@ The system is composed of several loosely coupled components, each responsible f
 - **Backend**: Implemented in Python using FastAPI. Handles business logic, database access, and API routing.
 - **Database**: PostgreSQL is used to persist all structured data. Redis serves as a cache layer.
 - **Background Task Management**: Long-running tasks, such as automated testing, are orchestrated using Prefect 2.
-- **Storage Layer**: GitLab is used as the primary storage backend for repositories and course content. The architecture is designed to support other Git-based systems in the future.
+- **Storage Layer**: 
+  - **GitLab** is used as the primary storage backend for repositories and course content
+  - **MinIO** provides S3-compatible object storage for files, documents, and binary assets
+  - The architecture is designed to support other Git-based systems in the future
 - **VSCode Extension**: Written in TypeScript, the extension provides a rich UI for students, tutors, and lecturers within their IDE (separate Repository, url coming soon).
 - **Web Dashboard**: A React application (early in development) to visualize user progress, view metrics, and offer admin functionality.
 
@@ -37,10 +40,12 @@ The backend is the core of the system, providing RESTful APIs and managing the c
 
 - **FastAPI** for high-performance HTTP services
 - **PostgreSQL** for persistent structured data
-- **Redis** for caching
-- **Prefect 2** for orchestrating background tasks (e.g., tests, cloning repositories)
+- **Redis** for caching and session management
+- **Celery** for distributed background task processing
+- **MinIO** for S3-compatible object storage
+- **Keycloak** for Single Sign-On (SSO) authentication
 
-The backend is also responsible for authenticating users via their GitLab Personal Access Tokens (GLPATs) and managing course-related data models.
+The backend provides comprehensive APIs for course management, user authentication, file storage, and background task execution.
 
 ---
 
@@ -112,6 +117,47 @@ Each content node is configured using a `meta.yaml` file. These files define met
 - Properties for future grading logic
 
 The system allows deep nesting of units, while assignments can only exist under the root or directly under a unit.
+
+---
+
+## 🗄️ MinIO Object Storage
+
+The platform includes a comprehensive object storage system using MinIO, providing S3-compatible storage for files, documents, and binary assets.
+
+### Key Features
+
+- **S3-Compatible API**: Full compatibility with AWS S3 client libraries
+- **Comprehensive Security**: File type validation, size limits, and content inspection
+- **Permission System**: Role-based access control for storage operations
+- **Performance**: Redis caching and streaming uploads/downloads
+- **Docker Integration**: Complete containerized deployment
+
+### Security Features
+
+- **File Size Limits**: Configurable maximum upload size (20MB default)
+- **File Type Whitelist**: Only educational content types allowed (PDF, DOC, code files, etc.)
+- **Filename Sanitization**: Prevents path traversal and dangerous characters
+- **Content Inspection**: Blocks executables and disguised malicious files
+- **Cross-Platform**: Handles both Windows and Unix path formats
+
+### API Endpoints
+
+- File upload/download with validation
+- Object listing with filtering
+- Bucket management
+- Presigned URL generation
+- Object copying and metadata management
+
+### Storage Organization
+
+Files are organized hierarchically:
+- `courses/{course_id}/materials/` - Course materials
+- `courses/{course_id}/submissions/{user_id}/` - Student submissions
+- `organizations/{org_id}/documents/` - Organization documents
+- `users/{user_id}/files/` - User files
+- `temp/{session_id}/` - Temporary files
+
+For detailed information, see `/docs/MINIO_STORAGE.md`.
 
 ---
 

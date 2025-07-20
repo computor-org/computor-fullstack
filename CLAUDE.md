@@ -195,6 +195,28 @@ Automatic TypeScript interface generation from Pydantic models:
   - Compile-time type safety
   - Reduces API integration errors
 
+### ✅ MinIO Object Storage (Completed)
+S3-compatible object storage system with comprehensive security features:
+- **S3-Compatible Storage**: MinIO service with bucket management and object operations
+- **RESTful API**: Complete FastAPI endpoints for upload, download, listing, and management
+- **Security Features**:
+  - File size limits (20MB default, configurable)
+  - File type whitelist (educational content only)
+  - Filename sanitization with path traversal prevention
+  - Content inspection to block executables and dangerous files
+  - Cross-platform path handling (Windows/Unix compatible)
+- **Permission System**: Role-based access control for storage operations
+- **Redis Caching**: Performance optimization with appropriate TTL values
+- **Comprehensive Testing**: 27 security tests covering all validation scenarios
+- **Docker Integration**: Complete container setup with health checks and Traefik routing
+- **Key Features**:
+  - Presigned URLs for direct access
+  - Metadata tracking for uploaded files
+  - Bucket statistics and management
+  - Streaming uploads and downloads
+  - Audit logging for security events
+  - Extensible configuration system
+
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
@@ -202,6 +224,7 @@ Automatic TypeScript interface generation from Pydantic models:
 - `/docs/DOCKER_TASK_WORKERS.md`: Docker task worker configuration
 - `/docs/SSO_FRONTEND_INTEGRATION.md`: SSO frontend integration guide
 - `/docs/TYPESCRIPT_GENERATION.md`: TypeScript generation guide
+- `/docs/MINIO_STORAGE.md`: MinIO object storage integration guide
 - `/docker-compose-dev.yaml`: Development environment with Celery workers and Flower UI
 - `/docker-compose-prod.yaml`: Production environment with Celery scaling
 - `/src/ctutor_backend/tasks/`: Celery task executor framework implementation
@@ -212,6 +235,10 @@ Automatic TypeScript interface generation from Pydantic models:
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration
 - `/src/ctutor_backend/tests/`: Test files for comprehensive testing (including Docker integration)
 - `/src/ctutor_backend/scripts/`: Development and maintenance scripts
+- `/src/ctutor_backend/storage_config.py`: MinIO storage security configuration
+- `/src/ctutor_backend/storage_security.py`: File security validation functions
+- `/src/ctutor_backend/services/storage_service.py`: MinIO storage service implementation
+- `/src/ctutor_backend/api/storage.py`: MinIO storage API endpoints
 
 ## Development Principles
 

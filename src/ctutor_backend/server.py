@@ -51,6 +51,7 @@ from ctutor_backend.api.role_claims import role_claim_router
 from ctutor_backend.api.user import user_router
 from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
+from ctutor_backend.api.storage import storage_router
 
 async def init_execution_backend_api(db: Session):
 
@@ -269,6 +270,12 @@ app.include_router(
 app.include_router(
     sso_router,
     tags=["sso", "authentication"]
+)
+
+app.include_router(
+    storage_router,
+    tags=["storage"],
+    dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
 )
 
 @app.head("/", status_code=204)

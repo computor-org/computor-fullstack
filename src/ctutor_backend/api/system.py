@@ -7,7 +7,7 @@ from typing import Annotated, Optional
 from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.crud import get_id_db
-from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
+from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
 from ctutor_backend.api.permissions import check_admin, check_course_permissions, get_permitted_course_ids
 from ctutor_backend.api.utils import get_course_id_from_url, sync_dependent_items
@@ -299,25 +299,26 @@ async def create_student_from_export(permissions: Annotated[Principal, Depends(g
     if len(course_member_create_tasks) > 0:
       deployment = get_computor_deployment_from_course_id_db(course_id, db)
 
-      async with get_prefect_client() as client:
+      raise NotImplementedException()
+      # async with get_prefect_client() as client:
 
-        deployment_response = await client.read_deployment_by_name("release-student/system")
+      #   deployment_response = await client.read_deployment_by_name("release-student/system")
 
-        try:
-          flow_run = await client.create_flow_run_from_deployment(
-            deployment_id=deployment_response.id,
-            parameters={
-              "deployment": deployment.model_dump(),
-              "payload": ReleaseStudentsCreate(
-                students=course_member_create_tasks,
-                course_id=course_id
-              ).model_dump()
-            }
-          )
-          print(f"Started flow_run {flow_run}")
+      #   try:
+      #     flow_run = await client.create_flow_run_from_deployment(
+      #       deployment_id=deployment_response.id,
+      #       parameters={
+      #         "deployment": deployment.model_dump(),
+      #         "payload": ReleaseStudentsCreate(
+      #           students=course_member_create_tasks,
+      #           course_id=course_id
+      #         ).model_dump()
+      #       }
+      #     )
+      #     print(f"Started flow_run {flow_run}")
 
-        except Exception as e:
-          raise BadRequestException()
+      #   except Exception as e:
+      #     raise BadRequestException()
 
     return students
 

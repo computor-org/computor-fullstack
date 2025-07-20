@@ -32,7 +32,7 @@ from ctutor_backend.model.execution import ExecutionBackend
 from prefect.client.orchestration import PrefectClient
 from sqlalchemy_utils import Ltree
 from ctutor_backend.settings import settings
-from ctutor_backend.helpers import get_prefect_client
+#from ctutor_backend.helpers import get_prefect_client
 
 def handle_merge_request(submission: Submission, branch: str, title: str) -> bool:
 
@@ -171,24 +171,24 @@ async def prefect_test_job(test_job: TestJob, properties: dict) -> str:
         raise BadRequestException()
 
 async def submission_job(submission: Submission):
+  raise NotImplementedException()
+  # async with get_prefect_client() as client:
 
-  async with get_prefect_client() as client:
+  #   deployment = await client.read_deployment_by_name("submit-result/system")
 
-    deployment = await client.read_deployment_by_name("submit-result/system")
+  #   try:
+  #     flow_run = await client.create_flow_run_from_deployment(
+  #       deployment_id=deployment.id,
+  #       parameters={
+  #         "submission": submission.model_dump(exclude_none=True)
+  #       },
+  #       tags=[f"user:{submission.user_id}"]
+  #     )
 
-    try:
-      flow_run = await client.create_flow_run_from_deployment(
-        deployment_id=deployment.id,
-        parameters={
-          "submission": submission.model_dump(exclude_none=True)
-        },
-        tags=[f"user:{submission.user_id}"]
-      )
+  #     return str(flow_run.id)
 
-      return str(flow_run.id)
-
-    except:
-      raise BadRequestException()
+  #   except:
+  #     raise BadRequestException()
 
 class TestRunResponse(ResultCreate):
   id: str

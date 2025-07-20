@@ -201,7 +201,7 @@ const Tasks: React.FC = () => {
   };
 
   const handleTaskClick = (taskId: string) => {
-    navigate(`/tasks/${taskId}`);
+    navigate(`/admin/tasks/${taskId}`);
   };
 
   const formatDate = (dateString?: string) => {
@@ -275,7 +275,7 @@ const Tasks: React.FC = () => {
 
       // Navigate to the new task
       if (response.task_id) {
-        navigate(`/tasks/${response.task_id}`);
+        navigate(`/admin/tasks/${response.task_id}`);
       }
     } catch (err) {
       console.error('Error submitting task:', err);

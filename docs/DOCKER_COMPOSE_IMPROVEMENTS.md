@@ -22,7 +22,6 @@ With corresponding environment files:
    - Current routes:
      - `/api` → uvicorn (prod only)
      - `/docs` → nginx (prod only, commented in dev)
-     - `/flower` → flower (Celery monitoring)
      - `/minio` → MinIO API
      - `/minio-console` → MinIO Console
      - `/auth` → Keycloak (dev only, commented)
@@ -48,12 +47,7 @@ With corresponding environment files:
    - S3-compatible storage
    - Default bucket: computor-storage
 
-6. **Flower** (Celery Monitoring)
-   - Port: 5555 (prod only)
-   - Basic auth: ${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-flower123}
-   - Accessible via Traefik at `/flower`
-
-7. **uvicorn** (API Server - Prod only)
+6. **uvicorn** (API Server - Prod only)
    - Port: 8000
    - FastAPI application
    - In dev mode, started via `bash api.sh`
@@ -139,7 +133,7 @@ Based on code analysis, Prefect is used for:
 - Note: docker/postgres/init-keycloak-schema.sql requires root permissions to remove
 
 ### 4. Security Concerns
-- Flower has basic auth but needs better integration
+- Admin interfaces need authentication
 - All services exposed through single port (good) but some lack authentication
 
 ## Proposed Improvements
@@ -234,6 +228,7 @@ docker/
 - Removed all Prefect-related variables
 - Added `setup_env.sh` utility script
 - Standardized Redis and PostgreSQL configurations
+- Fixed database connection by updating database.py to use POSTGRES_HOST and POSTGRES_PORT directly
 
 #### ✅ Phase 2: Prefect Removal
 - Removed prefect and prefect_db services from docker-compose files
@@ -286,7 +281,7 @@ docker/
 
 ### Phase 5: Authentication
 1. Implement Traefik auth middleware
-2. Secure Flower and other admin interfaces
+2. Secure admin interfaces
 3. Document access patterns
 
 ## Benefits
@@ -324,7 +319,20 @@ docker-compose -f docker-compose-dev.yaml up -d
 
 # Check status
 docker-compose -f docker-compose-dev.yaml ps
+
+# Access services
+# - MinIO Console: http://localhost:9001 (direct access)
+# - MinIO API: http://localhost:9000 (direct access)
+# - Keycloak: http://localhost:8180 (direct access, dev only)
+# - PostgreSQL: localhost:5432 (maps to internal port 5437)
+# - Redis: localhost:6379
 ```
+
+#### Important Configuration Notes
+- Database connection: Uses POSTGRES_HOST and POSTGRES_PORT directly (not POSTGRES_URL)
+- Docker services communicate using service names (e.g., `postgres`, `redis`)
+- Workers run inside Docker and connect to services via Docker network
+- All services use proper authentication (passwords in .env files)
 
 #### Production Setup
 ```bash
@@ -334,14 +342,13 @@ docker-compose -f docker-compose-dev.yaml ps
 # Start services with scaling
 docker-compose -f docker-compose-prod.yaml up -d --scale celery-system-worker=3
 
-# Monitor with Flower
-# Access at http://localhost:8080/flower
+# Check worker status
+docker-compose -f docker-compose-prod.yaml logs celery-system-worker
 ```
 
 ### Service URLs (via Traefik on port 8080)
 - `/api` - FastAPI application
 - `/docs` - Static file server
-- `/flower` - Celery monitoring
 - `/minio` - MinIO API
 - `/minio-console` - MinIO Console
 - `/auth` - Keycloak (dev only)

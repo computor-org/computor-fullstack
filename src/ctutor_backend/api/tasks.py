@@ -2,8 +2,8 @@
 FastAPI endpoints for task management.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import Dict, List, Any
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
+from typing import Dict, List, Any, Optional
 from celery.exceptions import NotRegistered
 
 from ctutor_backend.tasks import (
@@ -15,6 +15,43 @@ from ctutor_backend.tasks import (
 )
 
 tasks_router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+@tasks_router.get("", response_model=Dict[str, Any])
+async def list_tasks(
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of tasks to return"),
+    offset: int = Query(0, ge=0, description="Number of tasks to skip"),
+    status: Optional[str] = Query(None, description="Filter by task status (PENDING, STARTED, SUCCESS, FAILURE, RETRY, REVOKED)")
+):
+    """
+    List tasks with optional filtering and pagination.
+    
+    Args:
+        limit: Maximum number of tasks to return (1-1000)
+        offset: Number of tasks to skip for pagination
+        status: Optional status filter
+        
+    Returns:
+        Dictionary containing:
+        - tasks: List of task information
+        - total: Total number of tasks
+        - limit: Applied limit
+        - offset: Applied offset
+        - has_more: Whether more tasks are available
+        
+    Example:
+        GET /tasks?limit=10&offset=0&status=SUCCESS
+    """
+    try:
+        task_executor = get_task_executor()
+        result = await task_executor.list_tasks(limit=limit, offset=offset, status=status)
+        return result
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list tasks: {str(e)}"
+        )
 
 
 @tasks_router.post("/submit", response_model=Dict[str, str])
@@ -51,6 +88,23 @@ async def submit_task(submission: TaskSubmission):
             status_code=500,
             detail=f"Failed to submit task: {str(e)}"
         )
+
+
+@tasks_router.get("/{task_id}", response_model=TaskInfo)
+async def get_task(task_id: str):
+    """
+    Get task information by ID.
+    
+    Args:
+        task_id: Task ID
+        
+    Returns:
+        Task information including status, timestamps, and metadata
+        
+    Raises:
+        HTTPException: If task is not found
+    """
+    return await get_task_status(task_id)
 
 
 @tasks_router.get("/{task_id}/status", response_model=TaskInfo)

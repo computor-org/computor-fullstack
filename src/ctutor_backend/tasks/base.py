@@ -126,5 +126,10 @@ class TaskInfo(BaseModel):
     finished_at: Optional[datetime] = None
     progress: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    worker: Optional[str] = None
+    queue: Optional[str] = None
+    retries: Optional[int] = None
+    args: Optional[Any] = None
+    kwargs: Optional[Dict[str, Any]] = None
     
     model_config = ConfigDict(use_enum_values=True)

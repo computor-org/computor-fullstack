@@ -1,4 +1,5 @@
 import { SSOAuthService } from './ssoAuthService';
+import { BasicAuthService } from './basicAuthService';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -29,9 +30,18 @@ class APIClient {
 
     // Add authentication header if not skipped
     if (!skipAuth) {
-      const token = SSOAuthService.getStoredToken();
-      if (token) {
-        headers.set('Authorization', `Bearer ${token.accessToken}`);
+      // Check for basic auth first
+      if (BasicAuthService.isBasicAuth()) {
+        const basicToken = BasicAuthService.getStoredToken();
+        if (basicToken) {
+          headers.set('Authorization', `Basic ${basicToken.accessToken}`);
+        }
+      } else {
+        // Use SSO/Bearer token
+        const token = SSOAuthService.getStoredToken();
+        if (token) {
+          headers.set('Authorization', `Bearer ${token.accessToken}`);
+        }
       }
     }
 

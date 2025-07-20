@@ -48,6 +48,14 @@ export const globalNavigation: NavigationItem[] = [
     context: 'global',
   },
   {
+    id: 'tasks',
+    label: 'Tasks',
+    icon: 'TaskAlt',
+    path: '/tasks',
+    context: 'global',
+    permissions: ['admin_access'],
+  },
+  {
     id: 'admin',
     label: 'Administration',
     icon: 'AdminPanelSettings',

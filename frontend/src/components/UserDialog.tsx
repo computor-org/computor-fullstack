@@ -125,7 +125,9 @@ const UserDialog: React.FC<UserDialogProps> = ({
       if (mode === 'create') {
         await apiClient.createUser(formData);
       } else if (mode === 'edit' && user) {
-        await apiClient.updateUser(user.id, formData);
+        // For updates, exclude user_type as it's not allowed in UserUpdate interface
+        const { user_type, ...updateData } = formData;
+        await apiClient.updateUser(user.id, updateData);
       }
       
       onSuccess();
@@ -239,7 +241,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
             </Grid>
 
             <Grid item xs={12} sm={4}>
-              <FormControl fullWidth disabled={loading}>
+              <FormControl fullWidth disabled={loading || mode === 'edit'}>
                 <InputLabel>User Type</InputLabel>
                 <Select
                   value={formData.user_type}
@@ -249,6 +251,11 @@ const UserDialog: React.FC<UserDialogProps> = ({
                   <MenuItem value="user">User</MenuItem>
                   <MenuItem value="token">Token</MenuItem>
                 </Select>
+                {mode === 'edit' && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    User type cannot be changed after creation
+                  </Typography>
+                )}
               </FormControl>
             </Grid>
           </Grid>

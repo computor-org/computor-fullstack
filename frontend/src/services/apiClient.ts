@@ -222,6 +222,7 @@ class APIClient {
     family_name?: string;
     email?: string;
     username?: string;
+    number?: string;
     properties?: any;
   }): Promise<any> {
     return this.patch(`/users/${userId}`, userData);

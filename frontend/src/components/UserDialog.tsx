@@ -123,10 +123,46 @@ const UserDialog: React.FC<UserDialogProps> = ({
 
     try {
       if (mode === 'create') {
+        console.log('Creating user with data:', formData);
         await apiClient.createUser(formData);
       } else if (mode === 'edit' && user) {
         // For updates, exclude user_type as it's not allowed in UserUpdate interface
-        const { user_type, ...updateData } = formData;
+        const { user_type, ...rawUpdateData } = formData;
+        
+        // Only send fields that have actually changed and are not empty
+        const updateData: any = {};
+        
+        if (rawUpdateData.given_name && rawUpdateData.given_name.trim() !== user.given_name) {
+          updateData.given_name = rawUpdateData.given_name.trim();
+        }
+        if (rawUpdateData.family_name && rawUpdateData.family_name.trim() !== user.family_name) {
+          updateData.family_name = rawUpdateData.family_name.trim();
+        }
+        if (rawUpdateData.email && rawUpdateData.email.trim() !== user.email) {
+          updateData.email = rawUpdateData.email.trim();
+        }
+        if (rawUpdateData.username && rawUpdateData.username.trim() !== user.username) {
+          updateData.username = rawUpdateData.username.trim();
+        }
+        
+        console.log('Original user data:', {
+          given_name: user.given_name,
+          family_name: user.family_name,
+          email: user.email,
+          username: user.username
+        });
+        console.log('Form data:', rawUpdateData);
+        console.log('Update payload (only changed fields):', updateData);
+        console.log('User ID:', user.id);
+        
+        // Only send the update if there are actual changes
+        if (Object.keys(updateData).length === 0) {
+          console.log('No changes detected, skipping update');
+          onSuccess();
+          onClose();
+          return;
+        }
+        
         await apiClient.updateUser(user.id, updateData);
       }
       

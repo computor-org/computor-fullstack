@@ -87,6 +87,11 @@ class APIClient {
         throw new Error(errorBody || `API Error: ${response.status} ${response.statusText}`);
       }
 
+      // Handle 204 No Content responses (common for DELETE operations)
+      if (response.status === 204) {
+        return {} as T;
+      }
+
       // Return JSON response
       return await response.json();
     } catch (error) {
@@ -225,6 +230,8 @@ class APIClient {
     number?: string;
     properties?: any;
   }): Promise<any> {
+    console.log('API Client - PATCH request to:', `/users/${userId}`);
+    console.log('API Client - Payload:', JSON.stringify(userData, null, 2));
     return this.patch(`/users/${userId}`, userData);
   }
 

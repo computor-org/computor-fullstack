@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from typing import Annotated, Optional
 from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile
+import logging
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.crud import get_id_db
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
@@ -29,8 +30,10 @@ from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from celery.result import AsyncResult
 from ctutor_backend.tasks.celery_app import app as celery_app
+import os
 
 system_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 def get_computor_deployment_from_course_id_db(course_id: UUID | str, db: Session) -> ComputorDeploymentConfig: # TODO: REFACTORING
 
@@ -505,3 +508,242 @@ async def release_course_response(
        print(e.args)
        print(e.with_traceback())
        raise BadRequestException(e.args)
+
+
+# HIERARCHY TASK ENDPOINTS
+
+class GitLabCredentials(BaseModel):
+    """GitLab connection credentials."""
+    gitlab_url: str
+    gitlab_token: str
+
+
+class OrganizationTaskRequest(BaseModel):
+    """Request to create an organization via Celery task."""
+    organization: dict  # OrganizationCreate data
+    gitlab: GitLabCredentials
+    parent_group_id: int
+
+
+class CourseFamilyTaskRequest(BaseModel):
+    """Request to create a course family via Celery task."""
+    course_family: dict  # CourseFamilyCreate data
+    organization_id: str
+    gitlab: GitLabCredentials
+
+
+class CourseTaskRequest(BaseModel):
+    """Request to create a course via Celery task."""
+    course: dict  # CourseCreate data
+    course_family_id: str
+    gitlab: GitLabCredentials
+
+
+class TaskResponse(BaseModel):
+    """Response with task ID for async operation."""
+    task_id: str
+    status: str
+    message: str
+
+
+def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: int, path: str) -> dict:
+    """Convert GitLab credentials to config format."""
+    return {
+        "url": gitlab.gitlab_url,
+        "token": gitlab.gitlab_token,
+        "parent": parent_group_id,
+        "path": path
+    }
+
+
+@system_router.post("/hierarchy/organizations/create", response_model=TaskResponse)
+async def create_organization_async(
+    request: OrganizationTaskRequest,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """Create an organization asynchronously using Celery tasks."""
+    from ctutor_backend.tasks.hierarchy_management import create_organization_task
+    
+    try:
+        # Check permissions
+        if not permissions.is_admin:
+            raise NotFoundException("Insufficient permissions")
+        
+        # Convert to organization config format
+        org_config = {
+            "name": request.organization.get("title", ""),
+            "path": request.organization.get("path", ""),
+            "description": request.organization.get("description", ""),
+            "gitlab": convert_to_gitlab_config(
+                request.gitlab,
+                request.parent_group_id,
+                request.organization.get("path", "")
+            )
+        }
+        
+        # Submit task using direct Celery approach
+        result = create_organization_task.apply_async(
+            args=[
+                org_config,
+                request.gitlab.gitlab_url,
+                request.gitlab.gitlab_token,
+                permissions.user_id
+            ],
+            queue='high_priority'
+        )
+        
+        return TaskResponse(
+            task_id=result.id,
+            status="submitted",
+            message="Organization creation task submitted successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error submitting organization creation task: {e}")
+        raise BadRequestException(f"Failed to submit organization creation task: {str(e)}")
+
+
+@system_router.post("/hierarchy/course-families/create", response_model=TaskResponse)
+async def create_course_family_async(
+    request: CourseFamilyTaskRequest,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """Create a course family asynchronously using Celery tasks."""
+    from ctutor_backend.tasks.hierarchy_management import create_course_family_task
+    
+    try:
+        # Check permissions
+        if not permissions.is_admin:
+            raise NotFoundException("Insufficient permissions")
+        
+        # Validate parent organization exists
+        organization = db.query(Organization).filter(Organization.id == request.organization_id).first()
+        if not organization:
+            raise NotFoundException(f"Organization with ID {request.organization_id} not found")
+        
+        # Get parent GitLab group from organization
+        parent_gitlab_config = organization.properties.get("gitlab", {})
+        parent_group_id = parent_gitlab_config.get("group_id")
+        
+        if not parent_group_id:
+            raise BadRequestException("Parent organization missing GitLab group configuration")
+        
+        # Convert to course family config format
+        family_config = {
+            "name": request.course_family.get("title", ""),
+            "path": request.course_family.get("path", ""),
+            "description": request.course_family.get("description", ""),
+            "gitlab": convert_to_gitlab_config(
+                request.gitlab,
+                parent_group_id,
+                request.course_family.get("path", "")
+            )
+        }
+        
+        # Submit task using direct Celery approach
+        result = create_course_family_task.apply_async(
+            args=[
+                family_config,
+                request.organization_id,
+                request.gitlab.gitlab_url,
+                request.gitlab.gitlab_token,
+                permissions.user_id
+            ],
+            queue='high_priority'
+        )
+        
+        return TaskResponse(
+            task_id=result.id,
+            status="submitted",
+            message="Course family creation task submitted successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error submitting course family creation task: {e}")
+        raise BadRequestException(f"Failed to submit course family creation task: {str(e)}")
+
+
+@system_router.post("/hierarchy/courses/create", response_model=TaskResponse)
+async def create_course_async(
+    request: CourseTaskRequest,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """Create a course asynchronously using Celery tasks."""
+    from ctutor_backend.tasks.hierarchy_management import create_course_task
+    
+    try:
+        # Check permissions
+        if not permissions.is_admin:
+            raise NotFoundException("Insufficient permissions")
+        
+        # Validate parent course family exists
+        course_family = db.query(CourseFamily).filter(CourseFamily.id == request.course_family_id).first()
+        if not course_family:
+            raise NotFoundException(f"Course family with ID {request.course_family_id} not found")
+        
+        # Get parent GitLab group from course family
+        parent_gitlab_config = course_family.properties.get("gitlab", {})
+        parent_group_id = parent_gitlab_config.get("group_id")
+        
+        if not parent_group_id:
+            raise BadRequestException("Parent course family missing GitLab group configuration")
+        
+        # Convert to course config format
+        course_config = {
+            "name": request.course.get("title", ""),
+            "path": request.course.get("path", ""),
+            "description": request.course.get("description", ""),
+            "gitlab": convert_to_gitlab_config(
+                request.gitlab,
+                parent_group_id,
+                request.course.get("path", "")
+            )
+        }
+        
+        # Submit task using direct Celery approach
+        result = create_course_task.apply_async(
+            args=[
+                course_config,
+                request.course_family_id,
+                request.gitlab.gitlab_url,
+                request.gitlab.gitlab_token,
+                permissions.user_id
+            ],
+            queue='high_priority'
+        )
+        
+        return TaskResponse(
+            task_id=result.id,
+            status="submitted",
+            message="Course creation task submitted successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error submitting course creation task: {e}")
+        raise BadRequestException(f"Failed to submit course creation task: {str(e)}")
+
+
+class GitLabConfigResponse(BaseModel):
+    """GitLab configuration from environment."""
+    gitlab_url: Optional[str] = None
+    gitlab_token: Optional[str] = None
+    parent_group_id: Optional[str] = None
+
+
+@system_router.get("/gitlab-config", response_model=GitLabConfigResponse)
+async def get_gitlab_config(
+    permissions: Annotated[Principal, Depends(get_current_permissions)]
+):
+    """Get GitLab configuration from environment variables."""
+    # Only allow admin users to access this endpoint
+    if not permissions.is_admin:
+        raise NotFoundException("Insufficient permissions")
+    
+    return GitLabConfigResponse(
+        gitlab_url=os.environ.get('TEST_GITLAB_URL'),
+        gitlab_token=os.environ.get('TEST_GITLAB_TOKEN'),
+        parent_group_id=os.environ.get('TEST_GITLAB_GROUP_ID')
+    )

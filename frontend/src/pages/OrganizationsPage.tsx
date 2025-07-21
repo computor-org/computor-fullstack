@@ -22,6 +22,7 @@ import { apiClient } from '../services/apiClient';
 import { DataTable, Column } from '../components/common/DataTable';
 import { FormDialog } from '../components/common/FormDialog';
 import OrganizationForm from '../components/OrganizationForm';
+import OrganizationTaskForm from '../components/OrganizationTaskForm';
 import DeleteDialog from '../components/DeleteDialog';
 
 const OrganizationsPage: React.FC = () => {
@@ -116,6 +117,13 @@ const OrganizationsPage: React.FC = () => {
     } finally {
       setFormLoading(false);
     }
+  };
+
+  const handleTaskComplete = (organizationId: string) => {
+    setFormOpen(false);
+    loadOrganizations();
+    // Optionally navigate to the new organization
+    // navigate(`/admin/organizations/${organizationId}`);
   };
 
   const handleDeleteConfirm = async () => {
@@ -251,13 +259,23 @@ const OrganizationsPage: React.FC = () => {
         title={formMode === 'create' ? 'Create Organization' : 'Edit Organization'}
         loading={formLoading}
         maxWidth="md"
+        fullWidth
       >
-        <OrganizationForm
-          organization={selectedOrg}
-          mode={formMode}
-          onSubmit={handleFormSubmit}
-          onClose={() => setFormOpen(false)}
-        />
+        {formMode === 'create' ? (
+          <OrganizationTaskForm
+            mode={formMode}
+            onSubmit={handleFormSubmit}
+            onTaskComplete={handleTaskComplete}
+            onClose={() => setFormOpen(false)}
+          />
+        ) : (
+          <OrganizationForm
+            organization={selectedOrg}
+            mode={formMode}
+            onSubmit={handleFormSubmit}
+            onClose={() => setFormOpen(false)}
+          />
+        )}
       </FormDialog>
 
       <DeleteDialog

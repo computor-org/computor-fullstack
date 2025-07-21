@@ -4,10 +4,10 @@ import {
   Box,
   Button,
   Alert,
-  Stack,
   CircularProgress,
   LinearProgress,
   Typography,
+  Stack,
 } from '@mui/material';
 import { OrganizationCreate, OrganizationUpdate } from '../types/generated/organizations';
 import { apiClient } from '../services/apiClient';
@@ -122,11 +122,12 @@ const OrganizationCreatePage: React.FC = () => {
 
   // Action buttons for the fixed footer
   const actions = (
-    <Stack direction="row" spacing={2} justifyContent="flex-end">
+    <>
       <Button
         onClick={handleCancel}
         disabled={formState.isProcessing}
         color="inherit"
+        sx={{ mr: 2 }}
       >
         Cancel
       </Button>
@@ -138,7 +139,7 @@ const OrganizationCreatePage: React.FC = () => {
       >
         {formState.isProcessing ? 'Processing...' : 'Create Organization'}
       </Button>
-    </Stack>
+    </>
   );
 
   return (

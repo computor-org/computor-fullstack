@@ -373,6 +373,38 @@ def create_course_task(self, course_config, course_family_id, created_by_user_id
             course = Course(**course_dict)
             
             db.add(course)
+            db.flush()  # Get the ID before additional GitLab operations
+            
+            # Additional GitLab setup if GitLab group was created
+            if gitlab_group:
+                self.update_state(state='PROGRESS', meta={'status': 'Creating students group', 'progress': 70})
+                
+                # Create students group under the course
+                students_group_result = self._create_students_group(
+                    course=course,
+                    parent_group=gitlab_group,
+                    gl=gl
+                )
+                
+                if not students_group_result["success"]:
+                    logger.warning(f"Failed to create students group: {students_group_result['error']}")
+                else:
+                    logger.info(f"Created students group: {students_group_result['gitlab_group'].full_path}")
+                
+                self.update_state(state='PROGRESS', meta={'status': 'Creating course projects', 'progress': 80})
+                
+                # Create course projects (assignments, student-template, reference)
+                projects_result = self._create_course_projects(
+                    course=course,
+                    parent_group=gitlab_group,
+                    gl=gl
+                )
+                
+                if not projects_result["success"]:
+                    logger.warning(f"Failed to create course projects: {projects_result['error']}")
+                else:
+                    logger.info(f"Created course projects: {', '.join(projects_result['created_projects'])}")
+            
             db.commit()
             db.refresh(course)
             
@@ -397,6 +429,189 @@ def create_course_task(self, course_config, course_family_id, created_by_user_id
         logger.error(f"Error creating course: {e}")
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise
+
+    def _create_students_group(
+        self,
+        course: Course,
+        parent_group,
+        gl
+    ) -> Dict[str, Any]:
+        """Create students group under a course."""
+        result = {
+            "success": False,
+            "gitlab_group": None,
+            "error": None
+        }
+        
+        try:
+            # Check if students group already exists
+            students_path = "students"
+            
+            # Try to find existing students group
+            try:
+                existing_groups = parent_group.subgroups.list(search=students_path)
+                for group in existing_groups:
+                    if group.path == students_path:
+                        students_group = gl.groups.get(group.id)
+                        logger.info(f"Students group already exists: {students_group.full_path}")
+                        result["gitlab_group"] = students_group
+                        result["success"] = True
+                        return result
+            except Exception as e:
+                logger.warning(f"Error checking for existing students group: {e}")
+            
+            # Create students group
+            group_data = {
+                'name': 'Students',
+                'path': students_path,
+                'parent_id': parent_group.id,
+                'description': f'Students group for {course.title}',
+                'visibility': 'private'
+            }
+            
+            students_group = gl.groups.create(group_data)
+            logger.info(f"Created students group: {students_group.full_path}")
+            
+            # Update course properties to include students group info
+            if not course.properties:
+                course.properties = {}
+            
+            if "gitlab" not in course.properties:
+                course.properties["gitlab"] = {}
+            
+            course.properties["gitlab"]["students_group"] = {
+                "group_id": students_group.id,
+                "full_path": students_group.full_path,
+                "web_url": f"{gl.api_url.replace('/api/v4', '')}/groups/{students_group.full_path}",
+                "created_at": datetime.now().isoformat()
+            }
+            
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(course, "properties")
+            
+            result["gitlab_group"] = students_group
+            result["success"] = True
+            
+        except Exception as e:
+            logger.error(f"Failed to create students group: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
+    def _create_course_projects(
+        self,
+        course: Course,
+        parent_group,
+        gl
+    ) -> Dict[str, Any]:
+        """Create course projects (assignments, student-template, reference) under a course."""
+        result = {
+            "success": False,
+            "created_projects": [],
+            "existing_projects": [],
+            "error": None
+        }
+        
+        # Standard course projects
+        project_configs = [
+            {
+                "name": "Assignments",
+                "path": "assignments",
+                "description": f"Assignment templates and grading scripts for {course.title}",
+                "visibility": "private"
+            },
+            {
+                "name": "Student Template",
+                "path": "student-template",
+                "description": f"Template repository for students in {course.title}",
+                "visibility": "private"
+            },
+            {
+                "name": "Reference",
+                "path": "reference",
+                "description": f"Reference solutions and instructor materials for {course.title}",
+                "visibility": "private"
+            }
+        ]
+        
+        try:
+            for project_config in project_configs:
+                project_path = project_config["path"]
+                
+                # Check if project already exists
+                try:
+                    existing_projects = gl.projects.list(
+                        search=project_path,
+                        namespace_id=parent_group.id
+                    )
+                    
+                    project_exists = False
+                    for existing in existing_projects:
+                        if existing.path == project_path and existing.namespace['id'] == parent_group.id:
+                            logger.info(f"Project already exists: {existing.path_with_namespace}")
+                            result["existing_projects"].append(project_path)
+                            project_exists = True
+                            break
+                    
+                    if not project_exists:
+                        # Create project
+                        project_data = {
+                            'name': project_config["name"],
+                            'path': project_path,
+                            'namespace_id': parent_group.id,
+                            'description': project_config["description"],
+                            'visibility': project_config["visibility"],
+                            'initialize_with_readme': True,
+                            'default_branch': 'main'
+                        }
+                        
+                        project = gl.projects.create(project_data)
+                        logger.info(f"Created project: {project.path_with_namespace}")
+                        result["created_projects"].append(project_path)
+                        
+                except Exception as e:
+                    logger.warning(f"Error creating project {project_path}: {e}")
+                    continue
+            
+            # Update course properties to include projects info
+            if not course.properties:
+                course.properties = {}
+            
+            if "gitlab" not in course.properties:
+                course.properties["gitlab"] = {}
+            
+            course.properties["gitlab"]["projects"] = {
+                "assignments": {
+                    "path": "assignments",
+                    "full_path": f"{parent_group.full_path}/assignments",
+                    "web_url": f"{gl.api_url.replace('/api/v4', '')}/{parent_group.full_path}/assignments",
+                    "description": "Assignment templates and grading scripts"
+                },
+                "student_template": {
+                    "path": "student-template",
+                    "full_path": f"{parent_group.full_path}/student-template",
+                    "web_url": f"{gl.api_url.replace('/api/v4', '')}/{parent_group.full_path}/student-template",
+                    "description": "Template repository for students"
+                },
+                "reference": {
+                    "path": "reference",
+                    "full_path": f"{parent_group.full_path}/reference",
+                    "web_url": f"{gl.api_url.replace('/api/v4', '')}/{parent_group.full_path}/reference",
+                    "description": "Reference solutions and instructor materials"
+                },
+                "created_at": datetime.now().isoformat()
+            }
+            
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(course, "properties")
+            
+            result["success"] = True
+            
+        except Exception as e:
+            logger.error(f"Failed to create course projects: {e}")
+            result["error"] = str(e)
+        
+        return result
 
 
 @register_task

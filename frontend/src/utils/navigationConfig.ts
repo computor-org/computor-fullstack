@@ -62,6 +62,12 @@ export const globalNavigation: NavigationItem[] = [
         permissions: ['manage_courses'],
       },
       {
+        id: 'courses',
+        label: 'Courses',
+        path: '/admin/courses',
+        permissions: ['manage_courses'],
+      },
+      {
         id: 'roles',
         label: 'Roles & Permissions',
         path: '/admin/roles',

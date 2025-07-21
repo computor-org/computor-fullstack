@@ -41,59 +41,43 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
   return (
     <Box
       sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         bgcolor: 'background.default',
       }}
     >
-      {/* Fixed Header */}
-      <Box
-        sx={{
-          flexShrink: 0,
-          bgcolor: 'background.default',
-          borderBottom: 1,
-          borderColor: 'divider',
-        }}
-      >
-        {/* Title Section */}
-        <Box sx={{ p: 3, pb: headerContent ? 1 : 3, ml: '240px' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {onBack && (
-              <IconButton onClick={onBack} edge="start">
-                <ArrowBackIcon />
-              </IconButton>
-            )}
-            <Box>
-              <Typography variant="h4">{title}</Typography>
-              {subtitle && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                  {subtitle}
-                </Typography>
-              )}
-            </Box>
-          </Box>
+      {/* Header */}
+      <Box sx={{ pl: 3, pr: 3, pt: 3, pb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+          {onBack && (
+            <IconButton onClick={onBack} edge="start">
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+          <Typography variant="h4" component="h1">
+            {title}
+          </Typography>
         </Box>
-
-        {/* Optional Header Content (Progress bars, alerts, etc.) */}
+        {subtitle && (
+          <Typography variant="body2" color="text.secondary" sx={{ ml: onBack ? 7 : 0, mb: 2 }}>
+            {subtitle}
+          </Typography>
+        )}
         {headerContent && (
-          <Box sx={{ px: 3, pb: 2, ml: '240px' }}>
+          <Box sx={{ mt: 2 }}>
             {headerContent}
           </Box>
         )}
       </Box>
 
-      {/* Scrollable Content Area */}
+      {/* Content Area */}
       <Box
         sx={{
           flexGrow: 1,
           overflow: 'auto',
-          bgcolor: 'background.default',
-          p: 3,
+          px: 3,
+          pb: actions ? 10 : 3, // Add padding bottom if actions exist
         }}
       >
         <Paper
@@ -101,7 +85,6 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
             p: 3,
             maxWidth,
             mx: 'auto',
-            mb: 2, // Add margin bottom to ensure content doesn't get hidden behind footer
           }}
         >
           {children}
@@ -112,20 +95,21 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
       {actions && (
         <Box
           sx={{
-            flexShrink: 0,
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
             borderTop: 1,
             borderColor: 'divider',
+            bgcolor: 'background.paper',
             px: 3,
             py: 2,
-            bgcolor: 'background.default',
           }}
         >
           <Box 
             sx={{ 
-              width: '100%',
               display: 'flex',
               justifyContent: 'flex-end',
-              pr: 3,
             }}
           >
             {actions}

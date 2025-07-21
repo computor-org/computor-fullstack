@@ -62,6 +62,6 @@ if [ -f "data/keycloak/computor-realm.json" ]; then
     cp data/keycloak/computor-realm.json "$keycloak_imports/"
 fi
 
-echo "[Starting ${SYSTEM_TITLE} Server]"
+echo "[Starting Computor Server]"
 
 docker-compose -f $DOCKERCFILE up $DOCKER_ARGS

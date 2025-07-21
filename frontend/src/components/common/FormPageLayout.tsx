@@ -45,10 +45,11 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
         display: 'flex',
         flexDirection: 'column',
         bgcolor: 'background.default',
+        position: 'relative',
       }}
     >
       {/* Header */}
-      <Box sx={{ pl: 3, pr: 3, pt: 3, pb: 2 }}>
+      <Box sx={{ px: 3, pt: 3, pb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
           {onBack && (
             <IconButton onClick={onBack} edge="start">

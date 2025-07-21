@@ -41,10 +41,14 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
   return (
     <Box
       sx={{
-        height: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        bgcolor: 'background.default',
       }}
     >
       {/* Fixed Header */}
@@ -57,7 +61,7 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
         }}
       >
         {/* Title Section */}
-        <Box sx={{ p: 3, pb: headerContent ? 1 : 3 }}>
+        <Box sx={{ p: 3, pb: headerContent ? 1 : 3, ml: '240px' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {onBack && (
               <IconButton onClick={onBack} edge="start">
@@ -77,7 +81,7 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
 
         {/* Optional Header Content (Progress bars, alerts, etc.) */}
         {headerContent && (
-          <Box sx={{ px: 3, pb: 2 }}>
+          <Box sx={{ px: 3, pb: 2, ml: '240px' }}>
             {headerContent}
           </Box>
         )}
@@ -109,13 +113,21 @@ export const FormPageLayout: React.FC<FormPageLayoutProps> = ({
         <Box
           sx={{
             flexShrink: 0,
-            bgcolor: 'background.paper',
             borderTop: 1,
             borderColor: 'divider',
-            p: 3,
+            px: 3,
+            py: 2,
+            bgcolor: 'background.default',
           }}
         >
-          <Box sx={{ maxWidth, mx: 'auto' }}>
+          <Box 
+            sx={{ 
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              pr: 3,
+            }}
+          >
             {actions}
           </Box>
         </Box>

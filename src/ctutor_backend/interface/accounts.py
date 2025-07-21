@@ -4,18 +4,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.auth import Account
-from enum import Enum
-
-class AccountType(str, Enum):
-    oauth = "oauth"
-    saml = "saml"
-    ldap = "ldap"
-    local = "local"
-    token = "token"
 
 class AccountCreate(BaseModel):
     provider: str = Field(min_length=1, max_length=255, description="Authentication provider name")
-    type: AccountType = Field(description="Type of authentication account")
+    type: str = Field(description="Type of authentication account")
     provider_account_id: str = Field(min_length=1, max_length=255, description="Account ID from the provider")
     user_id: str = Field(description="Associated user ID")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
@@ -39,7 +31,7 @@ class AccountCreate(BaseModel):
 class AccountGet(BaseEntityGet):
     id: str = Field(description="Account unique identifier")
     provider: str = Field(description="Authentication provider name")
-    type: AccountType = Field(description="Type of authentication account")
+    type: str = Field(description="Type of authentication account")
     provider_account_id: str = Field(description="Account ID from the provider")
     user_id: str = Field(description="Associated user ID")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
@@ -54,7 +46,7 @@ class AccountGet(BaseEntityGet):
 class AccountList(BaseEntityList):
     id: str = Field(description="Account unique identifier")
     provider: str = Field(description="Authentication provider name")
-    type: AccountType = Field(description="Type of authentication account")
+    type: str = Field(description="Type of authentication account")
     provider_account_id: str = Field(description="Account ID from the provider")
     user_id: str = Field(description="Associated user ID")
     
@@ -67,7 +59,7 @@ class AccountList(BaseEntityList):
     
 class AccountUpdate(BaseModel):
     provider: Optional[str] = Field(None, min_length=1, max_length=255, description="Authentication provider name")
-    type: Optional[AccountType] = Field(None, description="Type of authentication account")
+    type: Optional[str] = Field(None, description="Type of authentication account")
     provider_account_id: Optional[str] = Field(None, min_length=1, max_length=255, description="Account ID from the provider")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
     
@@ -96,6 +88,9 @@ class AccountQuery(ListQuery):
     properties: Optional[str] = None
     
 def account_search(db: Session, query, params: Optional[AccountQuery]):
+    if params is None:
+        return query
+        
     if params.id != None:
         query = query.filter(Account.id == params.id)
     if params.provider != None:

@@ -54,6 +54,17 @@ const UserDetailPage: React.FC = () => {
       // Load user details
       const userData = await apiClient.get<any>(`/users/${id}`);
       
+      // Load user accounts
+      let accountsData: any[] = [];
+      try {
+        accountsData = await apiClient.get<any[]>(`/accounts?user_id=${id}`);
+        console.log('Accounts data loaded:', accountsData);
+      } catch (accountError) {
+        console.error('Error loading accounts:', accountError);
+        // Continue with empty accounts array if accounts API fails
+        accountsData = [];
+      }
+      
       // Load user roles
       const rolesData = await apiClient.get<any[]>(`/user-roles?user_id=${id}`);
       
@@ -71,6 +82,7 @@ const UserDetailPage: React.FC = () => {
 
       setUser({
         ...userData,
+        accounts: accountsData || [],
         roles: rolesWithDetails,
       });
     } catch (err) {

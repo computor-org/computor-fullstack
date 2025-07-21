@@ -77,7 +77,7 @@ export function DataTable<T extends { id: string }>({
     onPageChange(0);
   };
 
-  const displayedCount = totalCount !== undefined ? totalCount : data.length;
+  const displayedCount = totalCount !== undefined ? totalCount : (data?.length || 0);
 
   return (
     <Paper sx={{ width: '100%', mb: 2 }}>
@@ -145,7 +145,7 @@ export function DataTable<T extends { id: string }>({
                   <CircularProgress size={40} />
                 </TableCell>
               </TableRow>
-            ) : data.length === 0 ? (
+            ) : !data || data.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length + (rowActions ? 1 : 0)} align="center">
                   <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
@@ -154,7 +154,7 @@ export function DataTable<T extends { id: string }>({
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row) => (
+              (data || []).map((row) => (
                 <TableRow
                   key={row.id}
                   hover

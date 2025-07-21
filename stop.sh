@@ -12,6 +12,6 @@ ENVIRONMENT=${1:-dev}
 
 DOCKERCFILE="docker-compose-${ENVIRONMENT}.yaml"
 
-echo "[Stopping ${SYSTEM_TITLE} Server]"
+echo "[Stopping Computor Server]"
 
 docker-compose -f $DOCKERCFILE down

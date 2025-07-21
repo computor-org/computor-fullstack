@@ -8,7 +8,7 @@ services:
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"
     volumes:
-      - ${DOCKER_SOCKED_PATH}:/var/run/docker.sock:ro
+      - ${DOCKER_SOCKET_PATH}:/var/run/docker.sock:ro
   redis:
     image: "redis:alpine"
     restart: unless-stopped

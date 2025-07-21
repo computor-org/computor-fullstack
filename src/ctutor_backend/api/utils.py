@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import tuple_, and_
 from sqlalchemy.orm import Session
 from ctutor_backend.api.exceptions import BadRequestException
-from ctutor_backend.model.course import CourseContent
+from ctutor_backend.model.course import Course, CourseContent
 
 # TODO: REFACTORING to other types (github, minio, filesystem, etc.)
 

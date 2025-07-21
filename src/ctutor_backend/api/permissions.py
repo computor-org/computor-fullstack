@@ -67,7 +67,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
                     )
                     .distinct()
             )
-
+            
             return query
         
         else:

@@ -27,15 +27,28 @@ interface OrganizationTaskFormProps {
   onSubmit?: (data: OrganizationCreate | OrganizationUpdate) => void;
   onTaskComplete?: (organizationId: string) => void;
   onClose?: () => void;
+  renderActions?: boolean; // If false, actions will not be rendered (for external control)
+  hideStatusAlerts?: boolean; // If true, status alerts will not be shown (parent will handle them)
 }
 
-const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
+export interface OrganizationTaskFormHandle {
+  isProcessing: boolean;
+  taskStatus: string | null;
+  taskProgress: number;
+  taskError: string | null;
+  taskId: string | null;
+  handleSubmit: (e?: React.FormEvent) => void;
+}
+
+const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, OrganizationTaskFormProps>(({
   organization,
   mode,
   onSubmit,
   onTaskComplete,
   onClose,
-}) => {
+  renderActions = true,
+  hideStatusAlerts = false,
+}, ref) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -160,8 +173,8 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     
     if (mode === 'create' && gitlabEnabled) {
       // Use task-based creation
@@ -220,6 +233,16 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
 
   const isProcessing = taskStatus === 'submitting' || taskStatus === 'submitted' || isMonitoring;
 
+  // Expose form state and submit handler to parent
+  React.useImperativeHandle(ref, () => ({
+    isProcessing,
+    taskStatus,
+    taskProgress,
+    taskError,
+    taskId,
+    handleSubmit,
+  }), [isProcessing, taskStatus, taskProgress, taskError, taskId, handleSubmit]);
+
   return (
     <Box component="form" onSubmit={handleSubmit}>
       {mode === 'create' && (
@@ -237,7 +260,7 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
         </Box>
       )}
 
-      {taskStatus && taskStatus !== 'completed' && (
+      {!hideStatusAlerts && taskStatus && taskStatus !== 'completed' && (
         <Box sx={{ mb: 2 }}>
           {taskStatus === 'submitting' && (
             <Alert severity="info">Submitting organization creation task...</Alert>
@@ -461,24 +484,28 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
           />
         </Grid>
       </Grid>
-      <DialogActions>
-        {onClose && (
-          <Button onClick={onClose} color="inherit" disabled={isProcessing}>
-            Cancel
+      {renderActions && (
+        <DialogActions>
+          {onClose && (
+            <Button onClick={onClose} color="inherit" disabled={isProcessing}>
+              Cancel
+            </Button>
+          )}
+          <Button 
+            type="submit" 
+            variant="contained" 
+            color="primary"
+            disabled={isProcessing || taskStatus === 'completed'}
+            startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+          >
+            {isProcessing ? 'Processing...' : (mode === 'create' ? 'Create' : 'Update')}
           </Button>
-        )}
-        <Button 
-          type="submit" 
-          variant="contained" 
-          color="primary"
-          disabled={isProcessing || taskStatus === 'completed'}
-          startIcon={isProcessing ? <CircularProgress size={20} /> : null}
-        >
-          {isProcessing ? 'Processing...' : (mode === 'create' ? 'Create' : 'Update')}
-        </Button>
-      </DialogActions>
+        </DialogActions>
+      )}
     </Box>
   );
-};
+});
+
+OrganizationTaskForm.displayName = 'OrganizationTaskForm';
 
 export default OrganizationTaskForm;

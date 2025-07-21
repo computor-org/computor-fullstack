@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Paper,
-  Typography,
   Button,
-  IconButton,
   Alert,
+  Stack,
+  CircularProgress,
+  LinearProgress,
+  Typography,
 } from '@mui/material';
-import {
-  ArrowBack as ArrowBackIcon,
-} from '@mui/icons-material';
 import { OrganizationCreate, OrganizationUpdate } from '../types/generated/organizations';
 import { apiClient } from '../services/apiClient';
-import OrganizationTaskForm from '../components/OrganizationTaskForm';
+import OrganizationTaskForm, { OrganizationTaskFormHandle } from '../components/OrganizationTaskForm';
+import { FormPageLayout } from '../components/common/FormPageLayout';
 
 const OrganizationCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const formRef = useRef<OrganizationTaskFormHandle>(null);
 
   const handleFormSubmit = async (data: OrganizationCreate | OrganizationUpdate) => {
     try {
@@ -44,42 +44,120 @@ const OrganizationCreatePage: React.FC = () => {
     navigate('/admin/organizations');
   };
 
+  const handleSubmit = () => {
+    formRef.current?.handleSubmit();
+  };
+
+  const [formState, setFormState] = useState({
+    isProcessing: false,
+    taskStatus: null as string | null,
+    taskProgress: 0,
+    taskError: null as string | null,
+    taskId: null as string | null,
+  });
+
+  // Update form state when ref changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (formRef.current) {
+        setFormState({
+          isProcessing: formRef.current.isProcessing,
+          taskStatus: formRef.current.taskStatus,
+          taskProgress: formRef.current.taskProgress,
+          taskError: formRef.current.taskError,
+          taskId: formRef.current.taskId,
+        });
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Header content with alerts and progress indicators
+  const headerContent = (
+    <Stack spacing={2}>
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      
+      {formState.taskStatus && formState.taskStatus !== 'completed' && (
+        <>
+          {formState.taskStatus === 'submitting' && (
+            <Alert severity="info">Submitting organization creation task...</Alert>
+          )}
+          {formState.taskStatus === 'submitted' && (
+            <Alert severity="info">
+              Task submitted successfully. Task ID: {formState.taskId}
+              <LinearProgress sx={{ mt: 1 }} />
+            </Alert>
+          )}
+          {formState.isProcessing && formState.taskProgress > 0 && (
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                Creating organization... {formState.taskProgress}%
+              </Typography>
+              <LinearProgress variant="determinate" value={formState.taskProgress} sx={{ mt: 1 }} />
+            </Box>
+          )}
+          {formState.taskStatus === 'failed' && (
+            <Alert severity="error">
+              Task failed: {formState.taskError || 'Unknown error'}
+            </Alert>
+          )}
+          {formState.taskStatus === 'timeout' && (
+            <Alert severity="warning">
+              Task monitoring timed out. Task ID: {formState.taskId}
+            </Alert>
+          )}
+          {formState.taskStatus === 'completed' && (
+            <Alert severity="success">
+              Organization created successfully!
+            </Alert>
+          )}
+        </>
+      )}
+    </Stack>
+  );
+
+  // Action buttons for the fixed footer
+  const actions = (
+    <Stack direction="row" spacing={2} justifyContent="flex-end">
+      <Button
+        onClick={handleCancel}
+        disabled={formState.isProcessing}
+        color="inherit"
+      >
+        Cancel
+      </Button>
+      <Button
+        onClick={handleSubmit}
+        variant="contained"
+        disabled={formState.isProcessing || formState.taskStatus === 'completed' || loading}
+        startIcon={formState.isProcessing ? <CircularProgress size={20} /> : null}
+      >
+        {formState.isProcessing ? 'Processing...' : 'Create Organization'}
+      </Button>
+    </Stack>
+  );
+
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <IconButton onClick={handleCancel}>
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography variant="h4">Create Organization</Typography>
-      </Box>
-
-      {/* Main Content */}
-      <Paper sx={{ p: 3, maxWidth: 1000 }}>
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            New Organization
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Create a new organization. You can optionally enable GitLab integration to automatically 
-            create a GitLab group for this organization.
-          </Typography>
-        </Box>
-
-        <OrganizationTaskForm
-          mode="create"
-          onSubmit={handleFormSubmit}
-          onTaskComplete={handleTaskComplete}
-          onClose={handleCancel}
-        />
-      </Paper>
-    </Box>
+    <FormPageLayout
+      title="Create Organization"
+      subtitle="Create a new organization. You can optionally enable GitLab integration to automatically create a GitLab group."
+      onBack={handleCancel}
+      headerContent={headerContent}
+      actions={actions}
+    >
+      <OrganizationTaskForm
+        ref={formRef}
+        mode="create"
+        onSubmit={handleFormSubmit}
+        onTaskComplete={handleTaskComplete}
+        renderActions={false}
+        hideStatusAlerts={true}
+      />
+    </FormPageLayout>
   );
 };
 

@@ -30,6 +30,7 @@ import OrganizationCreatePage from './pages/OrganizationCreatePage';
 import CourseFamiliesPage from './pages/CourseFamiliesPage';
 import CourseFamilyDetailPage from './pages/CourseFamilyDetailPage';
 import CourseFamilyEditPage from './pages/CourseFamilyEditPage';
+import CourseFamilyCreatePage from './pages/CourseFamilyCreatePage';
 import RolesPage from './pages/RolesPage';
 import Sidebar from './components/Sidebar';
 import SSOLoginModal from './components/SSOLoginModal';
@@ -227,6 +228,7 @@ function AuthenticatedAppContent() {
           <Route path="/admin/organizations/:id" element={<OrganizationDetailPage />} />
           <Route path="/admin/organizations/:id/edit" element={<OrganizationEditPage />} />
           <Route path="/admin/course-families" element={<CourseFamiliesPage />} />
+          <Route path="/admin/course-families/create" element={<CourseFamilyCreatePage />} />
           <Route path="/admin/course-families/:id" element={<CourseFamilyDetailPage />} />
           <Route path="/admin/course-families/:id/edit" element={<CourseFamilyEditPage />} />
           <Route path="/admin/roles" element={<RolesPage />} />

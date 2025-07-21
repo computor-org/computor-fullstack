@@ -140,50 +140,106 @@ def create_organization_task(self, organization_config, gitlab_url, gitlab_token
 
 
 @app.task(bind=True, name='ctutor_backend.tasks.create_course_family')  
-def create_course_family_task(self, course_family_config, organization_id, gitlab_url, gitlab_token, created_by_user_id=None):
+def create_course_family_task(self, course_family_config, organization_id, created_by_user_id=None):
     """Create a course family with GitLab group and database entry."""
     task_id = self.request.id
     
     try:
         from ctutor_backend.database import get_db
-        from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+        from ctutor_backend.model.organization import Organization
         from ctutor_backend.model.course import CourseFamily
         from ctutor_backend.interface.course_families import CourseFamilyCreate
-        from ctutor_backend.interface.tokens import encrypt_api_key
+        from ctutor_backend.interface.tokens import encrypt_api_key, decrypt_api_key
+        import gitlab
         
-        self.update_state(state='PROGRESS', meta={'status': 'Creating GitLab group', 'progress': 20})
-        
-        # Get database session and initialize GitLab builder
+        # Get database session
         with next(get_db()) as db:
-            builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
+            # Fetch organization to get GitLab config
+            organization = db.query(Organization).filter(Organization.id == organization_id).first()
+            if not organization:
+                raise Exception(f"Organization {organization_id} not found")
             
-            # Create GitLab group
-            gitlab_group = builder.create_group(
-                name=course_family_config["name"],
-                path=course_family_config["path"],
-                description=course_family_config.get("description", ""),
-                parent_id=course_family_config["gitlab"]["parent"]
-            )
+            # Check if organization has GitLab integration
+            gitlab_config = organization.properties.get("gitlab", {})
+            gitlab_group = None
+            
+            if course_family_config.get("has_gitlab") and gitlab_config.get("group_id"):
+                # Get GitLab credentials from organization
+                gitlab_url = gitlab_config.get("url")
+                gitlab_token_encrypted = gitlab_config.get("token")
+                parent_group_id = gitlab_config.get("group_id")
+                
+                if not gitlab_url or not gitlab_token_encrypted:
+                    raise Exception("Organization has GitLab integration but missing credentials")
+                
+                # Decrypt the token
+                gitlab_token = decrypt_api_key(gitlab_token_encrypted)
+                
+                self.update_state(state='PROGRESS', meta={'status': 'Connecting to GitLab', 'progress': 10})
+                
+                # Connect to GitLab
+                gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)
+                gl.auth()
+                
+                self.update_state(state='PROGRESS', meta={'status': 'Creating GitLab subgroup', 'progress': 30})
+                
+                # Create GitLab subgroup under parent
+                group_data = {
+                    "name": course_family_config["name"],
+                    "path": course_family_config["path"],
+                    "description": course_family_config.get("description", ""),
+                    "visibility": "private",
+                    "parent_id": parent_group_id
+                }
+                
+                try:
+                    # Check if group already exists
+                    groups = gl.groups.list(search=course_family_config["path"], all=True)
+                    
+                    for g in groups:
+                        if g.path == course_family_config["path"] and g.parent_id == parent_group_id:
+                            gitlab_group = g
+                            logger.info(f"Found existing GitLab group: {g.full_path}")
+                            break
+                    
+                    if not gitlab_group:
+                        gitlab_group = gl.groups.create(group_data)
+                        logger.info(f"Created new GitLab subgroup: {gitlab_group.full_path}")
+                
+                except Exception as e:
+                    logger.error(f"Error creating GitLab group: {e}")
+                    raise
             
             self.update_state(state='PROGRESS', meta={'status': 'Creating database entry', 'progress': 60})
+            
+            # Build course family data
             course_family_data = {
                 "title": course_family_config["name"],
                 "path": course_family_config["path"],
                 "description": course_family_config.get("description", ""),
                 "organization_id": organization_id,
-                "properties": {
-                    "gitlab": {
-                        "url": gitlab_url,
-                        "token": encrypt_api_key(gitlab_token),
-                        "group_id": gitlab_group["id"],
-                        "full_path": gitlab_group["full_path"],
-                        "parent": course_family_config["gitlab"]["parent"]
-                    }
-                }
+                "properties": {}
             }
             
+            # Add GitLab properties if GitLab group was created
+            if gitlab_group:
+                course_family_data["properties"]["gitlab"] = {
+                    "url": gitlab_url,
+                    "token": encrypt_api_key(gitlab_token),
+                    "group_id": gitlab_group.id,
+                    "full_path": gitlab_group.full_path,
+                    "web_url": gitlab_group.web_url,
+                    "parent": parent_group_id
+                }
+            
+            # Convert path to Ltree format (replace hyphens with underscores)
+            from sqlalchemy_utils import Ltree
+            ltree_path = course_family_config["path"].replace('-', '_')
+            
             course_family_create = CourseFamilyCreate(**course_family_data)
-            course_family = CourseFamily(**course_family_create.model_dump())
+            course_family_dict = course_family_create.model_dump()
+            course_family_dict['path'] = Ltree(ltree_path)
+            course_family = CourseFamily(**course_family_dict)
             
             db.add(course_family)
             db.commit()
@@ -191,13 +247,20 @@ def create_course_family_task(self, course_family_config, organization_id, gitla
             
             self.update_state(state='PROGRESS', meta={'status': 'Complete', 'progress': 100})
             
-            return {
+            result = {
                 "success": True,
                 "course_family_id": str(course_family.id),
-                "gitlab_group_id": gitlab_group["id"],
-                "gitlab_path": gitlab_group["full_path"],
                 "task_id": task_id
             }
+            
+            if gitlab_group:
+                result.update({
+                    "gitlab_group_id": gitlab_group.id,
+                    "gitlab_path": gitlab_group.full_path,
+                    "gitlab_web_url": gitlab_group.web_url
+                })
+            
+            return result
             
     except Exception as e:
         logger.error(f"Error creating course family: {e}")

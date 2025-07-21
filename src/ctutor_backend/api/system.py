@@ -528,14 +528,14 @@ class CourseFamilyTaskRequest(BaseModel):
     """Request to create a course family via Celery task."""
     course_family: dict  # CourseFamilyCreate data
     organization_id: str
-    gitlab: GitLabCredentials
+    gitlab: Optional[GitLabCredentials] = None  # Optional - will use org's GitLab config if not provided
 
 
 class CourseTaskRequest(BaseModel):
     """Request to create a course via Celery task."""
     course: dict  # CourseCreate data
     course_family_id: str
-    gitlab: GitLabCredentials
+    gitlab: Optional[GitLabCredentials] = None  # Optional - will use course family's GitLab config if not provided
 
 
 class TaskResponse(BaseModel):
@@ -545,14 +545,16 @@ class TaskResponse(BaseModel):
     message: str
 
 
-def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: int, path: str) -> dict:
+def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: Optional[int], path: str) -> dict:
     """Convert GitLab credentials to config format."""
-    return {
+    config = {
         "url": gitlab.gitlab_url,
         "token": gitlab.gitlab_token,
-        "parent": parent_group_id,
         "path": path
     }
+    if parent_group_id is not None:
+        config["parent"] = parent_group_id
+    return config
 
 
 @system_router.post("/hierarchy/organizations/create", response_model=TaskResponse)
@@ -622,32 +624,25 @@ async def create_course_family_async(
         if not organization:
             raise NotFoundException(f"Organization with ID {request.organization_id} not found")
         
-        # Get parent GitLab group from organization
+        # Check if organization has GitLab integration
         parent_gitlab_config = organization.properties.get("gitlab", {})
-        parent_group_id = parent_gitlab_config.get("group_id")
-        
-        if not parent_group_id:
-            raise BadRequestException("Parent organization missing GitLab group configuration")
+        has_gitlab = bool(parent_gitlab_config.get("group_id"))
         
         # Convert to course family config format
         family_config = {
             "name": request.course_family.get("title", ""),
             "path": request.course_family.get("path", ""),
             "description": request.course_family.get("description", ""),
-            "gitlab": convert_to_gitlab_config(
-                request.gitlab,
-                parent_group_id,
-                request.course_family.get("path", "")
-            )
+            "organization_id": request.organization_id,
+            "has_gitlab": has_gitlab
         }
         
         # Submit task using direct Celery approach
+        # The task will fetch GitLab credentials from the organization
         result = create_course_family_task.apply_async(
             args=[
                 family_config,
                 request.organization_id,
-                request.gitlab.gitlab_url,
-                request.gitlab.gitlab_token,
                 permissions.user_id
             ],
             queue='high_priority'

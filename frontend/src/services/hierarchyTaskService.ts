@@ -79,7 +79,7 @@ export interface CourseFamilyTaskRequest {
     organization_id: string;
   };
   organization_id: string;
-  gitlab: GitLabCredentials;
+  gitlab?: GitLabCredentials;  // Optional - will use org's GitLab config if not provided
 }
 
 export interface CourseTaskRequest {
@@ -90,7 +90,7 @@ export interface CourseTaskRequest {
     course_family_id: string;
   };
   course_family_id: string;
-  gitlab: GitLabCredentials;
+  gitlab?: GitLabCredentials;  // Optional - will use course family's GitLab config if not provided
 }
 
 export interface HierarchyTaskRequest {

@@ -110,7 +110,7 @@ const OrganizationDetailPage: React.FC = () => {
     {
       id: 'created_at',
       label: 'Created',
-      render: (value) => formatDistanceToNow(new Date(value), { addSuffix: true }),
+      render: (value) => value ? formatDistanceToNow(new Date(value), { addSuffix: true }) : '-',
     },
   ];
 

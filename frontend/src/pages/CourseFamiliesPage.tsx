@@ -100,9 +100,7 @@ const CourseFamiliesPage: React.FC = () => {
   }, [loadCourseFamilies]);
 
   const handleCreate = () => {
-    setSelectedCourseFamily(null);
-    setFormMode('create');
-    setFormOpen(true);
+    navigate('/admin/course-families/create');
   };
 
   const handleEdit = (courseFamily: CourseFamilyGet) => {

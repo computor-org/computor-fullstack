@@ -116,7 +116,7 @@ const CourseFamilyDetailPage: React.FC = () => {
     {
       id: 'created_at',
       label: 'Created',
-      render: (value) => formatDistanceToNow(new Date(value), { addSuffix: true }),
+      render: (value) => value ? formatDistanceToNow(new Date(value), { addSuffix: true }) : '-',
     },
   ];
 
@@ -222,11 +222,11 @@ const CourseFamilyDetailPage: React.FC = () => {
                   Metadata
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Created:</strong> {formatDistanceToNow(new Date(courseFamily.created_at || ''), { addSuffix: true })}
+                  <strong>Created:</strong> {courseFamily.created_at ? formatDistanceToNow(new Date(courseFamily.created_at), { addSuffix: true }) : '-'}
                 </Typography>
                 {courseFamily.updated_at && courseFamily.updated_at !== courseFamily.created_at && (
                   <Typography variant="body2" color="text.secondary">
-                    <strong>Updated:</strong> {formatDistanceToNow(new Date(courseFamily.updated_at), { addSuffix: true })}
+                    <strong>Updated:</strong> {courseFamily.updated_at ? formatDistanceToNow(new Date(courseFamily.updated_at), { addSuffix: true }) : '-'}
                   </Typography>
                 )}
               </Box>

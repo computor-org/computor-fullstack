@@ -380,38 +380,6 @@ const UsersPage: React.FC<UsersPageProps> = () => {
         />
       </Paper>
 
-      {/* Statistics Summary */}
-      <Paper sx={{ p: 2, mt: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          User Statistics
-        </Typography>
-        <Stack direction="row" spacing={4}>
-          <Box>
-            <Typography variant="h4" color="primary">
-              {users.filter(u => !u.archived_at).length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Active Users
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="h4" color="info.main">
-              {users.filter(u => u.accounts.some(a => a.provider === 'keycloak')).length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              SSO Users
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="h4" color="warning.main">
-              {users.filter(u => u.archived_at).length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Archived
-            </Typography>
-          </Box>
-        </Stack>
-      </Paper>
 
       {/* User Create/Edit Dialog */}
       <UserDialog

@@ -41,13 +41,47 @@ def create_organization_task(self, organization_config, gitlab_url, gitlab_token
         from ctutor_backend.model.organization import Organization
         from ctutor_backend.interface.organizations import OrganizationCreate
         from ctutor_backend.interface.tokens import encrypt_api_key
-        import random
+        import gitlab
         
-        self.update_state(state='PROGRESS', meta={'status': 'Creating organization (test mode)', 'progress': 30})
+        self.update_state(state='PROGRESS', meta={'status': 'Connecting to GitLab', 'progress': 10})
         
-        # For testing: create mock GitLab group data
-        mock_group_id = random.randint(1000, 9999)
-        mock_full_path = f"test-groups/{organization_config['path']}"
+        # Connect to GitLab
+        gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)
+        gl.auth()
+        
+        self.update_state(state='PROGRESS', meta={'status': 'Creating GitLab group', 'progress': 30})
+        
+        # Create GitLab group
+        parent_id = organization_config["gitlab"]["parent"]
+        group_data = {
+            "name": organization_config["name"],
+            "path": organization_config["path"],
+            "description": organization_config.get("description", ""),
+            "visibility": "private"
+        }
+        
+        if parent_id:
+            group_data["parent_id"] = parent_id
+        
+        try:
+            # Check if group already exists
+            groups = gl.groups.list(search=organization_config["path"], all=True)
+            gitlab_group = None
+            
+            for g in groups:
+                if g.path == organization_config["path"]:
+                    gitlab_group = g
+                    logger.info(f"Found existing GitLab group: {g.full_path}")
+                    break
+            
+            if not gitlab_group:
+                gitlab_group = gl.groups.create(group_data)
+                logger.info(f"Created new GitLab group: {gitlab_group.full_path}")
+            
+        except Exception as e:
+            logger.error(f"Error creating GitLab group: {e}")
+            # Continue with database creation even if GitLab fails
+            gitlab_group = None
         
         self.update_state(state='PROGRESS', meta={'status': 'Creating database entry', 'progress': 70})
         
@@ -64,12 +98,16 @@ def create_organization_task(self, organization_config, gitlab_url, gitlab_token
                     "gitlab": {
                         "url": gitlab_url,
                         "token": encrypt_api_key(gitlab_token),
-                        "group_id": mock_group_id,
-                        "full_path": mock_full_path,
                         "parent": organization_config["gitlab"]["parent"]
                     }
                 }
             }
+            
+            # Add GitLab group info if created
+            if gitlab_group:
+                organization_data["properties"]["gitlab"]["group_id"] = gitlab_group.id
+                organization_data["properties"]["gitlab"]["full_path"] = gitlab_group.full_path
+                organization_data["properties"]["gitlab"]["web_url"] = gitlab_group.web_url
             
             organization_create = OrganizationCreate(**organization_data)
             organization_dict = organization_create.model_dump()
@@ -89,10 +127,10 @@ def create_organization_task(self, organization_config, gitlab_url, gitlab_token
             return {
                 "success": True,
                 "organization_id": str(organization.id),
-                "gitlab_group_id": mock_group_id,
-                "gitlab_path": mock_full_path,
-                "task_id": task_id,
-                "note": "Created in test mode without actual GitLab integration"
+                "gitlab_group_id": gitlab_group.id if gitlab_group else None,
+                "gitlab_path": gitlab_group.full_path if gitlab_group else None,
+                "gitlab_web_url": gitlab_group.web_url if gitlab_group else None,
+                "task_id": task_id
             }
             
     except Exception as e:

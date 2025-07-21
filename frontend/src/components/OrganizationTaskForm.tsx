@@ -86,28 +86,8 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
     }
   }, [organization, mode]);
 
-  // Load GitLab config from backend .env file
-  useEffect(() => {
-    const loadGitLabConfig = async () => {
-      try {
-        const response = await apiClient.get('/system/gitlab-config');
-        if (response.gitlab_url || response.gitlab_token || response.parent_group_id) {
-          setGitlabConfig({
-            gitlab_url: response.gitlab_url || '',
-            gitlab_token: response.gitlab_token || '',
-            parent_group_id: response.parent_group_id || '',
-          });
-        }
-      } catch (error) {
-        console.log('Could not load GitLab config from backend');
-        // Leave fields empty for manual entry
-      }
-    };
-
-    if (mode === 'create') {
-      loadGitLabConfig();
-    }
-  }, [mode]);
+  // GitLab config fields are left empty for manual entry
+  // The TEST_GITLAB_* variables are only for testing/deployment, not for system use
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -144,7 +124,7 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
           setTaskError(status.message || 'Task failed');
           setIsMonitoring(false);
           return true;
-        } else if (status.status === 'RUNNING' || status.status === 'PROGRESS') {
+        } else if (status.status === 'RUNNING') {
           // Update progress if available
           if (status.message) {
             const progressMatch = status.message.match(/progress: (\d+)/);

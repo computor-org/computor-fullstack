@@ -163,29 +163,13 @@ export class HierarchyTaskService {
   static async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
     try {
       const response = await apiClient.get<TaskStatusResponse>(`/system/status/${taskId}`);
-      return response.data || response;
+      return response;
     } catch (error: any) {
       console.error('Error getting task status:', error);
       throw new Error(error.message || 'Failed to get task status');
     }
   }
 
-  /**
-   * Get GitLab configuration from backend or environment
-   */
-  static async getGitLabConfig(): Promise<GitLabCredentials | null> {
-    try {
-      // Try to get config from backend first
-      const response = await apiClient.get('/system/gitlab-config');
-      if (response.data) {
-        return response.data;
-      }
-    } catch (error) {
-      // Fallback to environment variables
-      console.log('Using environment variables for GitLab config');
-    }
-    return null;
-  }
 
   /**
    * Get task result (waits for completion)

@@ -678,32 +678,25 @@ async def create_course_async(
         if not course_family:
             raise NotFoundException(f"Course family with ID {request.course_family_id} not found")
         
-        # Get parent GitLab group from course family
+        # Check if course family has GitLab integration
         parent_gitlab_config = course_family.properties.get("gitlab", {})
-        parent_group_id = parent_gitlab_config.get("group_id")
-        
-        if not parent_group_id:
-            raise BadRequestException("Parent course family missing GitLab group configuration")
+        has_gitlab = bool(parent_gitlab_config.get("group_id"))
         
         # Convert to course config format
         course_config = {
             "name": request.course.get("title", ""),
             "path": request.course.get("path", ""),
             "description": request.course.get("description", ""),
-            "gitlab": convert_to_gitlab_config(
-                request.gitlab,
-                parent_group_id,
-                request.course.get("path", "")
-            )
+            "course_family_id": request.course_family_id,
+            "has_gitlab": has_gitlab
         }
         
         # Submit task using direct Celery approach
+        # The task will fetch GitLab credentials from the course family
         result = create_course_task.apply_async(
             args=[
                 course_config,
                 request.course_family_id,
-                request.gitlab.gitlab_url,
-                request.gitlab.gitlab_token,
                 permissions.user_id
             ],
             queue='high_priority'

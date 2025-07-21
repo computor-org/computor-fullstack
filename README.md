@@ -68,11 +68,6 @@ bash api.sh
 ```
 Check if the server is running API docs on http://0.0.0.0:8000/docs .
 
-Start the system agent with
-```
-bash system_agent.sh
-```
-
 Install the CLI with
 ```bash
 pip install -e src

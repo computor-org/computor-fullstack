@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-15T01:10:05.977679
+ * Generated on: 2025-07-21T09:06:47.334683
 
  * Category: Common
 
@@ -97,6 +97,13 @@ export interface CourseMemberGitLabConfig {
   directory?: string | null;
   registry?: string | null;
   parent?: number | null;
+  group_id?: number | null;
+  parent_id?: number | null;
+  namespace_id?: number | null;
+  namespace_path?: string | null;
+  web_url?: string | null;
+  visibility?: string | null;
+  last_synced_at?: string | null;
   full_path_submission?: string | null;
 }
 
@@ -462,6 +469,12 @@ export interface GitCommit {
   author: string;
 }
 
+/**
+ * Base class for all CodeAbility meta models.
+ */
+export interface CodeAbilityBase {
+}
+
 export interface SubmissionGroupProperties {
   gitlab?: GitLabConfig | null;
 }
@@ -552,6 +565,168 @@ export interface SubmissionGroupMemberUpdate {
   properties?: SubmissionGroupMemberProperties | null;
 }
 
+/**
+ * Metadata for storage objects
+ */
+export interface StorageObjectMetadata {
+  /** MIME type of the object */
+  content_type: string;
+  /** Size of the object in bytes */
+  size: number;
+  /** Entity tag of the object */
+  etag: string;
+  /** Last modification timestamp */
+  last_modified: string;
+  /** Custom metadata */
+  metadata?: Record<string, string> | null;
+}
+
+/**
+ * DTO for creating/uploading a storage object
+ */
+export interface StorageObjectCreate {
+  /** Key/path for the object in the bucket */
+  object_key: string;
+  /** Target bucket name */
+  bucket_name?: string | null;
+  /** Custom metadata for the object */
+  metadata?: Record<string, string> | null;
+  /** MIME type of the object */
+  content_type?: string | null;
+}
+
+/**
+ * DTO for retrieving a storage object
+ */
+export interface StorageObjectGet {
+  /** MIME type of the object */
+  content_type: string;
+  /** Size of the object in bytes */
+  size: number;
+  /** Entity tag of the object */
+  etag: string;
+  /** Last modification timestamp */
+  last_modified: string;
+  /** Custom metadata */
+  metadata?: Record<string, string> | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** Storage object ID */
+  id: number;
+  /** Object key/path in the bucket */
+  object_key: string;
+  /** Bucket name */
+  bucket_name: string;
+  /** Presigned download URL */
+  download_url?: string | null;
+}
+
+/**
+ * DTO for listing storage objects
+ */
+export interface StorageObjectList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** Storage object ID */
+  id: number;
+  /** Object key/path in the bucket */
+  object_key: string;
+  /** Bucket name */
+  bucket_name: string;
+  /** MIME type of the object */
+  content_type: string;
+  /** Size of the object in bytes */
+  size: number;
+  /** Last modification timestamp */
+  last_modified: string;
+}
+
+/**
+ * DTO for updating storage object metadata
+ */
+export interface StorageObjectUpdate {
+  /** Updated custom metadata */
+  metadata?: Record<string, string> | null;
+  /** Updated MIME type */
+  content_type?: string | null;
+}
+
+/**
+ * DTO for creating a storage bucket
+ */
+export interface BucketCreate {
+  /** Name of the bucket to create */
+  bucket_name: string;
+  /** Region for the bucket */
+  region?: string | null;
+}
+
+/**
+ * DTO for bucket information
+ */
+export interface BucketInfo {
+  /** Name of the bucket */
+  bucket_name: string;
+  /** Bucket creation date */
+  creation_date?: string | null;
+  /** Bucket region */
+  region?: string | null;
+}
+
+/**
+ * DTO for listing buckets
+ */
+export interface BucketList {
+  /** List of buckets */
+  buckets: BucketInfo[];
+}
+
+/**
+ * DTO for generating presigned URLs
+ */
+export interface PresignedUrlRequest {
+  /** Object key/path in the bucket */
+  object_key: string;
+  /** Bucket name */
+  bucket_name?: string | null;
+  /** URL expiry time in seconds */
+  expiry_seconds?: number | null;
+  /** HTTP method for the presigned URL */
+  method?: string | null;
+}
+
+/**
+ * DTO for presigned URL response
+ */
+export interface PresignedUrlResponse {
+  /** The presigned URL */
+  url: string;
+  /** URL expiration timestamp */
+  expires_at: string;
+  /** HTTP method for the URL */
+  method: string;
+}
+
+/**
+ * DTO for storage usage statistics
+ */
+export interface StorageUsageStats {
+  /** Bucket name */
+  bucket_name: string;
+  /** Number of objects in the bucket */
+  object_count: number;
+  /** Total size of all objects in bytes */
+  total_size: number;
+  /** Last statistics update timestamp */
+  last_updated: string;
+}
+
 export interface BaseDeployment {
 }
 
@@ -585,6 +760,13 @@ export interface GitLabConfigGet {
   directory?: string | null;
   registry?: string | null;
   parent?: number | null;
+  group_id?: number | null;
+  parent_id?: number | null;
+  namespace_id?: number | null;
+  namespace_path?: string | null;
+  web_url?: string | null;
+  visibility?: string | null;
+  last_synced_at?: string | null;
 }
 
 export interface GitLabConfig {
@@ -594,6 +776,13 @@ export interface GitLabConfig {
   directory?: string | null;
   registry?: string | null;
   parent?: number | null;
+  group_id?: number | null;
+  parent_id?: number | null;
+  namespace_id?: number | null;
+  namespace_path?: string | null;
+  web_url?: string | null;
+  visibility?: string | null;
+  last_synced_at?: string | null;
   token?: string | null;
 }
 
@@ -658,9 +847,6 @@ export interface ComputorDeploymentConfig {
   courseFamily: CourseFamilyConfig;
   course: CourseConfig;
   settings?: any | null;
-}
-
-export interface CodeAbilityBase {
 }
 
 export interface CodeAbilityTestCommon {

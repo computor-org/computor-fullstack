@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean;
+  params?: Record<string, any>;
 }
 
 class APIClient {
@@ -23,7 +24,7 @@ class APIClient {
    * Make an authenticated API request
    */
   async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const { skipAuth = false, ...fetchOptions } = options;
+    const { skipAuth = false, params, ...fetchOptions } = options;
 
     // Prepare headers
     const headers = new Headers(fetchOptions.headers);
@@ -50,7 +51,19 @@ class APIClient {
       headers.set('Content-Type', 'application/json');
     }
 
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Build URL with query parameters
+    let url = `${API_BASE_URL}${endpoint}`;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      if (searchParams.toString()) {
+        url += `?${searchParams.toString()}`;
+      }
+    }
     
     try {
       const response = await fetch(url, {

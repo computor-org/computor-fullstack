@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-15T01:10:05.968174
+ * Generated on: 2025-07-21T09:06:47.314330
 
  * Category: Users
 
@@ -230,4 +230,40 @@ export interface AccountUpdate {
 export interface UserPassword {
   username: string;
   password: string;
+}
+
+/**
+ * User registration request.
+ */
+export interface UserRegistrationRequest {
+  /** Username */
+  username: string;
+  /** Email address */
+  email: string;
+  /** Password */
+  password: string;
+  /** First name */
+  given_name: string;
+  /** Last name */
+  family_name: string;
+  /** Authentication provider to register with */
+  provider?: string;
+  /** Send email verification */
+  send_verification_email?: boolean;
+}
+
+/**
+ * Response after successful user registration.
+ */
+export interface UserRegistrationResponse {
+  /** User ID in Computor */
+  user_id: string;
+  /** User ID in authentication provider */
+  provider_user_id: string;
+  /** Username */
+  username: string;
+  /** Email address */
+  email: string;
+  /** Success message */
+  message: string;
 }

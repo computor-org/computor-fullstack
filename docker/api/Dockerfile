@@ -1,4 +1,4 @@
-FROM prefecthq/prefect:2.20.3-python3.10
+FROM python:3.10-slim
 
 RUN apt-get update && apt-get install -y postgresql-client
 

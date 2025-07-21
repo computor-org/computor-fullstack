@@ -50,6 +50,24 @@ export const globalNavigation: NavigationItem[] = [
         permissions: ['manage_users'],
       },
       {
+        id: 'organizations',
+        label: 'Organizations',
+        path: '/admin/organizations',
+        permissions: ['manage_organizations'],
+      },
+      {
+        id: 'course-families',
+        label: 'Course Families',
+        path: '/admin/course-families',
+        permissions: ['manage_courses'],
+      },
+      {
+        id: 'roles',
+        label: 'Roles & Permissions',
+        path: '/admin/roles',
+        permissions: ['manage_roles'],
+      },
+      {
         id: 'tasks',
         label: 'Tasks',
         path: '/admin/tasks',

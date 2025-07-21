@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -27,16 +28,16 @@ import {
   Search as SearchIcon,
   PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
-import { User, Account } from '../types';
+import { UserGet, AccountGet } from '../types/generated/users';
 import { apiClient } from '../services/apiClient';
 import UserDialog from '../components/UserDialog';
 import DeleteUserDialog from '../components/DeleteUserDialog';
 
 interface UsersPageProps {}
 
-// Mock data structure based on the database models
-interface UserWithAccounts extends User {
-  accounts: Account[];
+// Extended user type with accounts
+interface UserWithAccounts extends UserGet {
+  accounts: AccountGet[];
   profile?: {
     avatar_color?: number;
     avatar_image?: string;
@@ -51,6 +52,7 @@ interface UserWithAccounts extends User {
 
 
 const UsersPage: React.FC<UsersPageProps> = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<UserWithAccounts[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -285,15 +287,19 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                 <TableCell>Username</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Student ID</TableCell>
-                <TableCell>Accounts</TableCell>
-                <TableCell>Created</TableCell>
+                  <TableCell>Created</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {displayUsers.map((user) => (
-                  <TableRow key={user.id} hover>
+                  <TableRow 
+                    key={user.id} 
+                    hover
+                    onClick={() => navigate(`/admin/users/${user.id}`)}
+                    sx={{ cursor: 'pointer' }}
+                  >
                     <TableCell>
                       <Stack direction="row" spacing={2} alignItems="center">
                         <Avatar
@@ -304,7 +310,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                           }}
                           src={user.profile?.avatar_image}
                         >
-                          {getInitials(user.given_name, user.family_name)}
+                          {getInitials(user.given_name || '', user.family_name || '')}
                         </Avatar>
                         <Box>
                           <Typography variant="subtitle2">
@@ -345,21 +351,8 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                        {user.accounts.map((account) => (
-                          <Chip
-                            key={account.id}
-                            label={`${account.provider}:${account.type}`}
-                            color={getAccountProviderColor(account.provider)}
-                            size="small"
-                            variant="outlined"
-                          />
-                        ))}
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
                       <Typography variant="body2">
-                        {formatDate(user.created_at)}
+                        {formatDate(user.created_at || '')}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -369,7 +362,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                         size="small"
                       />
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                         <Tooltip title="Edit User">
                           <IconButton

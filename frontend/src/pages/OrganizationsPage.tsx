@@ -259,7 +259,6 @@ const OrganizationsPage: React.FC = () => {
         title={formMode === 'create' ? 'Create Organization' : 'Edit Organization'}
         loading={formLoading}
         maxWidth="md"
-        fullWidth
       >
         {formMode === 'create' ? (
           <OrganizationTaskForm

@@ -369,6 +369,12 @@ Complete GitLab integration with automated project setup and content generation:
 - **Test Configuration**: Fixed test setup for single hierarchy without random suffixes
 - **CodeAbility Integration**: Meta.yaml generation matching gitlab_builder.py format
 
+## Git Commit Guidelines
+
+- **Always ask before making commits** - Never commit without user approval
+- **Use short, concise commit messages** - Keep messages brief and descriptive
+- **Follow conventional commit format** when possible (e.g., "fix: resolve user deletion issue", "feat: add organization management")
+
 ## Notes
 - The web UI is in early development stages
 - Plugin system exists at `/plugins/` (see above for Git workflow)

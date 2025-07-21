@@ -16,14 +16,14 @@ import {
   Typography,
   Box,
 } from '@mui/material';
-import { User } from '../types';
+import { UserGet } from '../types/generated/users';
 import { apiClient } from '../services/apiClient';
 
 interface UserDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  user?: User | null; // If provided, we're editing; if null/undefined, we're creating
+  user?: UserGet | null; // If provided, we're editing; if null/undefined, we're creating
   mode: 'create' | 'edit';
 }
 

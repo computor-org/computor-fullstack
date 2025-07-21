@@ -63,10 +63,12 @@ ctutor generate-types --watch   # Watch mode for auto-regeneration
 ```bash
 bash frontend.sh            # Start dev server
 # Or directly:
-cd frontend && npm start     # Development server
-cd frontend && npm build     # Production build
-cd frontend && npm test      # Run tests
-cd frontend && npm install   # Install dependencies
+cd frontend && yarn start    # Development server
+cd frontend && yarn build    # Production build
+cd frontend && yarn test     # Run tests
+cd frontend && yarn install  # Install dependencies
+
+# IMPORTANT: We use yarn for package management, not npm
 
 # Frontend stack:
 # - React 19 + TypeScript

@@ -44,10 +44,6 @@ interface UserWithAccounts extends UserGet {
     nickname?: string;
     bio?: string;
   };
-  student_profile?: {
-    student_id?: string;
-    student_email?: string;
-  };
 }
 
 
@@ -94,11 +90,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
         updated_at: user.updated_at || new Date().toISOString(),
         archived_at: user.archived_at,
         accounts: user.accounts || [],
-        profile: user.profile,
-        student_profile: user.student_profiles?.[0] ? {
-          student_id: user.student_profiles[0].student_id,
-          student_email: user.student_profiles[0].student_email
-        } : undefined
+        profile: user.profile
       }));
       
       setUsers(transformedUsers);
@@ -255,7 +247,7 @@ const UsersPage: React.FC<UsersPageProps> = () => {
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <TextField
-            placeholder="Search users by name, email, username, or student ID..."
+            placeholder="Search users by name, email, or username..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             variant="outlined"
@@ -286,7 +278,6 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                 <TableCell>User</TableCell>
                 <TableCell>Username</TableCell>
                 <TableCell>Type</TableCell>
-                <TableCell>Student ID</TableCell>
                   <TableCell>Created</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -338,17 +329,6 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                         color={getUserTypeColor(user.user_type)}
                         size="small"
                       />
-                    </TableCell>
-                    <TableCell>
-                      {user.student_profile?.student_id ? (
-                        <Chip
-                          label={user.student_profile.student_id}
-                          variant="outlined"
-                          size="small"
-                        />
-                      ) : (
-                        '-'
-                      )}
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
@@ -412,14 +392,6 @@ const UsersPage: React.FC<UsersPageProps> = () => {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Active Users
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant="h4" color="secondary">
-              {users.filter(u => u.student_profile?.student_id).length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Students
             </Typography>
           </Box>
           <Box>

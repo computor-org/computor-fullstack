@@ -166,6 +166,9 @@ export class BasicAuthService {
         'manage_course',
         'admin_access',
         'manage_users',
+        'manage_organizations',
+        'manage_courses',
+        'manage_roles',
         'system_settings',
         'view_audit'
       );

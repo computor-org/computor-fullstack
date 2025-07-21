@@ -24,7 +24,11 @@ import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import UserEditPage from './pages/UserEditPage';
 import OrganizationsPage from './pages/OrganizationsPage';
+import OrganizationDetailPage from './pages/OrganizationDetailPage';
+import OrganizationEditPage from './pages/OrganizationEditPage';
 import CourseFamiliesPage from './pages/CourseFamiliesPage';
+import CourseFamilyDetailPage from './pages/CourseFamilyDetailPage';
+import CourseFamilyEditPage from './pages/CourseFamilyEditPage';
 import RolesPage from './pages/RolesPage';
 import Sidebar from './components/Sidebar';
 import SSOLoginModal from './components/SSOLoginModal';
@@ -218,7 +222,11 @@ function AuthenticatedAppContent() {
           <Route path="/admin/users/:id" element={<UserDetailPage />} />
           <Route path="/admin/users/:id/edit" element={<UserEditPage />} />
           <Route path="/admin/organizations" element={<OrganizationsPage />} />
+          <Route path="/admin/organizations/:id" element={<OrganizationDetailPage />} />
+          <Route path="/admin/organizations/:id/edit" element={<OrganizationEditPage />} />
           <Route path="/admin/course-families" element={<CourseFamiliesPage />} />
+          <Route path="/admin/course-families/:id" element={<CourseFamilyDetailPage />} />
+          <Route path="/admin/course-families/:id/edit" element={<CourseFamilyEditPage />} />
           <Route path="/admin/roles" element={<RolesPage />} />
           <Route path="/course/:courseId" element={<Dashboard />} />
           <Route path="/course/:courseId/students" element={<StudentsPage />} />

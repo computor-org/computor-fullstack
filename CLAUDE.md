@@ -22,7 +22,6 @@ pip install -r src/requirements.txt
 # Start development services
 bash startup.sh             # All Docker services (dev/prod)
 bash api.sh                 # FastAPI only
-bash system_agent.sh        # System agent
 
 # Docker services (includes task workers)
 docker-compose -f docker-compose-dev.yaml up -d     # Development with workers

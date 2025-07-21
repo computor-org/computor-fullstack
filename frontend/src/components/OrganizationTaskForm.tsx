@@ -14,7 +14,6 @@ import {
   CircularProgress,
   Typography,
   LinearProgress,
-  Collapse,
   Switch,
   FormControlLabel,
 } from '@mui/material';
@@ -327,10 +326,10 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
           </FormControl>
         </Grid>
 
-        <Collapse in={gitlabEnabled && mode === 'create'} sx={{ width: '100%' }}>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
+        {gitlabEnabled && mode === 'create' && (
+          <>
             <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom>
+              <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
                 GitLab Configuration
               </Typography>
             </Grid>
@@ -367,8 +366,8 @@ const OrganizationTaskForm: React.FC<OrganizationTaskFormProps> = ({
                 helperText="GitLab parent group ID"
               />
             </Grid>
-          </Grid>
-        </Collapse>
+          </>
+        )}
 
         <Grid item xs={12} md={6}>
           <TextField

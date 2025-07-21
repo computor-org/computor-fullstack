@@ -26,6 +26,7 @@ import UserEditPage from './pages/UserEditPage';
 import OrganizationsPage from './pages/OrganizationsPage';
 import OrganizationDetailPage from './pages/OrganizationDetailPage';
 import OrganizationEditPage from './pages/OrganizationEditPage';
+import OrganizationCreatePage from './pages/OrganizationCreatePage';
 import CourseFamiliesPage from './pages/CourseFamiliesPage';
 import CourseFamilyDetailPage from './pages/CourseFamilyDetailPage';
 import CourseFamilyEditPage from './pages/CourseFamilyEditPage';
@@ -222,6 +223,7 @@ function AuthenticatedAppContent() {
           <Route path="/admin/users/:id" element={<UserDetailPage />} />
           <Route path="/admin/users/:id/edit" element={<UserEditPage />} />
           <Route path="/admin/organizations" element={<OrganizationsPage />} />
+          <Route path="/admin/organizations/create" element={<OrganizationCreatePage />} />
           <Route path="/admin/organizations/:id" element={<OrganizationDetailPage />} />
           <Route path="/admin/organizations/:id/edit" element={<OrganizationEditPage />} />
           <Route path="/admin/course-families" element={<CourseFamiliesPage />} />

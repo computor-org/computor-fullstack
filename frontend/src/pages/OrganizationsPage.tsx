@@ -22,7 +22,6 @@ import { apiClient } from '../services/apiClient';
 import { DataTable, Column } from '../components/common/DataTable';
 import { FormDialog } from '../components/common/FormDialog';
 import OrganizationForm from '../components/OrganizationForm';
-import OrganizationTaskForm from '../components/OrganizationTaskForm';
 import DeleteDialog from '../components/DeleteDialog';
 
 const OrganizationsPage: React.FC = () => {
@@ -40,7 +39,6 @@ const OrganizationsPage: React.FC = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<OrganizationGet | null>(null);
-  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formLoading, setFormLoading] = useState(false);
 
   // Debounced search
@@ -85,14 +83,11 @@ const OrganizationsPage: React.FC = () => {
   }, [loadOrganizations]);
 
   const handleCreate = () => {
-    setSelectedOrg(null);
-    setFormMode('create');
-    setFormOpen(true);
+    navigate('/admin/organizations/create');
   };
 
   const handleEdit = (org: OrganizationGet) => {
     setSelectedOrg(org);
-    setFormMode('edit');
     setFormOpen(true);
   };
 
@@ -101,12 +96,10 @@ const OrganizationsPage: React.FC = () => {
     setDeleteOpen(true);
   };
 
-  const handleFormSubmit = async (data: OrganizationCreate | OrganizationUpdate) => {
+  const handleFormSubmit = async (data: OrganizationUpdate) => {
     try {
       setFormLoading(true);
-      if (formMode === 'create') {
-        await apiClient.post('/organizations', data);
-      } else if (selectedOrg) {
+      if (selectedOrg) {
         await apiClient.patch(`/organizations/${selectedOrg.id}`, data);
       }
       setFormOpen(false);
@@ -117,13 +110,6 @@ const OrganizationsPage: React.FC = () => {
     } finally {
       setFormLoading(false);
     }
-  };
-
-  const handleTaskComplete = (organizationId: string) => {
-    setFormOpen(false);
-    loadOrganizations();
-    // Optionally navigate to the new organization
-    // navigate(`/admin/organizations/${organizationId}`);
   };
 
   const handleDeleteConfirm = async () => {
@@ -256,25 +242,16 @@ const OrganizationsPage: React.FC = () => {
       <FormDialog
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={formMode === 'create' ? 'Create Organization' : 'Edit Organization'}
+        title="Edit Organization"
         loading={formLoading}
         maxWidth="md"
       >
-        {formMode === 'create' ? (
-          <OrganizationTaskForm
-            mode={formMode}
-            onSubmit={handleFormSubmit}
-            onTaskComplete={handleTaskComplete}
-            onClose={() => setFormOpen(false)}
-          />
-        ) : (
-          <OrganizationForm
-            organization={selectedOrg}
-            mode={formMode}
-            onSubmit={handleFormSubmit}
-            onClose={() => setFormOpen(false)}
-          />
-        )}
+        <OrganizationForm
+          organization={selectedOrg}
+          mode="edit"
+          onSubmit={handleFormSubmit}
+          onClose={() => setFormOpen(false)}
+        />
       </FormDialog>
 
       <DeleteDialog

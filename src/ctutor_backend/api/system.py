@@ -30,7 +30,6 @@ from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from celery.result import AsyncResult
 from ctutor_backend.tasks.celery_app import app as celery_app
-import os
 
 system_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -726,24 +725,3 @@ async def create_course_async(
         raise BadRequestException(f"Failed to submit course creation task: {str(e)}")
 
 
-class GitLabConfigResponse(BaseModel):
-    """GitLab configuration from environment."""
-    gitlab_url: Optional[str] = None
-    gitlab_token: Optional[str] = None
-    parent_group_id: Optional[str] = None
-
-
-@system_router.get("/gitlab-config", response_model=GitLabConfigResponse)
-async def get_gitlab_config(
-    permissions: Annotated[Principal, Depends(get_current_permissions)]
-):
-    """Get GitLab configuration from environment variables."""
-    # Only allow admin users to access this endpoint
-    if not permissions.is_admin:
-        raise NotFoundException("Insufficient permissions")
-    
-    return GitLabConfigResponse(
-        gitlab_url=os.environ.get('TEST_GITLAB_URL'),
-        gitlab_token=os.environ.get('TEST_GITLAB_TOKEN'),
-        parent_group_id=os.environ.get('TEST_GITLAB_GROUP_ID')
-    )

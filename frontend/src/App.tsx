@@ -22,6 +22,7 @@ import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
+import UserEditPage from './pages/UserEditPage';
 import OrganizationsPage from './pages/OrganizationsPage';
 import CourseFamiliesPage from './pages/CourseFamiliesPage';
 import RolesPage from './pages/RolesPage';
@@ -215,6 +216,7 @@ function AuthenticatedAppContent() {
           <Route path="/admin/tasks/:taskId" element={<TaskDetail />} />
           <Route path="/admin/users" element={<UsersPage />} />
           <Route path="/admin/users/:id" element={<UserDetailPage />} />
+          <Route path="/admin/users/:id/edit" element={<UserEditPage />} />
           <Route path="/admin/organizations" element={<OrganizationsPage />} />
           <Route path="/admin/course-families" element={<CourseFamiliesPage />} />
           <Route path="/admin/roles" element={<RolesPage />} />

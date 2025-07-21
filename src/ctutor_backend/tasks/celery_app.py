@@ -36,7 +36,7 @@ app = Celery(
     'ctutor_backend',
     broker=BROKER_URL,
     backend=BACKEND_URL,
-    include=['ctutor_backend.tasks.examples', 'ctutor_backend.tasks.student_testing', 'ctutor_backend.tasks.student_testing_advanced', 'ctutor_backend.tasks.system']
+    include=['ctutor_backend.tasks.examples', 'ctutor_backend.tasks.student_testing', 'ctutor_backend.tasks.student_testing_advanced', 'ctutor_backend.tasks.system', 'ctutor_backend.tasks.hierarchy_management']
 )
 
 # Celery configuration

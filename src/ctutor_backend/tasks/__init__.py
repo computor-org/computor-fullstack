@@ -12,6 +12,9 @@ from .registry import task_registry, register_task
 # Import examples to auto-register tasks
 from . import examples
 
+# Import hierarchy management tasks to auto-register
+from . import hierarchy_management
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

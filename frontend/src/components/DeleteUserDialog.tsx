@@ -12,14 +12,14 @@ import {
   Chip,
 } from '@mui/material';
 import { Warning as WarningIcon } from '@mui/icons-material';
-import { User } from '../types';
+import { UserGet } from '../types/generated/users';
 import { apiClient } from '../services/apiClient';
 
 interface DeleteUserDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  user: User | null;
+  user: UserGet | null;
 }
 
 const DeleteUserDialog: React.FC<DeleteUserDialogProps> = ({

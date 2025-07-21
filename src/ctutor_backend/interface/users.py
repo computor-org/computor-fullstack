@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, field_validator, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from text_unidecode import unidecode
@@ -16,12 +16,23 @@ class UserCreate(BaseModel):
     id: Optional[str] = Field(None, description="User ID (UUID will be generated if not provided)")
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's family name")
-    email: Optional[EmailStr] = Field(None, description="User's email address")
+    email: Optional[str] = Field(None, description="User's email address")
     number: Optional[str] = Field(None, min_length=1, max_length=255, description="User number/identifier")
     user_type: Optional[UserTypeEnum] = Field(UserTypeEnum.user, description="Type of user account")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
-    
+
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        if v is None:
+            return v
+        # Basic email validation - just check for @ symbol and non-empty
+        if v and '@' not in v:
+            raise ValueError('Email must contain @ symbol')
+        return v
+
+
     @field_validator('username')
     @classmethod
     def validate_username(cls, v):
@@ -43,13 +54,14 @@ class UserGet(BaseEntityGet):
     id: str = Field(description="User unique identifier")
     given_name: Optional[str] = Field(None, description="User's given name")
     family_name: Optional[str] = Field(None, description="User's family name")
-    email: Optional[EmailStr] = Field(None, description="User's email address")
+    email: Optional[str] = Field(None, description="User's email address")
     number: Optional[str] = Field(None, description="User number/identifier")
     user_type: Optional[UserTypeEnum] = Field(None, description="Type of user account")
     username: Optional[str] = Field(None, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
     archived_at: Optional[datetime] = Field(None, description="Timestamp when user was archived")
     student_profiles: List[StudentProfileGet] = Field(default=[], description="Associated student profiles")
+    
     
     @property
     def full_name(self) -> str:
@@ -78,6 +90,7 @@ class UserList(BaseEntityList):
     username: Optional[str] = Field(None, description="Unique username")
     archived_at: Optional[datetime] = Field(None, description="Archive timestamp")
     
+    
     @property
     def display_name(self) -> str:
         """Get the user's display name for lists"""
@@ -94,10 +107,20 @@ class UserList(BaseEntityList):
 class UserUpdate(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's family name")
-    email: Optional[EmailStr] = Field(None, description="User's email address")
+    email: Optional[str] = Field(None, description="User's email address")
     number: Optional[str] = Field(None, min_length=1, max_length=255, description="User number/identifier")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Unique username")
     properties: Optional[dict] = Field(None, description="Additional user properties")
+    
+    @field_validator('email')
+    @classmethod
+    def validate_email(cls, v):
+        if v is None:
+            return v
+        # Basic email validation - just check for @ symbol and non-empty
+        if v and '@' not in v:
+            raise ValueError('Email must contain @ symbol')
+        return v
     
     @field_validator('username')
     @classmethod

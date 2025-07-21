@@ -1,7 +1,7 @@
 from abc import ABC
 from datetime import datetime
 from typing import List, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class ListQuery(BaseModel):
     skip: Optional[int] = 0

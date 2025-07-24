@@ -302,7 +302,7 @@ class TestTaskSubmission:
         
         assert submission.task_name == "test_task"
         assert submission.parameters == {}
-        assert submission.priority == 0
+        assert submission.queue == "computor-tasks"
         assert submission.delay is None
     
     def test_task_submission_with_parameters(self):
@@ -310,13 +310,13 @@ class TestTaskSubmission:
         submission = TaskSubmission(
             task_name="test_task",
             parameters={"param1": "value1", "param2": 42},
-            priority=5,
+            queue="computor-high-priority",
             delay=60
         )
         
         assert submission.task_name == "test_task"
         assert submission.parameters == {"param1": "value1", "param2": 42}
-        assert submission.priority == 5
+        assert submission.queue == "computor-high-priority"
         assert submission.delay == 60
 
 

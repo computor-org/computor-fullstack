@@ -8,7 +8,12 @@ that handles operations exceeding FastAPI's request-response cycle.
 from .temporal_executor import TemporalTaskExecutor as TaskExecutor, get_task_executor
 from .base import BaseTask, TaskStatus, TaskResult, TaskSubmission, TaskInfo
 from .registry import task_registry, register_task
-from .temporal_client import get_temporal_client, close_temporal_client
+from .temporal_client import (
+    get_temporal_client, 
+    close_temporal_client,
+    get_task_queue_name,
+    DEFAULT_TASK_QUEUE
+)
 from .temporal_base import BaseWorkflow, BaseActivity, WorkflowResult, WorkflowProgress
 
 # Import Temporal examples to auto-register tasks
@@ -35,6 +40,8 @@ __all__ = [
     'register_task',
     'get_temporal_client',
     'close_temporal_client',
+    'get_task_queue_name',
+    'DEFAULT_TASK_QUEUE',
     'BaseWorkflow',
     'BaseActivity',
     'WorkflowResult',

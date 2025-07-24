@@ -144,7 +144,7 @@ async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[
                 course_id=course_id
             ).model_dump()
         },
-        priority=8  # High priority
+        queue="computor-high-priority"
     )
     
     task_id = await task_executor.submit_task(task_submission)
@@ -342,7 +342,7 @@ async def create_course_client(course_id: str | None, deployment: ComputorDeploy
             "descendants": descendants if descendants else False,
             "release_dir_list": release_dir_list
         },
-        priority=5  # Default priority
+        queue="computor-tasks"
     )
     
     task_id = await task_executor.submit_task(task_submission)
@@ -616,7 +616,7 @@ async def create_organization_async(
                 "gitlab_token": request.gitlab.gitlab_token,
                 "user_id": permissions.user_id
             },
-            priority=8  # High priority
+            queue="computor-high-priority"
         )
         
         task_id = await task_executor.submit_task(task_submission)
@@ -673,7 +673,7 @@ async def create_course_family_async(
                 "organization_id": request.organization_id,
                 "user_id": permissions.user_id
             },
-            priority=8  # High priority
+            queue="computor-high-priority"
         )
         
         task_id = await task_executor.submit_task(task_submission)
@@ -730,7 +730,7 @@ async def create_course_async(
                 "course_family_id": request.course_family_id,
                 "user_id": permissions.user_id
             },
-            priority=8  # High priority
+            queue="computor-high-priority"
         )
         
         task_id = await task_executor.submit_task(task_submission)

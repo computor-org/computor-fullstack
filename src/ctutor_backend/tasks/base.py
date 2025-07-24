@@ -112,7 +112,7 @@ class TaskSubmission(BaseModel):
     """Task submission request."""
     task_name: str
     parameters: Dict[str, Any] = {}
-    priority: int = 0  # Higher values = higher priority
+    queue: str = "computor-tasks"  # Task queue name
     delay: Optional[int] = None  # Delay in seconds before execution
     
     

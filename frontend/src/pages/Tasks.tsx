@@ -309,9 +309,32 @@ const Tasks: React.FC = () => {
       await apiClient.deleteTask(taskId);
       // Refresh the task list
       fetchTasks();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting task:', err);
-      alert('Failed to delete task. Please try again.');
+      
+      // Try to parse the error response for detailed message
+      let errorMessage = 'Failed to delete task. Please try again.';
+      
+      if (err.message) {
+        // Try to extract the detailed error message from the JSON response
+        try {
+          const errorData = JSON.parse(err.message);
+          if (errorData.detail) {
+            errorMessage = errorData.detail;
+          }
+        } catch {
+          // If JSON parsing fails, use the raw message
+          // Check if it contains specific error patterns
+          if (err.message.includes('501') || 
+              err.message.includes('NotImplementedError') || 
+              err.message.includes('not supported') ||
+              err.message.includes('Temporal doesn\'t support')) {
+            errorMessage = err.message;
+          }
+        }
+      }
+      
+      setError(errorMessage);
     }
   };
 

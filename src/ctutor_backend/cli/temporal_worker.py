@@ -9,9 +9,7 @@ from typing import Optional, List
 from ctutor_backend.tasks.temporal_worker import run_worker
 from ctutor_backend.tasks.temporal_client import (
     get_temporal_client,
-    DEFAULT_TASK_QUEUE,
-    HIGH_PRIORITY_TASK_QUEUE,
-    LOW_PRIORITY_TASK_QUEUE
+    DEFAULT_TASK_QUEUE
 )
 
 
@@ -42,16 +40,16 @@ def start(queues: str, high_priority: bool, default: bool, low_priority: bool):
     if queues:
         queue_list = [q.strip() for q in queues.split(',')]
     elif high_priority:
-        queue_list = [HIGH_PRIORITY_TASK_QUEUE]
+        queue_list = ["computor-high-priority"]
     elif default:
         queue_list = [DEFAULT_TASK_QUEUE]
     elif low_priority:
-        queue_list = [LOW_PRIORITY_TASK_QUEUE]
+        queue_list = ["computor-low-priority"]
     
     if queue_list:
         click.echo(f"Processing queues: {', '.join(queue_list)}")
     else:
-        click.echo(f"Processing all queues: {DEFAULT_TASK_QUEUE}, {HIGH_PRIORITY_TASK_QUEUE}, {LOW_PRIORITY_TASK_QUEUE}")
+        click.echo(f"Processing all queues: {DEFAULT_TASK_QUEUE}, computor-high-priority, computor-low-priority")
     
     try:
         # Run the worker
@@ -80,9 +78,9 @@ def status():
             
             # Show task queues
             click.echo("\nTask Queues:")
-            click.echo(f"  - {DEFAULT_TASK_QUEUE} (default priority)")
-            click.echo(f"  - {HIGH_PRIORITY_TASK_QUEUE} (high priority)")
-            click.echo(f"  - {LOW_PRIORITY_TASK_QUEUE} (low priority)")
+            click.echo(f"  - {DEFAULT_TASK_QUEUE} (default)")
+            click.echo(f"  - computor-high-priority (high priority)")
+            click.echo(f"  - computor-low-priority (low priority)")
             
             click.echo("\nNote: Use Temporal Web UI at http://localhost:8088 for detailed worker and workflow status")
             
@@ -103,15 +101,15 @@ def status():
 @worker.command()
 @click.argument('task_type')
 @click.option('--params', default='{}', help='JSON parameters for the task')
-@click.option('--priority', default=5, help='Task priority (0-10)')
+@click.option('--queue', default='computor-tasks', help='Task queue name')
 @click.option('--wait', is_flag=True, help='Wait for task completion')
-def test_job(task_type: str, params: str, priority: int, wait: bool):
+def test_job(task_type: str, params: str, queue: str, wait: bool):
     """
     Submit a test task/workflow for debugging.
     
     Examples:
         ctutor worker test-job example_long_running --params='{"duration": 10}'
-        ctutor worker test-job example_data_processing --params='{"data": [1,2,3]}' --wait
+        ctutor worker test-job example_data_processing --params='{"data": [1,2,3]}' --queue=computor-high-priority --wait
     """
     import json
     from ctutor_backend.tasks import get_task_executor, TaskSubmission
@@ -126,7 +124,7 @@ def test_job(task_type: str, params: str, priority: int, wait: bool):
         submission = TaskSubmission(
             task_name=task_type,
             parameters=parameters,
-            priority=priority
+            queue=queue
         )
         
         async def submit_and_wait():

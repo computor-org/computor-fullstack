@@ -65,6 +65,10 @@ class ExampleLongRunningWorkflow(BaseWorkflow):
         return "example_long_running"
     
     @classmethod
+    def get_task_queue(cls) -> str:
+        return "computor-long-running"
+    
+    @classmethod
     def get_execution_timeout(cls) -> timedelta:
         return timedelta(minutes=5)
     

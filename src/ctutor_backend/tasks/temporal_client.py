@@ -19,10 +19,8 @@ TEMPORAL_TLS_CERT = os.environ.get('TEMPORAL_TLS_CERT')
 TEMPORAL_TLS_KEY = os.environ.get('TEMPORAL_TLS_KEY')
 TEMPORAL_TLS_CA = os.environ.get('TEMPORAL_TLS_CA')
 
-# Task queue configuration
+# Default task queue
 DEFAULT_TASK_QUEUE = "computor-tasks"
-HIGH_PRIORITY_TASK_QUEUE = "computor-high-priority"
-LOW_PRIORITY_TASK_QUEUE = "computor-low-priority"
 
 # Default retry policy
 DEFAULT_RETRY_POLICY = RetryPolicy(
@@ -68,22 +66,17 @@ async def get_temporal_client() -> Client:
         return _client
 
 
-def get_task_queue_by_priority(priority: int) -> str:
+def get_task_queue_name(queue_name: Optional[str] = None) -> str:
     """
-    Get the appropriate task queue based on priority.
+    Get task queue name, using default if none provided.
     
     Args:
-        priority: Task priority (0-10)
+        queue_name: Task queue name (optional)
         
     Returns:
-        Task queue name
+        Task queue name to use
     """
-    if priority > 5:
-        return HIGH_PRIORITY_TASK_QUEUE
-    elif priority < 0:
-        return LOW_PRIORITY_TASK_QUEUE
-    else:
-        return DEFAULT_TASK_QUEUE
+    return queue_name or DEFAULT_TASK_QUEUE
 
 
 async def close_temporal_client():

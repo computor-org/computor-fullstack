@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
 from temporalio.client import WorkflowHandle, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy
-from .temporal_client import get_temporal_client, get_task_queue_by_priority
+from .temporal_client import get_temporal_client, get_task_queue_name, DEFAULT_TASK_QUEUE
 from .temporal_base import WorkflowResult
 from .base import TaskStatus, TaskResult, TaskInfo, TaskSubmission
 from .registry import task_registry
@@ -77,8 +77,9 @@ class TemporalTaskExecutor:
         # Generate unique workflow ID
         workflow_id = f"{submission.task_name}-{uuid.uuid4()}"
         
-        # Get queue name based on priority
-        task_queue = get_task_queue_by_priority(submission.priority)
+        # Get task queue name - use workflow's default queue or submission's queue
+        workflow_queue = workflow_class.get_task_queue()
+        task_queue = get_task_queue_name(submission.queue if submission.queue != DEFAULT_TASK_QUEUE else workflow_queue)
         
         # Start workflow
         handle = await client.start_workflow(

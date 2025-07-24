@@ -91,6 +91,78 @@ services:
       - temporal
     labels:
       - traefik.enable=false
+
+  # Temporal Worker (Production)
+  temporal-worker:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    container_name: temporal-worker
+    restart: unless-stopped
+    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker"]
+    environment:
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - TOKEN_SECRET=${TOKEN_SECRET}
+      - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
+      - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+    labels:
+      - traefik.enable=false
+
+  # Temporal Worker Scaled (for high load)
+  temporal-worker-scaled:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker", "--high-priority"]
+    environment:
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - TOKEN_SECRET=${TOKEN_SECRET}
+      - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
+      - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+    depends_on:
+      - temporal
+      - postgres
+      - redis
+    labels:
+      - traefik.enable=false
+    deploy:
+      replicas: 2
+
   uvicorn:
     build:
       context: ./

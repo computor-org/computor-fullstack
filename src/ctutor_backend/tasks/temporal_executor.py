@@ -109,7 +109,7 @@ class TemporalTaskExecutor:
                 created_at=description.start_time or datetime.now(timezone.utc),
                 started_at=description.start_time,
                 finished_at=description.close_time,
-                error=description.most_recent_execution_run_id if status == TaskStatus.FAILED else None,
+                error="Task failed" if status == TaskStatus.FAILED else None,
                 worker=description.task_queue,
                 queue=description.task_queue,
             )
@@ -234,9 +234,6 @@ class TemporalTaskExecutor:
         """
         List tasks with pagination and filtering.
         
-        Note: This is a simplified implementation. Full implementation would
-        require querying Temporal's visibility store.
-        
         Args:
             limit: Maximum number of tasks to return
             offset: Number of tasks to skip
@@ -245,15 +242,89 @@ class TemporalTaskExecutor:
         Returns:
             Dictionary with task list and pagination info
         """
-        # This is a placeholder implementation
-        # In production, you would query Temporal's visibility store
-        return {
-            "tasks": [],
-            "total": 0,
-            "limit": limit,
-            "offset": offset,
-            "has_more": False
-        }
+        client = await get_temporal_client()
+        
+        try:
+            # Use Temporal's list_workflows API to get workflows
+            from temporalio.client import WorkflowExecutionStatus
+            
+            # Build query filter
+            query_parts = []
+            
+            # Note: Status filtering requires proper Temporal query syntax
+            # For now, we'll filter in Python after fetching results
+            status_filter = None
+            if status:
+                status_mapping = {
+                    "PENDING": [WorkflowExecutionStatus.RUNNING],
+                    "STARTED": [WorkflowExecutionStatus.RUNNING], 
+                    "FINISHED": [WorkflowExecutionStatus.COMPLETED],
+                    "SUCCESS": [WorkflowExecutionStatus.COMPLETED],
+                    "FAILED": [WorkflowExecutionStatus.FAILED, WorkflowExecutionStatus.TIMED_OUT],
+                    "CANCELLED": [WorkflowExecutionStatus.CANCELED, WorkflowExecutionStatus.TERMINATED],
+                    "REVOKED": [WorkflowExecutionStatus.TERMINATED]
+                }
+                status_filter = status_mapping.get(status.upper(), [])
+            
+            # Build query string
+            query = " AND ".join(query_parts) if query_parts else ""
+            
+            # List workflows using Temporal's visibility API
+            workflows = []
+            async for workflow in client.list_workflows(
+                query=query or None,
+                page_size=min(limit * 2, 1000)  # Fetch more to account for filtering
+            ):
+                # Apply status filter if specified
+                if status_filter and workflow.status not in status_filter:
+                    continue
+                
+                # Convert to our TaskInfo format
+                task_info = {
+                    "task_id": workflow.id,
+                    "task_name": workflow.workflow_type,
+                    "status": self._status_mapping.get(workflow.status, TaskStatus.QUEUED).value,
+                    "created_at": workflow.start_time,
+                    "started_at": workflow.start_time,
+                    "finished_at": workflow.close_time,
+                    "error": None,
+                    "worker": workflow.task_queue or "unknown",
+                    "queue": workflow.task_queue or "unknown",
+                    "workflow_id": workflow.id,
+                    "run_id": workflow.run_id,
+                    "execution_time": workflow.execution_time,
+                    "history_length": workflow.history_length
+                }
+                workflows.append(task_info)
+                
+                # Apply manual offset/limit since Temporal doesn't support offset directly
+                if len(workflows) >= limit + offset:
+                    break
+            
+            # Apply offset and limit
+            start_idx = min(offset, len(workflows))
+            end_idx = min(offset + limit, len(workflows))
+            paginated_workflows = workflows[start_idx:end_idx]
+            
+            return {
+                "tasks": paginated_workflows,
+                "total": len(workflows),  # This is approximate since we don't get total count from Temporal
+                "limit": limit,
+                "offset": offset,
+                "has_more": len(workflows) >= limit + offset
+            }
+            
+        except Exception as e:
+            # Fallback to empty result on error, but log it
+            print(f"Error listing workflows: {e}")
+            return {
+                "tasks": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "has_more": False,
+                "error": str(e)
+            }
     
     async def delete_task(self, task_id: str) -> bool:
         """

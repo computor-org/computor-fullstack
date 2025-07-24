@@ -69,17 +69,24 @@ class ExampleLongRunningWorkflow(BaseWorkflow):
         return timedelta(minutes=5)
     
     @workflow.run
-    async def run(self, duration: int = 60, message: str = "Processing...") -> WorkflowResult:
+    async def run(self, parameters: dict) -> WorkflowResult:
         """
         Run the long-running workflow.
         
         Args:
-            duration: How long to run (seconds)
-            message: Status message
+            parameters: Dictionary containing duration and message
             
         Returns:
             WorkflowResult with execution details
         """
+        # Extract parameters with defaults
+        duration = parameters.get('duration', 60)
+        message = parameters.get('message', 'Processing...')
+        
+        # Ensure duration is an integer
+        if isinstance(duration, str):
+            duration = int(duration)
+        
         # Record progress
         workflow.logger.info(f"Starting long-running task for {duration} seconds")
         
@@ -119,19 +126,28 @@ class ExampleDataProcessingWorkflow(BaseWorkflow):
         return timedelta(minutes=10)
     
     @workflow.run
-    async def run(self, data: list, chunk_size: int = 10, operation: str = "sum") -> WorkflowResult:
+    async def run(self, parameters: dict) -> WorkflowResult:
         """
         Process data in chunks.
         
         Args:
-            data: List of data to process
-            chunk_size: Size of each chunk
-            operation: Operation to perform (sum, count, max)
+            parameters: Dictionary containing data, chunk_size, and operation
             
         Returns:
             WorkflowResult with processing results
         """
-        workflow.logger.info(f"Processing {len(data)} items in chunks of {chunk_size}")
+        # Extract parameters with defaults
+        data_size = parameters.get('data_size', 100)
+        chunk_size = parameters.get('chunk_size', 10)
+        operation = parameters.get('operation', 'sum')
+        
+        # Generate sample data if data_size is provided instead of actual data
+        if isinstance(data_size, int):
+            data = list(range(1, data_size + 1))
+        else:
+            data = parameters.get('data', list(range(1, 101)))
+        
+        workflow.logger.info(f"Processing {len(data)} items in chunks of {chunk_size} using {operation} operation")
         
         # Split data into chunks
         chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
@@ -193,24 +209,33 @@ class ExampleErrorHandlingWorkflow(BaseWorkflow):
         return "example_error_handling"
     
     @workflow.run
-    async def run(self, should_fail: bool = False, retry_count: int = 0) -> WorkflowResult:
+    async def run(self, parameters: dict) -> WorkflowResult:
         """
         Demonstrate error handling in workflows.
         
         Args:
-            should_fail: Whether the workflow should fail
-            retry_count: Number of retries before success
+            parameters: Dictionary containing should_fail, retry_count, and fail_at_step
             
         Returns:
             WorkflowResult
         """
+        # Extract parameters with defaults
+        should_fail = parameters.get('should_fail', False)
+        retry_count = parameters.get('retry_count', 0)
+        fail_at_step = parameters.get('fail_at_step', 1)
+        
+        # Ensure boolean conversion
+        if isinstance(should_fail, str):
+            should_fail = should_fail.lower() in ('true', '1', 'yes')
+            
         attempts = 0
         
         while attempts <= retry_count:
             try:
-                if should_fail and attempts < retry_count:
-                    workflow.logger.warning(f"Simulating failure (attempt {attempts + 1}/{retry_count + 1})")
-                    raise Exception(f"Simulated failure on attempt {attempts + 1}")
+                # Use fail_at_step to determine when to fail
+                if should_fail and attempts < fail_at_step:
+                    workflow.logger.warning(f"Simulating failure at step {attempts + 1} (configured to fail at step {fail_at_step})")
+                    raise Exception(f"Simulated failure at step {attempts + 1}")
                 
                 # Success case
                 workflow.logger.info(f"Processing succeeded on attempt {attempts + 1}")

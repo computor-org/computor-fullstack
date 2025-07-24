@@ -34,6 +34,63 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
       - PGPORT=${POSTGRES_PORT}
+      
+  # Temporal PostgreSQL database
+  temporal-postgres:
+    image: postgres:16
+    container_name: temporal-postgres
+    restart: unless-stopped
+    ports:
+      - 5433:5433
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/temporal-postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+      PGPORT: 5433
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      
+  # Temporal server
+  temporal:
+    image: temporalio/auto-setup:1.27.0
+    container_name: temporal
+    restart: unless-stopped
+    ports:
+      - 7233:7233
+    environment:
+      - DB=postgresql
+      - DB_PORT=5433
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig.yaml
+    volumes:
+      - ./docker/temporal/dynamicconfig.yaml:/etc/temporal/config/dynamicconfig.yaml
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    labels:
+      - traefik.enable=false
+      
+  # Temporal Web UI
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: temporal-ui
+    restart: unless-stopped
+    ports:
+      - 8088:8080
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - temporal
+    labels:
+      - traefik.enable=false
   uvicorn:
     build:
       context: ./
@@ -92,60 +149,6 @@ services:
     depends_on:
       - traefik
 
-  # Celery System Worker - Handles all system-dependent tasks (releases, filesystem operations)
-  celery-system-worker:
-    deploy:
-      mode: replicated
-      replicas: ${CELERY_SYSTEM_WORKER_REPLICAS:-2}
-    build:
-      context: ./
-      dockerfile: ./docker/celery-worker/Dockerfile
-      args:
-        SYSTEM_GIT_NAME: ${SYSTEM_GIT_NAME}
-        SYSTEM_GIT_EMAIL: ${SYSTEM_GIT_EMAIL}
-    restart: unless-stopped
-    volumes:
-      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-    environment:
-      # Worker configuration
-      WORKER_TYPE: system
-      WORKER_QUEUES: high_priority,default,low_priority
-      WORKER_CONCURRENCY: 4
-      WORKER_LOG_LEVEL: info
-      # API configuration
-      EXECUTION_BACKEND_API_URL: ${EXECUTION_BACKEND_API_URL}
-      EXECUTION_BACKEND_API_USER: ${EXECUTION_BACKEND_API_USER}
-      EXECUTION_BACKEND_API_PASSWORD: ${EXECUTION_BACKEND_API_PASSWORD}
-      API_LOCAL_STORAGE_DIR: ${API_LOCAL_STORAGE_DIR}
-      # Database configuration
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      # Redis configuration
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      # Other configuration
-      DEBUG_MODE: ${DEBUG_MODE}
-      TOKEN_SECRET: ${TOKEN_SECRET}
-      # MinIO configuration
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      MINIO_SECURE: "false"
-      MINIO_REGION: ${MINIO_REGION:-us-east-1}
-      MINIO_DEFAULT_BUCKET: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      uvicorn:
-        condition: service_started
-    labels:
-      - traefik.enable=false
 
 
   # MinIO Object Storage Service

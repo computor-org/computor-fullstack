@@ -47,6 +47,7 @@ interface Task {
   task_name: string;
   status: string;
   date_done?: string;
+  completed_at?: string;
   worker?: string;
   retries?: number;
   queue?: string;
@@ -73,16 +74,22 @@ const statusOptions = [
 ];
 
 const getStatusIcon = (status: string) => {
-  switch (status) {
+  const upperStatus = status.toUpperCase();
+  switch (upperStatus) {
     case 'SUCCESS':
+    case 'FINISHED':
       return <SuccessIcon fontSize="small" />;
     case 'FAILURE':
+    case 'FAILED':
       return <ErrorIcon fontSize="small" />;
     case 'PENDING':
+    case 'QUEUED':
       return <PendingIcon fontSize="small" />;
     case 'STARTED':
+    case 'RUNNING':
       return <RunningIcon fontSize="small" />;
     case 'REVOKED':
+    case 'CANCELLED':
       return <CancelledIcon fontSize="small" />;
     default:
       return undefined;
@@ -90,16 +97,22 @@ const getStatusIcon = (status: string) => {
 };
 
 const getStatusColor = (status: string): "default" | "success" | "error" | "warning" | "info" | "primary" | "secondary" => {
-  switch (status) {
+  const upperStatus = status.toUpperCase();
+  switch (upperStatus) {
     case 'SUCCESS':
+    case 'FINISHED':
       return 'success';
     case 'FAILURE':
+    case 'FAILED':
       return 'error';
     case 'PENDING':
+    case 'QUEUED':
       return 'default';
     case 'STARTED':
+    case 'RUNNING':
       return 'info';
     case 'REVOKED':
+    case 'CANCELLED':
       return 'warning';
     default:
       return 'default';
@@ -422,7 +435,7 @@ const Tasks: React.FC = () => {
                       {task.worker || '-'}
                     </TableCell>
                     <TableCell onClick={() => handleTaskClick(task.task_id)}>
-                      {formatDate(task.date_done)}
+                      {formatDate(task.completed_at || task.date_done)}
                     </TableCell>
                     <TableCell onClick={() => handleTaskClick(task.task_id)}>
                       {task.retries || 0}

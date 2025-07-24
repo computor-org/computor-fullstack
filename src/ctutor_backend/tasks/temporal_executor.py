@@ -31,6 +31,29 @@ class TemporalTaskExecutor:
             WorkflowExecutionStatus.TIMED_OUT: TaskStatus.FAILED,
         }
     
+    def _calculate_duration(self, start_time: Optional[datetime], end_time: Optional[datetime]) -> Optional[str]:
+        """Calculate human-readable duration between start and end times."""
+        if not start_time:
+            return None
+        
+        if not end_time:
+            # Task is still running, calculate duration from start to now
+            end_time = datetime.now(timezone.utc)
+        
+        duration = end_time - start_time
+        total_seconds = int(duration.total_seconds())
+        
+        if total_seconds < 60:
+            return f"{total_seconds}s"
+        elif total_seconds < 3600:
+            minutes = total_seconds // 60
+            seconds = total_seconds % 60
+            return f"{minutes}m {seconds}s"
+        else:
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            return f"{hours}h {minutes}m"
+    
     async def submit_task(self, submission: TaskSubmission) -> str:
         """
         Submit a task for execution.
@@ -101,17 +124,33 @@ class TemporalTaskExecutor:
             # Extract task name from workflow ID
             task_name = task_id.split('-')[0] if '-' in task_id else "unknown"
             
+            # Create shortened task ID for better display
+            short_task_id = task_id.split('-')[-1] if '-' in task_id else task_id
+            
+            # Determine if task has result
+            has_result = description.status in [WorkflowExecutionStatus.COMPLETED, WorkflowExecutionStatus.FAILED]
+            
             # Build task info
             task_info = TaskInfo(
                 task_id=task_id,
+                short_task_id=short_task_id,
                 task_name=task_name,
                 status=status,
+                status_display=status.value.upper(),
                 created_at=description.start_time or datetime.now(timezone.utc),
                 started_at=description.start_time,
                 finished_at=description.close_time,
+                completed_at=description.close_time,
                 error="Task failed" if status == TaskStatus.FAILED else None,
                 worker=description.task_queue,
                 queue=description.task_queue,
+                has_result=has_result,
+                result_available="Yes" if has_result else "No",
+                duration=self._calculate_duration(description.start_time, description.close_time),
+                workflow_id=task_id,
+                run_id=description.most_recent_execution_run_id if hasattr(description, 'most_recent_execution_run_id') else None,
+                execution_time=description.start_time,
+                history_length=getattr(description, 'history_length', None)
             )
             
             return task_info
@@ -280,20 +319,34 @@ class TemporalTaskExecutor:
                     continue
                 
                 # Convert to our TaskInfo format
+                status_value = self._status_mapping.get(workflow.status, TaskStatus.QUEUED).value
+                
+                # Create shortened task ID for better display
+                short_task_id = workflow.id.split('-')[-1] if '-' in workflow.id else workflow.id
+                
+                # Determine if task has result
+                has_result = workflow.status in [WorkflowExecutionStatus.COMPLETED, WorkflowExecutionStatus.FAILED]
+                
                 task_info = {
                     "task_id": workflow.id,
+                    "short_task_id": short_task_id,
                     "task_name": workflow.workflow_type,
-                    "status": self._status_mapping.get(workflow.status, TaskStatus.QUEUED).value,
+                    "status": status_value,
+                    "status_display": status_value.upper(),
                     "created_at": workflow.start_time,
                     "started_at": workflow.start_time,
                     "finished_at": workflow.close_time,
+                    "completed_at": workflow.close_time,  # Alternative field name for UI
                     "error": None,
                     "worker": workflow.task_queue or "unknown",
                     "queue": workflow.task_queue or "unknown",
                     "workflow_id": workflow.id,
                     "run_id": workflow.run_id,
                     "execution_time": workflow.execution_time,
-                    "history_length": workflow.history_length
+                    "history_length": workflow.history_length,
+                    "has_result": has_result,
+                    "result_available": "Yes" if has_result else "No",
+                    "duration": self._calculate_duration(workflow.start_time, workflow.close_time)
                 }
                 workflows.append(task_info)
                 

@@ -132,4 +132,16 @@ class TaskInfo(BaseModel):
     args: Optional[Any] = None
     kwargs: Optional[Dict[str, Any]] = None
     
+    # UI enhancement fields
+    short_task_id: Optional[str] = None
+    status_display: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    has_result: Optional[bool] = None
+    result_available: Optional[str] = None
+    duration: Optional[str] = None
+    workflow_id: Optional[str] = None
+    run_id: Optional[str] = None
+    execution_time: Optional[datetime] = None
+    history_length: Optional[int] = None
+    
     model_config = ConfigDict(use_enum_values=True)

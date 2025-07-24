@@ -4,7 +4,6 @@ FastAPI endpoints for task management.
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Query
 from typing import Dict, List, Any, Optional
-from celery.exceptions import NotRegistered
 
 from ctutor_backend.tasks import (
     get_task_executor, 
@@ -126,7 +125,7 @@ async def get_task_status(task_id: str):
         task_info = await task_executor.get_task_status(task_id)
         return task_info
     
-    except (NotRegistered, KeyError):
+    except KeyError:
         raise HTTPException(
             status_code=404,
             detail=f"Task with ID {task_id} not found"
@@ -157,7 +156,7 @@ async def get_task_result(task_id: str):
         task_result = await task_executor.get_task_result(task_id)
         return task_result
     
-    except (NotRegistered, KeyError):
+    except KeyError:
         raise HTTPException(
             status_code=404,
             detail=f"Task with ID {task_id} not found"
@@ -211,7 +210,7 @@ async def delete_task(task_id: str):
     """
     Delete a task from the database.
     
-    This permanently removes the task record from the celery_taskmeta table.
+    This permanently removes the task record from Temporal's history.
     Note: This does not cancel a running task, it only removes the database record.
     
     Args:
@@ -273,7 +272,7 @@ async def list_task_types():
 @tasks_router.get("/workers/status", response_model=Dict[str, Any])
 async def get_worker_status():
     """
-    Get Celery worker and queue status information.
+    Get Temporal worker and queue status information.
     
     Returns:
         Dictionary containing worker status, queue information, and connection details

@@ -23,7 +23,7 @@ class TaskRegistry:
             The registered task class (for decorator usage)
         """
         task_instance = task_class()
-        task_name = task_instance.name
+        task_name = task_instance.get_name()
         
         if task_name in self._tasks:
             raise ValueError(f"Task '{task_name}' is already registered")

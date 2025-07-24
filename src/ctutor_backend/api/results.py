@@ -8,36 +8,49 @@ from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.results import ResultInterface, ResultStatus
 from ctutor_backend.model.result import Result
-from celery.result import AsyncResult
-from ctutor_backend.tasks.celery_app import app as celery_app
+from ctutor_backend.tasks import get_task_executor
 from sqlalchemy.orm import Session
 
 # TODO: if result status is missing, ResultStatus.NOT_AVAILABLE should be returned
 async def get_result_status(result: Result):
-    # Use Celery AsyncResult instead of Prefect
-    task_result = AsyncResult(result.test_system_id, app=celery_app)
-    
-    if task_result.state == 'PENDING':
-        return ResultStatus.PENDING
-    elif task_result.state == 'PROGRESS':
-        return ResultStatus.RUNNING
-    elif task_result.state == 'SUCCESS':
-        return ResultStatus.COMPLETED
-    elif task_result.state == 'FAILURE':
-        return ResultStatus.FAILED
-    else:
+    # Use Temporal task executor
+    try:
+        task_executor = get_task_executor()
+        task_info = await task_executor.get_task_status(result.test_system_id)
+        
+        # Map task status to result status
+        if task_info.status == "QUEUED":
+            return ResultStatus.PENDING
+        elif task_info.status == "STARTED":
+            return ResultStatus.RUNNING
+        elif task_info.status == "FINISHED":
+            return ResultStatus.COMPLETED
+        elif task_info.status == "FAILED":
+            return ResultStatus.FAILED
+        else:
+            return ResultStatus.NOT_AVAILABLE
+    except Exception:
         return ResultStatus.NOT_AVAILABLE
 
 async def get_result(result: Result):
-    # Use Celery AsyncResult instead of Prefect
-    task_result = AsyncResult(result.test_system_id, app=celery_app)
-    
-    return {
-        "state": task_result.state,
-        "result": task_result.result if task_result.successful() else None,
-        "info": task_result.info,
-        "task_id": result.test_system_id
-    }
+    # Use Temporal task executor
+    try:
+        task_executor = get_task_executor()
+        task_result = await task_executor.get_task_result(result.test_system_id)
+        
+        return {
+            "state": task_result.status,
+            "result": task_result.result,
+            "info": {"error": task_result.error} if task_result.error else {},
+            "task_id": result.test_system_id
+        }
+    except Exception as e:
+        return {
+            "state": "UNKNOWN",
+            "result": None,
+            "info": {"error": str(e)},
+            "task_id": result.test_system_id
+        }
 
 result_router = CrudRouter(ResultInterface)
 

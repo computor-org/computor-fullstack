@@ -29,7 +29,6 @@ from ctutor_backend.model.course import Course, CourseContent, CourseContentType
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
-from prefect.client.orchestration import PrefectClient
 from sqlalchemy_utils import Ltree
 from ctutor_backend.settings import settings
 #from ctutor_backend.helpers import get_prefect_client
@@ -143,32 +142,32 @@ def create_submission(submission: Submission):
 
 # TODO: REFACTORING
 async def prefect_test_job(test_job: TestJob, properties: dict) -> str:
-  
-    if settings.DEBUG_MODE == "production":
-      prefect_url = properties["url"]
-    else:
-      prefect_url = "http://localhost:4200/api"
+  raise NotImplementedException()
+    # if settings.DEBUG_MODE == "production":
+    #   prefect_url = properties["url"]
+    # else:
+    #   prefect_url = "http://localhost:4200/api"
 
-    async with PrefectClient(prefect_url) as client:
+    # async with PrefectClient(prefect_url) as client:
       
-      try:
-        deployment = await client.read_deployment_by_name(properties["deployment"])
-      except:
-        raise NotFoundException(detail=f"Worker [{properties['deployment']}] is currently not available. Please wait a moment!")
+    #   try:
+    #     deployment = await client.read_deployment_by_name(properties["deployment"])
+    #   except:
+    #     raise NotFoundException(detail=f"Worker [{properties['deployment']}] is currently not available. Please wait a moment!")
       
-      try:
-        flow_run = await client.create_flow_run_from_deployment(
-          deployment_id=deployment.id,
-          parameters={
-            "test_job": test_job.model_dump(exclude_none=True)
-          },
-          tags=[f"user:{test_job.user_id}"]
-        )
+    #   try:
+    #     flow_run = await client.create_flow_run_from_deployment(
+    #       deployment_id=deployment.id,
+    #       parameters={
+    #         "test_job": test_job.model_dump(exclude_none=True)
+    #       },
+    #       tags=[f"user:{test_job.user_id}"]
+    #     )
 
-        return str(flow_run.id)
+    #     return str(flow_run.id)
 
-      except:
-        raise BadRequestException()
+    #   except:
+    #     raise BadRequestException()
 
 async def submission_job(submission: Submission):
   raise NotImplementedException()

@@ -11,18 +11,12 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
 from ctutor_backend.api.system import ReleaseStudentsCreate
-from ctutor_backend.api.tests_celery import create_submission as api_create_submission
 from ctutor_backend.api.utils import collect_sub_path_positions_if_meta_exists
 from ctutor_backend.generator.gitlab_builder import CodeabilityGitlabBuilder
 from ctutor_backend.interface.deployments import ApiConfig, ComputorDeploymentConfig, CodeabilityReleaseBuilder
 from ctutor_backend.interface.tests import Submission
-from ctutor_backend.tasks.temporal_base import BaseWorkflow, WorkflowResult
-from ctutor_backend.tasks.registry import register_task
-
-
-EXECUTION_BACKEND_API_URL = os.environ.get("EXECUTION_BACKEND_API_URL")
-EXECUTION_BACKEND_API_USER = os.environ.get("EXECUTION_BACKEND_API_USER")
-EXECUTION_BACKEND_API_PASSWORD = os.environ.get("EXECUTION_BACKEND_API_PASSWORD")
+from .temporal_base import BaseWorkflow, WorkflowResult
+from .registry import register_task
 
 
 # Activities

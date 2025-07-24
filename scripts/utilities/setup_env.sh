@@ -5,10 +5,10 @@ MODE=${1:-dev}
 
 if [ "$MODE" = "dev" ]; then
     echo "Setting up development environment..."
-    cat .env.common .env.dev > .env
+    cp .env.dev .env
 elif [ "$MODE" = "prod" ]; then
     echo "Setting up production environment..."
-    cat .env.common .env.prod > .env
+    cp .env.prod .env
 else
     echo "Invalid mode: $MODE"
     echo "Usage: $0 [dev|prod]"

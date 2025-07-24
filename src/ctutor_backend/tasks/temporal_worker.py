@@ -11,9 +11,7 @@ from temporalio.client import Client
 
 from .temporal_client import (
     get_temporal_client,
-    DEFAULT_TASK_QUEUE,
-    HIGH_PRIORITY_TASK_QUEUE,
-    LOW_PRIORITY_TASK_QUEUE
+    DEFAULT_TASK_QUEUE
 )
 
 # Import all workflows and activities
@@ -59,8 +57,8 @@ class TemporalWorker:
         """
         self.task_queues = task_queues or [
             DEFAULT_TASK_QUEUE,
-            HIGH_PRIORITY_TASK_QUEUE,
-            LOW_PRIORITY_TASK_QUEUE
+            "computor-high-priority",
+            "computor-low-priority"
         ]
         self.workers: List[Worker] = []
         self.client: Optional[Client] = None
@@ -191,11 +189,11 @@ def main():
     if args.queues:
         queues = args.queues
     elif args.high_priority:
-        queues = [HIGH_PRIORITY_TASK_QUEUE]
+        queues = ["computor-high-priority"]
     elif args.default:
         queues = [DEFAULT_TASK_QUEUE]
     elif args.low_priority:
-        queues = [LOW_PRIORITY_TASK_QUEUE]
+        queues = ["computor-low-priority"]
     
     # Run worker
     asyncio.run(run_worker(queues))

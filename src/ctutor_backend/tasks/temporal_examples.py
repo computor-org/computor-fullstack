@@ -259,8 +259,9 @@ class ExampleErrorHandlingWorkflow(BaseWorkflow):
                         metadata={"attempts": attempts}
                     )
                 
-                # Wait before retry
-                await workflow.sleep(timedelta(seconds=2 ** attempts))
+                # Wait before retry (max 60 seconds)
+                sleep_seconds = min(2 ** attempts, 60)
+                await asyncio.sleep(sleep_seconds)
         
         # Should not reach here
         return WorkflowResult(

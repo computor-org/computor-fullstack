@@ -53,13 +53,9 @@ class TemporalWorker:
         Initialize the worker.
         
         Args:
-            task_queues: List of task queues to listen on. If None, listens on all queues.
+            task_queues: List of task queues to listen on. If None, listens on default queue.
         """
-        self.task_queues = task_queues or [
-            DEFAULT_TASK_QUEUE,
-            "computor-high-priority",
-            "computor-low-priority"
-        ]
+        self.task_queues = task_queues or [DEFAULT_TASK_QUEUE]
         self.workers: List[Worker] = []
         self.client: Optional[Client] = None
         self._shutdown = False
@@ -163,37 +159,14 @@ def main():
     parser.add_argument(
         "--queues",
         nargs="+",
-        help="Task queues to process (default: all queues)",
+        help="Task queues to process (default: computor-tasks)",
         default=None
-    )
-    parser.add_argument(
-        "--high-priority",
-        action="store_true",
-        help="Process only high priority queue"
-    )
-    parser.add_argument(
-        "--default",
-        action="store_true", 
-        help="Process only default queue"
-    )
-    parser.add_argument(
-        "--low-priority",
-        action="store_true",
-        help="Process only low priority queue"
     )
     
     args = parser.parse_args()
     
-    # Determine queues
-    queues = None
-    if args.queues:
-        queues = args.queues
-    elif args.high_priority:
-        queues = ["computor-high-priority"]
-    elif args.default:
-        queues = [DEFAULT_TASK_QUEUE]
-    elif args.low_priority:
-        queues = ["computor-low-priority"]
+    # Use specified queues or default
+    queues = args.queues
     
     # Run worker
     asyncio.run(run_worker(queues))

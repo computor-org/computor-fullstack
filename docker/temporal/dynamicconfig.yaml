@@ -1,0 +1,47 @@
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}
+
+history.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+frontend.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+matching.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+worker.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+system.advancedVisibilityWritingMode:
+  - value: "dual"
+    constraints: {}
+
+history.cacheInitialSize:
+  - value: 128
+    constraints: {}
+
+history.cacheTTL:
+  - value: 3600s
+    constraints: {}
+
+history.cacheMaxSize:
+  - value: 512
+    constraints: {}
+
+history.eventsCacheInitialSize:
+  - value: 128
+    constraints: {}
+
+history.eventsCacheTTL:
+  - value: 3600s
+    constraints: {}
+
+history.eventsCacheMaxSize:
+  - value: 512
+    constraints: {}

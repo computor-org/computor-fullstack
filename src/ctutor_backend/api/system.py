@@ -28,8 +28,7 @@ from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.auth import User, StudentProfile
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
-from celery.result import AsyncResult
-from ctutor_backend.tasks.celery_app import app as celery_app
+from ctutor_backend.tasks import get_task_executor, TaskSubmission
 
 system_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -133,18 +132,24 @@ async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[
 
     deployment = get_computor_deployment_from_course_id_db(course_id, db)
 
-    # Use Celery task instead of Prefect
-    from ctutor_backend.tasks.system import release_student_task
+    # Use Temporal task executor
+    task_executor = get_task_executor()
     
-    result = release_student_task.apply_async(
-        args=[deployment.model_dump(), ReleaseStudentsCreate(
-            students=students,
-            course_id=course_id
-        ).model_dump()],
-        queue='high_priority'
+    task_submission = TaskSubmission(
+        task_name="release_students",
+        parameters={
+            "deployment": deployment.model_dump(),
+            "release_data": ReleaseStudentsCreate(
+                students=students,
+                course_id=course_id
+            ).model_dump()
+        },
+        priority=8  # High priority
     )
     
-    return {"task_id": result.id}
+    task_id = await task_executor.submit_task(task_submission)
+    
+    return {"task_id": task_id}
   
 class TUGStudentExport(BaseModel):
    course_group_title: str
@@ -325,21 +330,24 @@ async def create_student_from_export(permissions: Annotated[Principal, Depends(g
     return students
 
 async def create_course_client(course_id: str | None, deployment: ComputorDeploymentConfig, release_dir: str | None = None, ascendants: bool = False, descendants: bool = False, release_dir_list: list[str] = []):
-    # Use Celery task instead of Prefect
-    from ctutor_backend.tasks.system import release_course_task
+    # Use Temporal task executor
+    task_executor = get_task_executor()
     
-    result = release_course_task.apply_async(
-        args=[deployment.model_dump()],
-        kwargs={
+    task_submission = TaskSubmission(
+        task_name="release_course",
+        parameters={
+            "deployment": deployment.model_dump(),
             "release_dir": release_dir,
             "ascendants": ascendants if ascendants else False,
             "descendants": descendants if descendants else False,
             "release_dir_list": release_dir_list
         },
-        queue='default'
+        priority=5  # Default priority
     )
     
-    return {"task_id": result.id}
+    task_id = await task_executor.submit_task(task_submission)
+    
+    return {"task_id": task_id}
 
 class ReleaseCourseCreate(BaseModel):
     course_id: Optional[str] = None
@@ -396,8 +404,8 @@ class StatusQuery(BaseModel):
 
 @system_router.get("/status/{task_id}", response_model=dict)
 async def system_job_status(task_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: StatusQuery = Depends()):
-    # Use Celery AsyncResult instead of Prefect
-    result = AsyncResult(str(task_id), app=celery_app)
+    # Use Temporal task executor
+    task_executor = get_task_executor()
     
     # Check permissions
     if not permissions.is_admin:
@@ -409,32 +417,48 @@ async def system_job_status(task_id: UUID | str, permissions: Annotated[Principa
                 if params.course_id not in get_permitted_course_ids(permissions, "_maintainer", db):
                     raise NotFoundException()
     
-    # Get task status
-    if result.state == 'PENDING':
-        status = 'PENDING'
-        message = 'Task not found or still pending'
-    elif result.state == 'PROGRESS':
-        status = 'RUNNING'
-        message = result.info.get('status', 'In progress') if result.info else 'In progress'
-    elif result.state == 'SUCCESS':
-        status = 'COMPLETED'
-        message = 'Task completed successfully'
-    elif result.state == 'FAILURE':
-        status = 'FAILED'
-        message = str(result.info) if result.info else 'Task failed'
-    else:
-        status = result.state
-        message = None
-    
-    response_dict = {"status": status}
-    if message:
-        response_dict["message"] = message
-    
-    # Include result data for completed tasks
-    if result.state == 'SUCCESS' and result.result:
-        response_dict["result"] = result.result
-    
-    return response_dict
+    try:
+        # Get task status
+        task_info = await task_executor.get_task_status(str(task_id))
+        
+        # Map status
+        if task_info.status == 'QUEUED':
+            status = 'PENDING'
+            message = 'Task is queued for processing'
+        elif task_info.status == 'STARTED':
+            status = 'RUNNING'
+            message = task_info.progress.get('status', 'In progress') if task_info.progress else 'In progress'
+        elif task_info.status == 'FINISHED':
+            status = 'COMPLETED'
+            message = 'Task completed successfully'
+        elif task_info.status == 'FAILED':
+            status = 'FAILED'
+            message = task_info.error or 'Task failed'
+        else:
+            status = task_info.status
+            message = None
+        
+        response_dict = {"status": status}
+        if message:
+            response_dict["message"] = message
+        
+        # Include result data for completed tasks
+        if task_info.status == 'FINISHED':
+            try:
+                task_result = await task_executor.get_task_result(str(task_id))
+                if task_result.result:
+                    response_dict["result"] = task_result.result
+            except Exception:
+                pass
+        
+        return response_dict
+        
+    except Exception as e:
+        # Task not found
+        return {
+            "status": "NOT_FOUND",
+            "message": f"Task not found: {str(e)}"
+        }
 
 
 # SYSTEM RESPONSE ROUTES - NOT CALLABLE FROM NON-SYSTEM CLIENTS
@@ -518,21 +542,21 @@ class GitLabCredentials(BaseModel):
 
 
 class OrganizationTaskRequest(BaseModel):
-    """Request to create an organization via Celery task."""
+    """Request to create an organization via Temporal workflow."""
     organization: dict  # OrganizationCreate data
     gitlab: GitLabCredentials
     parent_group_id: int
 
 
 class CourseFamilyTaskRequest(BaseModel):
-    """Request to create a course family via Celery task."""
+    """Request to create a course family via Temporal workflow."""
     course_family: dict  # CourseFamilyCreate data
     organization_id: str
     gitlab: Optional[GitLabCredentials] = None  # Optional - will use org's GitLab config if not provided
 
 
 class CourseTaskRequest(BaseModel):
-    """Request to create a course via Celery task."""
+    """Request to create a course via Temporal workflow."""
     course: dict  # CourseCreate data
     course_family_id: str
     gitlab: Optional[GitLabCredentials] = None  # Optional - will use course family's GitLab config if not provided
@@ -563,8 +587,7 @@ async def create_organization_async(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
-    """Create an organization asynchronously using Celery tasks."""
-    from ctutor_backend.tasks.hierarchy_management import create_organization_task
+    """Create an organization asynchronously using Temporal workflows."""
     
     try:
         # Check permissions
@@ -583,19 +606,23 @@ async def create_organization_async(
             )
         }
         
-        # Submit task using direct Celery approach
-        result = create_organization_task.apply_async(
-            args=[
-                org_config,
-                request.gitlab.gitlab_url,
-                request.gitlab.gitlab_token,
-                permissions.user_id
-            ],
-            queue='high_priority'
+        # Submit task using Temporal
+        task_executor = get_task_executor()
+        task_submission = TaskSubmission(
+            task_name="create_organization",
+            parameters={
+                "org_config": org_config,
+                "gitlab_url": request.gitlab.gitlab_url,
+                "gitlab_token": request.gitlab.gitlab_token,
+                "user_id": permissions.user_id
+            },
+            priority=8  # High priority
         )
         
+        task_id = await task_executor.submit_task(task_submission)
+        
         return TaskResponse(
-            task_id=result.id,
+            task_id=task_id,
             status="submitted",
             message="Organization creation task submitted successfully"
         )
@@ -611,8 +638,7 @@ async def create_course_family_async(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
-    """Create a course family asynchronously using Celery tasks."""
-    from ctutor_backend.tasks.hierarchy_management import create_course_family_task
+    """Create a course family asynchronously using Temporal workflows."""
     
     try:
         # Check permissions
@@ -637,19 +663,23 @@ async def create_course_family_async(
             "has_gitlab": has_gitlab
         }
         
-        # Submit task using direct Celery approach
+        # Submit task using Temporal
         # The task will fetch GitLab credentials from the organization
-        result = create_course_family_task.apply_async(
-            args=[
-                family_config,
-                request.organization_id,
-                permissions.user_id
-            ],
-            queue='high_priority'
+        task_executor = get_task_executor()
+        task_submission = TaskSubmission(
+            task_name="create_course_family",
+            parameters={
+                "family_config": family_config,
+                "organization_id": request.organization_id,
+                "user_id": permissions.user_id
+            },
+            priority=8  # High priority
         )
         
+        task_id = await task_executor.submit_task(task_submission)
+        
         return TaskResponse(
-            task_id=result.id,
+            task_id=task_id,
             status="submitted",
             message="Course family creation task submitted successfully"
         )
@@ -665,8 +695,7 @@ async def create_course_async(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
-    """Create a course asynchronously using Celery tasks."""
-    from ctutor_backend.tasks.hierarchy_management import create_course_task
+    """Create a course asynchronously using Temporal workflows."""
     
     try:
         # Check permissions
@@ -691,19 +720,23 @@ async def create_course_async(
             "has_gitlab": has_gitlab
         }
         
-        # Submit task using direct Celery approach
+        # Submit task using Temporal
         # The task will fetch GitLab credentials from the course family
-        result = create_course_task.apply_async(
-            args=[
-                course_config,
-                request.course_family_id,
-                permissions.user_id
-            ],
-            queue='high_priority'
+        task_executor = get_task_executor()
+        task_submission = TaskSubmission(
+            task_name="create_course",
+            parameters={
+                "course_config": course_config,
+                "course_family_id": request.course_family_id,
+                "user_id": permissions.user_id
+            },
+            priority=8  # High priority
         )
         
+        task_id = await task_executor.submit_task(task_submission)
+        
         return TaskResponse(
-            task_id=result.id,
+            task_id=task_id,
             status="submitted",
             message="Course creation task submitted successfully"
         )

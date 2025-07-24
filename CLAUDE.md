@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 Computor is a full-stack university programming course management platform with:
-- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Celery for task execution
+- **Backend**: Python/FastAPI with PostgreSQL, Redis (aiocache 0.12.3), and Temporal for workflow orchestration
 - **Frontend**: React 19 + TypeScript with Material-UI, TanStack Table, Recharts, and modern tooling
 - **Infrastructure**: Docker-based deployment with Traefik/Nginx and horizontal task worker scaling
 - **Database**: Pure SQLAlchemy/Alembic approach with comprehensive model validation
@@ -37,20 +37,17 @@ alembic upgrade head        # Apply all pending migrations
 # Build and install CLI
 pip install -e src
 
-# Celery Task Workers (requires Redis)
-ctutor worker start              # Start Celery worker (all queues)
-ctutor worker start --burst      # Process jobs and exit
-ctutor worker start --queues=high_priority,default  # Specific queues
-ctutor worker status             # Check worker and queue status
+# Temporal Task Workers
+ctutor worker start              # Start Temporal worker (all queues)
+ctutor worker start --queues=computor-tasks,computor-high-priority  # Specific queues
+ctutor worker status             # Check worker and Temporal connection status
+ctutor worker test-job example_long_running --params='{"duration": 10}' --wait  # Test job submission
 
-# Direct Celery commands
-python -m celery -A ctutor_backend.tasks.celery_app worker --loglevel=info
-python -m celery -A ctutor_backend.tasks.celery_app flower  # Start Flower UI
+# Direct Temporal worker commands
+python -m ctutor_backend.tasks.temporal_worker  # Start worker manually
 
-# Docker Celery testing and monitoring
-./scripts/testing/test_celery_docker.sh start   # Start Docker services including Flower
-./scripts/testing/test_celery_docker.sh ui      # Show Flower UI access information
-./scripts/testing/test_celery_docker.sh all     # Full test cycle with Docker
+# Temporal UI for monitoring
+# Access at http://localhost:8088 when running Docker services
 
 # TypeScript Generation
 bash scripts/utilities/generate_types.sh          # Generate TypeScript interfaces
@@ -85,7 +82,7 @@ cd frontend && yarn install  # Install dependencies
 - **api/**: FastAPI endpoints organized by resource (courses, users, submissions, etc.)
 - **model/**: SQLAlchemy ORM models for database entities (single source of truth)
 - **interface/**: Pydantic schemas for API request/response validation (DTOs with EntityInterface pattern)
-- **flows/**: Prefect workflow definitions for async operations
+- **tasks/**: Temporal workflow and activity definitions for async operations
 - **generator/**: Code generation utilities for student repositories
 - **cli/**: Command-line interface tools
 - **utils/**: Shared utilities (color validation, etc.)
@@ -117,7 +114,7 @@ cd frontend && yarn install  # Install dependencies
 - **GitLab-style Sidebar**: Collapsible navigation with hierarchical menu structure (✅ **Completed**)
 - **Context-Aware Navigation**: Dynamic sidebar content based on selected course/context (✅ **Completed**)
 - **Permission-Based Menus**: Role-specific menu visibility (Admin/Lecturer/Student) (✅ **Completed**)
-- **Task-Based Operations**: Async entity creation with Celery tasks and real-time progress monitoring
+- **Task-Based Operations**: Async entity creation with Temporal workflows and real-time progress monitoring
 - **Form Framework**: React Hook Form + Zod validation with TypeScript integration
 - **Professional Data Tables**: Advanced search, pagination, sorting, and row actions
 - **Cache Management**: Intelligent cache invalidation and refresh mechanisms
@@ -129,12 +126,12 @@ cd frontend && yarn install  # Install dependencies
 2. **GitLab Integration**: Deep integration for repository management and CI/CD
 3. **Role-Based Access**: Students, Tutors, Lecturers with different permissions
 4. **Automated Testing**: Framework for testing student submissions (Python/MATLAB)
-5. **Task Management**: Uses Prefect for orchestrating long running tasks and complex workflows
+5. **Task Management**: Uses Temporal for orchestrating long running workflows and complex operations
 
 ### Database
 - **PostgreSQL 16** for main data storage with comprehensive schema
 - **Redis** for caching and session management (using aiocache 0.12.3)
-- **Hybrid Task Storage**: Redis for message broker + PostgreSQL for task results (production-grade persistence)
+- **Temporal Backend**: Temporal server with PostgreSQL for workflow state persistence
 - **Redis Configuration**: Clean environment variable approach with `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
 - **Migration Strategy**: Pure SQLAlchemy/Alembic approach (✅ **Completed**)
   - SQLAlchemy models are the single source of truth
@@ -146,17 +143,17 @@ cd frontend && yarn install  # Install dependencies
   - Hierarchical paths using PostgreSQL ltree extension
   - UUID primary keys with proper relationships
 
-### ✅ Celery Task Executor Framework (Completed)
-Comprehensive Celery-based system for handling long-running operations:
-- **Priority Queues**: High, default, and low priority task processing with Celery
-- **Horizontal Scaling**: Multiple Celery worker instances with Docker Compose
-- **FastAPI Integration**: RESTful endpoints for task submission, monitoring, and worker status
-- **CLI Tools**: Worker management commands (`ctutor worker start/status`) with Celery backend
-- **Flower UI**: Web-based monitoring and diagnostics interface with automatic configuration
-- **Docker Integration**: Complete Docker Compose setup with Redis broker and Celery workers
-- **Hybrid Architecture**: Redis message broker + PostgreSQL result backend for optimal performance and persistence
-- **Clean Configuration**: Structured environment variables for both Redis and PostgreSQL
-- **Simplified Setup**: Environment variables with fallback defaults, no separate config files needed
+### ✅ Temporal Workflow Framework (Completed)
+Comprehensive Temporal-based system for handling long-running workflows:
+- **Dynamic Queue System**: Workflows can define their own task queues for better organization
+- **Horizontal Scaling**: Multiple Temporal worker instances with Docker Compose
+- **FastAPI Integration**: RESTful endpoints for workflow submission, monitoring, and status
+- **CLI Tools**: Worker management commands (`ctutor worker start/status`) with Temporal backend
+- **Temporal UI**: Web-based monitoring interface at http://localhost:8088 with workflow history
+- **Docker Integration**: Complete Docker Compose setup with Temporal server and workers
+- **Workflow Persistence**: Temporal handles state persistence and recovery automatically
+- **Clean Configuration**: Environment variables for TEMPORAL_HOST, TEMPORAL_PORT, TEMPORAL_NAMESPACE
+- **Activity Retries**: Built-in retry policies and error handling for activities
 
 ### ✅ Keycloak SSO Integration (Completed)
 Full Single Sign-On implementation with Keycloak identity provider:
@@ -223,16 +220,16 @@ S3-compatible object storage system with comprehensive security features:
 ## Important Files
 - `/docs/documentation.md`: Comprehensive system architecture
 - `/docs/PRODUCTION_MIGRATION_GUIDE.md`: Database migration guide
-- `/docs/TASK_EXECUTOR.md`: Task executor framework guide
-- `/docs/DOCKER_TASK_WORKERS.md`: Docker task worker configuration
+- `/docs/TEMPORAL_TASK_SYSTEM.md`: Comprehensive Temporal workflow system documentation
 - `/docs/SSO_FRONTEND_INTEGRATION.md`: SSO frontend integration guide
 - `/docs/TYPESCRIPT_GENERATION.md`: TypeScript generation guide
 - `/docs/MINIO_STORAGE.md`: MinIO object storage integration guide
-- `/docker-compose-dev.yaml`: Development environment with Celery workers and Flower UI
-- `/docker-compose-prod.yaml`: Production environment with Celery scaling
-- `/src/ctutor_backend/tasks/`: Celery task executor framework implementation
-- `/src/ctutor_backend/tasks/celery_app.py`: Celery application configuration and setup
-- `/scripts/testing/test_celery_docker.sh`: Helper script for Docker Celery testing and monitoring
+- `/docker-compose-dev.yaml`: Development environment with Temporal server and workers
+- `/docker-compose-prod.yaml`: Production environment with Temporal scaling
+- `/src/ctutor_backend/tasks/`: Temporal workflow framework implementation
+- `/src/ctutor_backend/tasks/temporal_client.py`: Temporal client configuration
+- `/src/ctutor_backend/tasks/temporal_worker.py`: Temporal worker implementation
+- `/src/ctutor_backend/tasks/temporal_executor.py`: Temporal task executor integration
 - `/src/ctutor_backend/config.py`: Configuration management
 - `/defaults/`: Template structures for course content
 - `/src/ctutor_backend/alembic/`: Database migration files and configuration
@@ -317,15 +314,15 @@ git push
 
 ## Recent Enhancements
 
-### ✅ Task Queue Migration: RQ → Celery (Completed)
-Successfully migrated the task execution framework from Redis Queue (RQ) to Celery:
-- **Enhanced Scalability**: Celery provides better horizontal scaling and worker management
-- **Production Ready**: More robust task queue system with better error handling and retries
-- **Monitoring & Diagnostics**: Integrated Flower UI for real-time task and worker monitoring
-- **Docker Integration**: Complete Docker Compose setup with Celery workers and Flower
-- **Comprehensive Testing**: 29 tests including unit tests and Docker integration tests
+### ✅ Workflow Migration: Celery → Temporal (Completed)
+Successfully migrated the task execution framework from Celery to Temporal.io:
+- **Workflow Orchestration**: Temporal provides better workflow management with built-in state persistence
+- **Production Ready**: Enterprise-grade workflow engine with automatic retries and recovery
+- **Monitoring & Diagnostics**: Temporal UI for workflow history, debugging, and monitoring
+- **Docker Integration**: Complete Docker Compose setup with Temporal server and workers
+- **Dynamic Queue System**: Workflows can define custom queues instead of priority-based routing
 - **Backwards Compatibility**: Maintained existing CLI and API interfaces
-- **Key Benefits**: Better reliability, monitoring, scaling, and production deployment support
+- **Key Benefits**: Better reliability, workflow visibility, automatic recovery, and durable execution
 
 ### ✅ Database Refactoring (Completed)
 Successfully migrated from PostgreSQL migration files to pure SQLAlchemy/Alembic approach:

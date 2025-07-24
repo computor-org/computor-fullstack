@@ -391,10 +391,16 @@ class TemporalTaskExecutor:
             
         Returns:
             True if deleted successfully
+            
+        Raises:
+            NotImplementedError: Temporal doesn't support direct workflow deletion
         """
         # Temporal doesn't support direct deletion of workflow history
         # This would need to be configured through retention policies
-        return False
+        raise NotImplementedError(
+            "Temporal doesn't support direct deletion of workflow history. "
+            "Use retention policies or cancel the workflow instead."
+        )
     
     async def get_worker_status(self) -> Dict[str, Any]:
         """

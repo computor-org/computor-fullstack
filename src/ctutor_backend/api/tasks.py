@@ -210,17 +210,17 @@ async def delete_task(task_id: str):
     """
     Delete a task from the database.
     
-    This permanently removes the task record from Temporal's history.
-    Note: This does not cancel a running task, it only removes the database record.
+    Note: Temporal doesn't support direct deletion of workflow history.
+    Use cancellation or retention policies instead.
     
     Args:
         task_id: Task ID to delete
         
     Returns:
-        Deletion confirmation
+        Error message explaining limitation
         
     Raises:
-        HTTPException: If task not found or deletion fails
+        HTTPException: Always returns 501 Not Implemented for Temporal
     """
     try:
         task_executor = get_task_executor()
@@ -238,6 +238,11 @@ async def delete_task(task_id: str):
                 detail=f"Task with ID {task_id} not found"
             )
     
+    except NotImplementedError as e:
+        raise HTTPException(
+            status_code=501,
+            detail=str(e)
+        )
     except KeyError:
         raise HTTPException(
             status_code=404,

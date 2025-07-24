@@ -168,9 +168,10 @@ services:
     build:
       context: ./
       dockerfile: ./docker/api/Dockerfile
-    container_name: temporal-worker
     restart: unless-stopped
     command: ["python", "-m", "ctutor_backend.tasks.temporal_worker"]
+    deploy:
+      replicas: ${TEMPORAL_WORKER_REPLICAS:-1}
     environment:
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233

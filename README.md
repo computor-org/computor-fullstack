@@ -128,3 +128,105 @@ computor import users -f users.csv -c <course_id>
 ```
 
 Don't forget to stop the services with CTRL+C !
+
+## Task Queue System (Temporal)
+
+The Computor platform uses Temporal.io for managing long-running workflows and asynchronous operations. Temporal provides durable workflow execution with automatic retries and state persistence.
+
+### Starting Temporal Services
+
+Temporal services are included in the Docker Compose setup:
+
+```bash
+# Development mode (includes Temporal server, UI, and workers)
+bash startup.sh dev
+
+# Access Temporal UI
+open http://localhost:8088
+```
+
+### Running Task Workers
+
+Task workers process workflows from different queues:
+
+```bash
+# Start a worker (processes all queues by default)
+ctutor worker start
+
+# Start worker for specific queues
+ctutor worker start --queues=computor-tasks,computor-high-priority
+
+# Check worker status
+ctutor worker status
+
+# Submit a test task
+ctutor worker test-job example_long_running --params='{"duration": 10}' --wait
+```
+
+### Workflow Types
+
+The system includes several example workflows:
+
+- **example_long_running**: Simulates long-running operations
+- **example_data_processing**: Processes data in chunks  
+- **example_error_handling**: Demonstrates error handling and retries
+- **student_testing**: Executes student code tests
+- **release_students**: GitLab student release operations
+- **create_organization/course_family/course**: Hierarchy creation with GitLab
+
+### Custom Queues
+
+Workflows can define their own task queues for better organization:
+
+```python
+@workflow.defn(name="my_workflow")
+class MyWorkflow(BaseWorkflow):
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return "my-custom-queue"  # Custom queue name
+```
+
+## Testing
+
+Run the test suite with:
+
+```bash
+# Run all tests
+bash test.sh
+
+# Run specific test files
+python -m pytest src/ctutor_backend/tests/test_temporal_client.py -v
+python -m pytest src/ctutor_backend/tests/test_temporal_executor.py -v
+python -m pytest src/ctutor_backend/tests/test_temporal_workflows.py -v
+
+# Run integration tests (requires Temporal server)
+SKIP_TEMPORAL_TESTS=false python -m pytest src/ctutor_backend/tests/test_temporal_integration.py -v
+```
+
+### Test Coverage
+
+The Temporal implementation includes comprehensive tests:
+
+- **test_temporal_client.py**: Tests for Temporal client configuration and connection management
+- **test_temporal_executor.py**: Tests for task submission, status tracking, and result retrieval
+- **test_temporal_workflows.py**: Tests for workflow implementations and activities
+- **test_temporal_integration.py**: End-to-end integration tests (requires running Temporal server)
+
+## API Endpoints
+
+Task management endpoints are available at:
+
+- `POST /tasks/submit` - Submit a new workflow
+- `GET /tasks/{task_id}` - Get workflow status  
+- `GET /tasks/{task_id}/result` - Get workflow result
+- `DELETE /tasks/{task_id}` - Returns 501 (Temporal doesn't support deletion)
+- `GET /tasks/types` - List available workflow types
+- `GET /tasks/workers/status` - Check worker status
+
+## Monitoring
+
+Monitor workflows and workers through:
+
+- **Temporal UI**: http://localhost:8088 - Visual workflow history and debugging
+- **API Status**: `ctutor worker status` - Command line worker status
+- **Task List UI**: http://localhost:3000/admin/tasks - React frontend for task management

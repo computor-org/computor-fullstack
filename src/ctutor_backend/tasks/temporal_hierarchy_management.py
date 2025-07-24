@@ -6,8 +6,8 @@ from typing import Dict, Any, Optional
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from ctutor_backend.tasks.temporal_base import BaseWorkflow, WorkflowResult
-from ctutor_backend.tasks.registry import register_task
+from .temporal_base import BaseWorkflow, WorkflowResult
+from .registry import register_task
 
 
 # Activities

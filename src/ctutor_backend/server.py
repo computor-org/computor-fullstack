@@ -13,7 +13,6 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
-from ctutor_backend.api.tests_celery import tests_celery_router
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.sso import sso_router
 from ctutor_backend.plugins.registry import initialize_plugin_registry
@@ -195,12 +194,6 @@ app.include_router(
     tests_router,
     prefix="/tests",
     tags=["tests"],
-    dependencies=[Depends(get_current_permissions)]
-)
-
-app.include_router(
-    tests_celery_router,
-    tags=["tests-celery"],
     dependencies=[Depends(get_current_permissions)]
 )
 

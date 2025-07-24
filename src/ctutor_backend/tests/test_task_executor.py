@@ -57,7 +57,7 @@ from ctutor_backend.tasks import (
     register_task,
     task_registry
 )
-from ctutor_backend.tasks.examples import ExampleLongRunningTask
+from ctutor_backend.tasks.temporal_examples import ExampleLongRunningWorkflow
 
 
 class TestTaskExecutor:
@@ -320,59 +320,15 @@ class TestTaskSubmission:
         assert submission.delay == 60
 
 
-class TestCeleryTaskWrapper:
-    """Test cases for Celery task wrapper functionality."""
+class TestTemporalWorkflows:
+    """Test cases for Temporal workflow functionality."""
     
-    def test_celery_task_wrappers_exist(self):
-        """Test that Celery task wrappers are properly defined."""
-        from ctutor_backend.tasks.examples import (
-            example_long_running_celery_task,
-            example_data_processing_celery_task,
-            example_failing_celery_task
-        )
-        
-        # Test that the wrapper functions exist and are callable
-        assert callable(example_long_running_celery_task)
-        assert callable(example_data_processing_celery_task)
-        assert callable(example_failing_celery_task)
-    
-    @patch('ctutor_backend.tasks.examples.asyncio.set_event_loop')
-    @patch('ctutor_backend.tasks.examples.asyncio.get_event_loop')
-    @patch('ctutor_backend.tasks.examples.asyncio.new_event_loop')
-    def test_execute_task_with_celery(self, mock_new_loop, mock_get_loop, mock_set_loop):
-        """Test the Celery task execution wrapper."""
-        from ctutor_backend.tasks.examples import _execute_task_with_celery
-        
-        # Mock event loop properly
-        mock_loop = Mock()
-        mock_get_loop.side_effect = RuntimeError("No running loop")
-        mock_new_loop.return_value = mock_loop
-        mock_set_loop.return_value = None
-        
-        # Mock Celery task instance
-        mock_celery_task = Mock()
-        mock_celery_task.update_state = Mock()
-        
-        # Mock BaseTask class
-        mock_task_class = Mock()
-        mock_task_instance = Mock()
-        mock_task_instance.execute = AsyncMock(return_value={"test": "result"})
-        mock_task_instance.on_success = AsyncMock()
-        mock_task_class.return_value = mock_task_instance
-        
-        # Mock run_until_complete to avoid actual async execution
-        mock_loop.run_until_complete.side_effect = [
-            {"test": "result"},  # execute result
-            None  # on_success result
-        ]
-        
-        # Execute the wrapper
-        result = _execute_task_with_celery(mock_celery_task, mock_task_class, test_param="value")
-        
-        # Verify task execution
-        assert result == {"test": "result"}
-        mock_celery_task.update_state.assert_called()
-        mock_set_loop.assert_called_with(mock_loop)
+    def test_temporal_workflows_registered(self):
+        """Test that Temporal workflows are properly registered."""
+        # Test that example workflows are registered
+        assert task_registry.is_registered("example_long_running")
+        assert task_registry.is_registered("example_data_processing")
+        assert task_registry.is_registered("example_error_handling")
 
 
 class TestExampleTasks:
@@ -381,7 +337,7 @@ class TestExampleTasks:
     @pytest.mark.asyncio
     async def test_example_long_running_task(self):
         """Test example long running task."""
-        task = ExampleLongRunningTask()
+        task = ExampleLongRunningWorkflow()
         
         # Test with short duration for quick test
         result = await task.execute(duration=1, message="test message")

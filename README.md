@@ -153,8 +153,8 @@ Task workers process workflows from different queues:
 # Start a worker (processes all queues by default)
 ctutor worker start
 
-# Start worker for specific queues
-ctutor worker start --queues=computor-tasks,computor-high-priority
+# Start worker for specific queue
+ctutor worker start --queues=computor-tasks
 
 # Check worker status
 ctutor worker status

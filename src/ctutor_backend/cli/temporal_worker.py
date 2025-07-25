@@ -21,17 +21,13 @@ def worker():
 
 @worker.command()
 @click.option('--queues', default=None, help='Comma-separated list of queue names')
-@click.option('--high-priority', is_flag=True, help='Process only high priority queue')
-@click.option('--default', is_flag=True, help='Process only default queue')
-@click.option('--low-priority', is_flag=True, help='Process only low priority queue')
-def start(queues: str, high_priority: bool, default: bool, low_priority: bool):
+def start(queues: str):
     """
     Start a Temporal worker to process workflows.
     
     Examples:
         ctutor worker start
-        ctutor worker start --high-priority
-        ctutor worker start --queues=computor-tasks,computor-high-priority
+        ctutor worker start --queues=computor-tasks
     """
     click.echo("Starting Temporal worker...")
     
@@ -39,17 +35,13 @@ def start(queues: str, high_priority: bool, default: bool, low_priority: bool):
     queue_list = None
     if queues:
         queue_list = [q.strip() for q in queues.split(',')]
-    elif high_priority:
-        queue_list = ["computor-high-priority"]
-    elif default:
-        queue_list = [DEFAULT_TASK_QUEUE]
-    elif low_priority:
-        queue_list = ["computor-low-priority"]
     
     if queue_list:
         click.echo(f"Processing queues: {', '.join(queue_list)}")
     else:
-        click.echo(f"Processing all queues: {DEFAULT_TASK_QUEUE}, computor-high-priority, computor-low-priority")
+        # Default to processing default queue
+        queue_list = [DEFAULT_TASK_QUEUE]
+        click.echo(f"Processing queue: {DEFAULT_TASK_QUEUE}")
     
     try:
         # Run the worker
@@ -76,11 +68,9 @@ def status():
             click.echo(f"  Server: {client.service_client.target_host}")
             click.echo(f"  Namespace: {client.namespace}")
             
-            # Show task queues
-            click.echo("\nTask Queues:")
-            click.echo(f"  - {DEFAULT_TASK_QUEUE} (default)")
-            click.echo(f"  - computor-high-priority (high priority)")
-            click.echo(f"  - computor-low-priority (low priority)")
+            # Show task queue
+            click.echo("\nTask Queue:")
+            click.echo(f"  - {DEFAULT_TASK_QUEUE}")
             
             click.echo("\nNote: Use Temporal Web UI at http://localhost:8088 for detailed worker and workflow status")
             
@@ -109,7 +99,7 @@ def test_job(task_type: str, params: str, queue: str, wait: bool):
     
     Examples:
         ctutor worker test-job example_long_running --params='{"duration": 10}'
-        ctutor worker test-job example_data_processing --params='{"data": [1,2,3]}' --queue=computor-high-priority --wait
+        ctutor worker test-job example_data_processing --params='{"data": [1,2,3]}' --wait
     """
     import json
     from ctutor_backend.tasks import get_task_executor, TaskSubmission

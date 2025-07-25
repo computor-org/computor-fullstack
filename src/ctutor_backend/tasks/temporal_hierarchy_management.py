@@ -75,25 +75,26 @@ class CreateOrganizationWorkflow(BaseWorkflow):
         return timedelta(minutes=10)
     
     @workflow.run
-    async def run(
-        self,
-        org_config: Dict[str, Any],
-        gitlab_url: str,
-        gitlab_token: str,
-        user_id: str
-    ) -> WorkflowResult:
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
         Create organization workflow.
         
         Args:
-            org_config: Organization configuration
-            gitlab_url: GitLab URL
-            gitlab_token: GitLab access token
-            user_id: User ID creating the organization
+            parameters: Dictionary containing:
+                - org_config: Organization configuration
+                - gitlab_url: GitLab URL
+                - gitlab_token: GitLab access token
+                - user_id: User ID creating the organization
             
         Returns:
             WorkflowResult
         """
+        # Extract parameters
+        org_config = parameters.get('org_config', {})
+        gitlab_url = parameters.get('gitlab_url')
+        gitlab_token = parameters.get('gitlab_token')
+        user_id = parameters.get('user_id')
+        
         workflow.logger.info(f"Creating organization: {org_config.get('name')}")
         
         try:
@@ -139,23 +140,24 @@ class CreateCourseFamilyWorkflow(BaseWorkflow):
         return timedelta(minutes=10)
     
     @workflow.run
-    async def run(
-        self,
-        family_config: Dict[str, Any],
-        organization_id: str,
-        user_id: str
-    ) -> WorkflowResult:
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
         Create course family workflow.
         
         Args:
-            family_config: Course family configuration
-            organization_id: Parent organization ID
-            user_id: User ID creating the course family
+            parameters: Dictionary containing:
+                - family_config: Course family configuration
+                - organization_id: Parent organization ID
+                - user_id: User ID creating the course family
             
         Returns:
             WorkflowResult
         """
+        # Extract parameters
+        family_config = parameters.get('family_config', {})
+        organization_id = parameters.get('organization_id')
+        user_id = parameters.get('user_id')
+        
         workflow.logger.info(f"Creating course family: {family_config.get('name')}")
         
         try:
@@ -201,23 +203,24 @@ class CreateCourseWorkflow(BaseWorkflow):
         return timedelta(minutes=10)
     
     @workflow.run
-    async def run(
-        self,
-        course_config: Dict[str, Any],
-        course_family_id: str,
-        user_id: str
-    ) -> WorkflowResult:
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
         Create course workflow.
         
         Args:
-            course_config: Course configuration
-            course_family_id: Parent course family ID
-            user_id: User ID creating the course
+            parameters: Dictionary containing:
+                - course_config: Course configuration
+                - course_family_id: Parent course family ID
+                - user_id: User ID creating the course
             
         Returns:
             WorkflowResult
         """
+        # Extract parameters
+        course_config = parameters.get('course_config', {})
+        course_family_id = parameters.get('course_family_id')
+        user_id = parameters.get('user_id')
+        
         workflow.logger.info(f"Creating course: {course_config.get('name')}")
         
         try:

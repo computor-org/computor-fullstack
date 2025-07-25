@@ -144,7 +144,7 @@ async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[
                 course_id=course_id
             ).model_dump()
         },
-        queue="computor-high-priority"
+        queue="computor-tasks"
     )
     
     task_id = await task_executor.submit_task(task_submission)
@@ -616,7 +616,7 @@ async def create_organization_async(
                 "gitlab_token": request.gitlab.gitlab_token,
                 "user_id": permissions.user_id
             },
-            queue="computor-high-priority"
+            queue="computor-tasks"
         )
         
         task_id = await task_executor.submit_task(task_submission)
@@ -673,7 +673,7 @@ async def create_course_family_async(
                 "organization_id": request.organization_id,
                 "user_id": permissions.user_id
             },
-            queue="computor-high-priority"
+            queue="computor-tasks"
         )
         
         task_id = await task_executor.submit_task(task_submission)
@@ -730,7 +730,7 @@ async def create_course_async(
                 "course_family_id": request.course_family_id,
                 "user_id": permissions.user_id
             },
-            queue="computor-high-priority"
+            queue="computor-tasks"
         )
         
         task_id = await task_executor.submit_task(task_submission)

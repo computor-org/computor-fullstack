@@ -119,7 +119,7 @@ Get the course ID with
 
 ```bash
 computor rest list -t courses
-````
+```
 
 Copy `docs/users.csv`, keep the header line and add your own GitLab user with role `_maintainer` (with an underline). You can retrieve your GitLab username by clicking your profile picture. Then run
 

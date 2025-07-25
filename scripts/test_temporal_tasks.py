@@ -161,23 +161,6 @@ def demo_long_running_task():
     get_task_result(task_id)
 
 
-def demo_high_priority_task():
-    """Demo: Submit a high-priority task."""
-    print("\n" + "="*60)
-    print("DEMO: High Priority Task")
-    print("="*60)
-    
-    task_id = submit_task(
-        task_name="example_data_processing",
-        parameters={
-            "data_size": 100,
-            "processing_type": "urgent_transform"
-        },
-        priority=10  # High priority
-    )
-    
-    if task_id:
-        print(f"\n🚀 High priority task submitted to 'computor-high-priority' queue")
 
 
 def main():
@@ -198,22 +181,19 @@ def main():
         print("\n" + "="*60)
         print("Select a demo:")
         print("1. Long running task (30 seconds)")
-        print("2. High priority task")
-        print("3. List task types")
-        print("4. Check specific task status")
+        print("2. List task types")
+        print("3. Check specific task status")
         print("0. Exit")
         
-        choice = input("\nEnter choice (0-4): ").strip()
+        choice = input("\nEnter choice (0-3): ").strip()
         
         if choice == "0":
             break
         elif choice == "1":
             demo_long_running_task()
         elif choice == "2":
-            demo_high_priority_task()
-        elif choice == "3":
             list_task_types()
-        elif choice == "4":
+        elif choice == "3":
             task_id = input("Enter task ID: ").strip()
             if task_id:
                 check_task_status(task_id)

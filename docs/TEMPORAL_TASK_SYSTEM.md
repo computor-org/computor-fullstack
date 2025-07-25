@@ -76,11 +76,10 @@ Client → FastAPI → Temporal Client → Temporal Server → Worker → Workfl
 
 ### Queue Architecture
 
-The system uses string-based queue names with workflows able to define their own queues:
+The system uses a single default queue:
 
-- **Default Queue**: `computor-tasks` - General purpose tasks
-- **High Priority**: `computor-high-priority` - Critical operations
-- **Custom Queues**: Workflows can define custom queues (e.g., `computor-long-running`)
+- **Default Queue**: `computor-tasks` - All tasks use this queue
+- **Custom Queues**: Workflows can optionally define custom queues by overriding `get_task_queue()`
 
 ### Dynamic Queue Selection
 
@@ -174,8 +173,8 @@ async def my_activity(parameters: dict) -> dict:
 # Start worker with default queue
 ctutor worker start
 
-# Start worker with specific queues
-ctutor worker start --queues=computor-tasks,computor-high-priority
+# Start worker with custom queues
+ctutor worker start --queues=computor-tasks,my-custom-queue
 
 # Check worker status
 ctutor worker status

@@ -39,7 +39,7 @@ pip install -e src
 
 # Temporal Task Workers
 ctutor worker start              # Start Temporal worker (all queues)
-ctutor worker start --queues=computor-tasks,computor-high-priority  # Specific queues
+ctutor worker start --queues=computor-tasks  # Specific queue
 ctutor worker status             # Check worker and Temporal connection status
 ctutor worker test-job example_long_running --params='{"duration": 10}' --wait  # Test job submission
 

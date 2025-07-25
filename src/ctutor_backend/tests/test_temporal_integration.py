@@ -80,18 +80,18 @@ class TestTemporalIntegration:
         assert result.result["duration_requested"] == 2
 
     @pytest.mark.asyncio
-    async def test_multiple_queues(self):
-        """Test tasks running on different queues."""
+    async def test_single_queue(self):
+        """Test tasks running on the default queue."""
         executor = get_task_executor()
         
-        # Submit tasks to different queues
+        # Submit multiple tasks to the same queue
         submissions = [
             TaskSubmission(
                 task_name="example_long_running",
                 parameters={"duration": 1, "message": f"Queue test {i}"},
-                queue=queue
+                queue="computor-tasks"
             )
-            for i, queue in enumerate(["computor-tasks", "computor-high-priority"])
+            for i in range(2)
         ]
         
         task_ids = []
@@ -347,11 +347,11 @@ class TestTemporalIntegration:
         # For now, we'll use the standard example workflows
         executor = get_task_executor()
         
-        # Submit to a specific queue
+        # Submit to the default queue
         submission = TaskSubmission(
             task_name="example_long_running",
-            parameters={"duration": 1, "message": "Custom queue"},
-            queue="computor-high-priority"
+            parameters={"duration": 1, "message": "Default queue"},
+            queue="computor-tasks"
         )
         
         task_id = await executor.submit_task(submission)

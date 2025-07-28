@@ -315,7 +315,7 @@ def clear_fake_data(session):
     session.query(CourseFamily).delete(synchronize_session=False)
     
     # Delete execution backends except system ones
-    session.query(ExecutionBackend).filter(ExecutionBackend.slug != 'prefect_builtin').delete(synchronize_session=False)
+    session.query(ExecutionBackend).filter(ExecutionBackend.slug != 'temporal.builtin').delete(synchronize_session=False)
     
     # Delete all organizations - we'll recreate them
     session.query(Organization).delete(synchronize_session=False)

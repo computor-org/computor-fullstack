@@ -206,9 +206,10 @@ def upgrade() -> None:
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False, comment='Human-readable name of the repository'),
     sa.Column('description', sa.Text(), nullable=True, comment='Description of the repository and its contents'),
-    sa.Column('source_url', sa.Text(), nullable=False, comment='Git repository URL'),
-    sa.Column('access_token', sa.Text(), nullable=True, comment='Encrypted token for accessing private repositories'),
-    sa.Column('default_branch', sa.String(length=100), nullable=False, server_default='main', comment='Default branch to sync from'),
+    sa.Column('source_type', sa.String(length=20), nullable=False, default='git', comment='Type of repository source: git, minio, github, etc.'),
+    sa.Column('source_url', sa.Text(), nullable=False, comment='Repository URL (Git URL, MinIO path, etc.)'),
+    sa.Column('access_credentials', sa.Text(), nullable=True, comment='Encrypted access credentials (Git token, MinIO credentials JSON, etc.)'),
+    sa.Column('default_branch', sa.String(length=100), nullable=False, server_default='main', comment='Default branch/version to sync from'),
     sa.Column('visibility', sa.String(length=20), nullable=False, server_default='private', comment='Repository visibility: public, private, or restricted'),
     sa.Column('organization_id', postgresql.UUID(), nullable=True, comment='Organization that owns this repository'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -216,6 +217,7 @@ def upgrade() -> None:
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this repository'),
     sa.Column('updated_by', postgresql.UUID(), nullable=True, comment='User who last updated this repository'),
     sa.CheckConstraint("visibility IN ('public', 'private', 'restricted')", name='check_visibility'),
+    sa.CheckConstraint("source_type IN ('git', 'minio', 'github', 's3', 'gitlab')", name='check_source_type'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
     sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
@@ -447,15 +449,28 @@ def upgrade() -> None:
     sa.Column('max_test_runs', sa.Integer(), nullable=True),
     sa.Column('max_submissions', sa.Integer(), nullable=True),
     sa.Column('execution_backend_id', postgresql.UUID(), nullable=True),
+    sa.Column('example_id', postgresql.UUID(), nullable=True, comment='Link to Example Library'),
+    sa.Column('example_version', sa.String(length=64), nullable=True, comment='Specific version snapshot from Example'),
     sa.ForeignKeyConstraint(['course_content_type_id'], ['course_content_type.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_id', 'course_content_type_id'], ['course_content_type.course_id', 'course_content_type.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_id'], ['course.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['execution_backend_id'], ['execution_backend.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['example_id'], ['example.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('course_content_path_key', 'course_content', ['course_id', 'path'], unique=True)
+    op.create_table('example_dependency',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('example_id', postgresql.UUID(), nullable=False, comment='Example that has the dependency'),
+    sa.Column('depends_id', postgresql.UUID(), nullable=False, comment='Example that this depends on'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.ForeignKeyConstraint(['depends_id'], ['example.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['example_id'], ['example.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('example_id', 'depends_id', name='unique_example_dependency')
+    )
     op.create_table('course_member',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -619,10 +634,178 @@ def upgrade() -> None:
     op.create_index('result_version_identifier_group_key', 'result', ['course_submission_group_id', 'version_identifier'], unique=True)
     op.create_index('result_version_identifier_member_key', 'result', ['course_member_id', 'version_identifier'], unique=True)
     # ### end Alembic commands ###
+    
+    # Create functions and triggers for CourseContent tree validation
+    op.execute("""
+        CREATE OR REPLACE FUNCTION validate_course_content_hierarchy()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            parent_path ltree;
+            parent_type_id uuid;
+            parent_kind_id text;
+            parent_has_descendants boolean;
+            current_kind_id text;
+            current_has_ascendants boolean;
+        BEGIN
+            -- Skip validation for root nodes
+            IF nlevel(NEW.path) <= 1 THEN
+                RETURN NEW;
+            END IF;
+            
+            -- Get parent path
+            parent_path := subpath(NEW.path, 0, nlevel(NEW.path) - 1);
+            
+            -- Get parent's content type and kind info
+            SELECT cc.course_content_type_id, cct.course_content_kind_id, cck.has_descendants
+            INTO parent_type_id, parent_kind_id, parent_has_descendants
+            FROM course_content cc
+            JOIN course_content_type cct ON cc.course_content_type_id = cct.id
+            JOIN course_content_kind cck ON cct.course_content_kind_id = cck.id
+            WHERE cc.course_id = NEW.course_id AND cc.path = parent_path;
+            
+            IF parent_type_id IS NULL THEN
+                RAISE EXCEPTION 'Parent course content not found for path %', parent_path;
+            END IF;
+            
+            -- Get current content's kind info
+            SELECT cct.course_content_kind_id, cck.has_ascendants
+            INTO current_kind_id, current_has_ascendants
+            FROM course_content_type cct
+            JOIN course_content_kind cck ON cct.course_content_kind_id = cck.id
+            WHERE cct.id = NEW.course_content_type_id;
+            
+            -- Check if parent allows descendants
+            IF NOT parent_has_descendants THEN
+                RAISE EXCEPTION 'Parent content kind % does not allow descendants', parent_kind_id;
+            END IF;
+            
+            -- Check if current content allows ascendants
+            IF NOT current_has_ascendants THEN
+                RAISE EXCEPTION 'Content kind % does not allow ascendants', current_kind_id;
+            END IF;
+            
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+        CREATE TRIGGER trg_validate_course_content_hierarchy
+        BEFORE INSERT OR UPDATE OF path, course_content_type_id ON course_content
+        FOR EACH ROW
+        EXECUTE FUNCTION validate_course_content_hierarchy();
+    """)
+    
+    # Function to validate that only submittable content can have examples
+    op.execute("""
+        CREATE OR REPLACE FUNCTION validate_course_content_example_submittable()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            is_submittable boolean;
+        BEGIN
+            -- Skip if no example is set
+            IF NEW.example_id IS NULL THEN
+                RETURN NEW;
+            END IF;
+            
+            -- Check if the content type's kind is submittable
+            SELECT cck.submittable INTO is_submittable
+            FROM course_content_type cct
+            JOIN course_content_kind cck ON cct.course_content_kind_id = cck.id
+            WHERE cct.id = NEW.course_content_type_id;
+            
+            IF NOT is_submittable THEN
+                RAISE EXCEPTION 'Only submittable content can have examples';
+            END IF;
+            
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+        CREATE TRIGGER trg_validate_course_content_example
+        BEFORE INSERT OR UPDATE OF example_id ON course_content
+        FOR EACH ROW
+        EXECUTE FUNCTION validate_course_content_example_submittable();
+    """)
+    
+    # Management functions for CourseContent hierarchy
+    op.execute("""
+        -- Function to get all descendants of a course content
+        CREATE OR REPLACE FUNCTION get_course_content_descendants(content_id uuid)
+        RETURNS TABLE(id uuid, path ltree, title text, depth int) AS $$
+        DECLARE
+            content_path ltree;
+            content_course_id uuid;
+        BEGIN
+            -- Get the path and course_id of the given content
+            SELECT cc.path, cc.course_id INTO content_path, content_course_id
+            FROM course_content cc
+            WHERE cc.id = content_id;
+            
+            -- Return all descendants
+            RETURN QUERY
+            SELECT cc.id, cc.path, cc.title, nlevel(cc.path) - nlevel(content_path) as depth
+            FROM course_content cc
+            WHERE cc.course_id = content_course_id
+              AND cc.path <@ content_path  -- is descendant
+              AND cc.path != content_path  -- exclude self
+            ORDER BY cc.path;
+        END;
+        $$ LANGUAGE plpgsql;
+        
+        -- Function to check if a course content can be safely deleted
+        CREATE OR REPLACE FUNCTION can_delete_course_content(content_id uuid)
+        RETURNS boolean AS $$
+        DECLARE
+            has_children boolean;
+        BEGIN
+            -- Check if the content has any children
+            SELECT EXISTS(
+                SELECT 1 FROM get_course_content_descendants(content_id)
+            ) INTO has_children;
+            
+            RETURN NOT has_children;
+        END;
+        $$ LANGUAGE plpgsql;
+    """)
+    
+    # Function to handle example dependency resolution
+    op.execute("""
+        CREATE OR REPLACE FUNCTION resolve_example_dependencies(example_id uuid)
+        RETURNS TABLE(depends_id uuid, depth int) AS $$
+        WITH RECURSIVE dep_tree AS (
+            -- Base case: direct dependencies
+            SELECT ed.depends_id, 1 as depth
+            FROM example_dependency ed
+            WHERE ed.example_id = $1
+            
+            UNION ALL
+            
+            -- Recursive case: transitive dependencies
+            SELECT ed.depends_id, dt.depth + 1
+            FROM example_dependency ed
+            JOIN dep_tree dt ON ed.example_id = dt.depends_id
+            WHERE dt.depth < 10  -- Prevent infinite recursion
+        )
+        SELECT DISTINCT depends_id, MIN(depth) as depth
+        FROM dep_tree
+        GROUP BY depends_id
+        ORDER BY depth, depends_id;
+        $$ LANGUAGE sql;
+    """)
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    # Drop functions and triggers
+    op.execute("""
+        DROP FUNCTION IF EXISTS resolve_example_dependencies(uuid) CASCADE;
+        DROP FUNCTION IF EXISTS can_delete_course_content(uuid) CASCADE;
+        DROP FUNCTION IF EXISTS get_course_content_descendants(uuid) CASCADE;
+        DROP TRIGGER IF EXISTS trg_validate_course_content_example ON course_content CASCADE;
+        DROP FUNCTION IF EXISTS validate_course_content_example_submittable() CASCADE;
+        DROP TRIGGER IF EXISTS trg_validate_course_content_hierarchy ON course_content CASCADE;
+        DROP FUNCTION IF EXISTS validate_course_content_hierarchy() CASCADE;
+    """)
+    
     # ### commands auto generated by Alembic - please adjust! ###
     op.drop_index('result_version_identifier_member_key', table_name='result')
     op.drop_index('result_version_identifier_group_key', table_name='result')
@@ -647,6 +830,7 @@ def downgrade() -> None:
     op.drop_table('codeability_message')
     op.drop_index('course_member_key', table_name='course_member')
     op.drop_table('course_member')
+    op.drop_table('example_dependency')
     op.drop_index('course_content_path_key', table_name='course_content')
     op.drop_table('course_content')
     op.drop_index('course_group_title_key', table_name='course_group')

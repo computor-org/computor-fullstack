@@ -27,7 +27,7 @@ Based on the GitLab refactoring progress:
   - `source_type`: Type of source ('git', 'minio', 'github', 's3', 'gitlab')
   - `source_url`: Repository URL (Git URL, MinIO path, etc.)
   - `access_credentials`: Encrypted credentials (Git token, MinIO JSON, etc.)
-  - `default_version`: Version to sync from (branch for Git, version tag for MinIO, etc.)
+  - `default_version`: Version to sync from (branch for Git, optional for MinIO)
   - `visibility`: public, private, or restricted
   - `organization_id`: For organization-owned repositories
 - **Storage**: Flat structure - each example in its own directory
@@ -39,8 +39,14 @@ Based on the GitLab refactoring progress:
   - `directory`: Name of the directory (e.g., 'hello-world')
   - `title`, `description`: Metadata
   - `subject`: Programming language
-  - `tags`: For searching/filtering
+  - `category`: For grouping examples
+  - `tags`: Array for searching/filtering
   - `version_identifier`: Hash for change detection
+- **Relationships**:
+  - `repository`: Parent ExampleRepository
+  - `versions`: List of ExampleVersion records
+  - `course_contents`: CourseContents using this example
+  - `dependencies`: Other examples this depends on
 - **Constraint**: Unique example per directory per repository
 
 #### ExampleVersion Model (New)
@@ -100,7 +106,34 @@ Based on the GitLab refactoring progress:
 - Purpose: Handle dependencies between examples (e.g., function from one example used in another)
 - **Current approach**: Uses relative paths due to static filesystem positions
 
-### 4. Key Architectural Challenges
+### 4. CourseContent Improvements (Implemented)
+
+#### Enhanced CourseContent Model
+- **New Fields**:
+  - `example_id`: Direct link to Example Library
+  - `example_version`: Specific version snapshot used
+- **Tree Validation**: Database triggers ensure proper hierarchy
+  - Parent must have `has_descendants = true`
+  - Child must have `has_ascendants = true`
+  - Only submittable content can have examples
+- **Benefits**:
+  - Decouple storage location from course structure
+  - Reuse examples across courses
+  - Track which version is deployed
+
+#### Tree Validation Functions
+```sql
+-- Validates parent-child relationships
+validate_course_content_hierarchy()
+-- Ensures only submittable content has examples  
+validate_course_content_example_submittable()
+-- Gets all descendants of a content
+get_course_content_descendants(content_id)
+-- Checks if content can be safely deleted
+can_delete_course_content(content_id)
+```
+
+### 5. Key Architectural Challenges
 
 #### Current System
 - **Tight Coupling**: Git repository filesystem mirrors the unit/assignments Ltree structure
@@ -699,12 +732,56 @@ course:
    - ✅ Reposition content without breaking dependencies
    - ✅ Update example versions independently
 
+## Summary of Implemented Changes
+
+### Database Schema Updates
+1. **ExampleRepository** enhancements:
+   - Added `source_type` field for multi-source support (git, minio, s3, etc.)
+   - Renamed `access_token` → `access_credentials` for generic auth
+   - Made `default_version` nullable (optional for MinIO)
+
+2. **Example** simplifications:
+   - Removed `is_active` field (unnecessary)
+   - Added relationship to `ExampleVersion` for version tracking
+
+3. **New ExampleVersion** model:
+   - Tracks versions with `version_tag` and `version_number`
+   - Stores `storage_path` for MinIO/S3 location
+   - Simple design without changelog or stability flags
+
+4. **ExampleDependency** simplification:
+   - Just `example_id` and `depends_id` fields
+   - Assumes current version for dependencies
+   - No complex version constraints
+
+5. **CourseContent** integration:
+   - Added `example_id` and `example_version` fields
+   - Foreign key to Example model
+   - Trigger ensures only submittable content has examples
+
+### Migration Consolidation
+All changes consolidated into the initial migration (`6c2c37382ca7_initial_schema_from_sqlalchemy_models.py`):
+- Example-related tables and fields
+- Tree validation triggers and functions
+- Proper constraints and indexes
+
+### Fake Data Seeder Enhancements
+Enhanced `/src/ctutor_backend/scripts/fake_data_seeder.py` with:
+- `create_course_content_types()`: Creates 'weekly' and 'mandatory' content types
+- `create_course_contents()`: Creates hierarchical units with assignments
+- GitLab integration via Temporal workflows
+- Proper ltree path structure (e.g., 'week1', 'week1.assignment1')
+- Respects submittable constraints (only assignments have examples)
+
 ## Implementation Plan
 
-### Phase 1: Database Schema Updates
-1. Add `example_id` to CourseContent model
-2. Create simplified ExampleDependency table (example_id, depends_id)
-3. Update relationships and constraints
+### Phase 1: Database Schema Updates ✅ COMPLETED
+1. ✅ Added `example_id` and `example_version` to CourseContent model
+2. ✅ Created simplified ExampleDependency table (example_id, depends_id)
+3. ✅ Updated relationships and constraints
+4. ✅ Added ExampleVersion model for version tracking
+5. ✅ Enhanced ExampleRepository for multi-source support
+6. ✅ Added tree validation triggers
 
 ### Phase 2: MinIO Integration
 1. Implement storage service

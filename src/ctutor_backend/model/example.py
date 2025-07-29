@@ -40,7 +40,7 @@ class ExampleRepository(Base):
     )
     source_url = Column(Text, nullable=False, unique=True, comment="Repository URL (Git URL, MinIO path, etc.)")
     access_credentials = Column(Text, comment="Encrypted access credentials (Git token, MinIO credentials JSON, etc.)")
-    default_branch = Column(String(100), nullable=False, default="main", comment="Default branch/version to sync from")
+    default_version = Column(String(100), nullable=False, default="main", comment="Default version to sync from (branch for Git, version tag for MinIO, etc.)")
     
     # Access control
     visibility = Column(

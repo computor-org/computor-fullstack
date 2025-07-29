@@ -24,6 +24,7 @@ from ctutor_backend.model.course import CourseRole, CourseContentKind
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.interface.tokens import encrypt_api_key
 from ctutor_backend.model.auth import User, Account
+from ctutor_backend.model.example import ExampleRepository
 from ctutor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
 import asyncio
 
@@ -173,6 +174,31 @@ def initialize_execution_backends(db: Session):
     db.commit()
 
 
+def initialize_example_repositories(db: Session):
+    """Initialize default example repositories."""
+    print("📚 Initializing example repositories...")
+    
+    # Default MinIO-based example repository
+    default_repo = {
+        'name': 'Default Examples',
+        'description': 'Default repository for programming examples and tutorials',
+        'source_type': 'minio',
+        'source_url': 'examples-bucket'
+    }
+    
+    # Check if default repository exists
+    existing_repo = db.query(ExampleRepository).filter(ExampleRepository.name == default_repo['name']).first()
+    if not existing_repo:
+        repo = ExampleRepository(**default_repo)
+        db.add(repo)
+        db.commit()
+        print(f"   ✅ Created default example repository: {default_repo['name']}")
+    else:
+        print(f"   ⚠️  Default example repository already exists: {default_repo['name']}")
+    
+    db.commit()
+
+
 async def sync_admin_with_keycloak(admin_username: str, admin_password: str, admin_email: str = 'admin@system.local'):
     """Sync admin user with Keycloak."""
     try:
@@ -316,6 +342,7 @@ def main():
             initialize_course_roles(db)
             initialize_course_content_kinds(db)
             initialize_execution_backends(db)
+            initialize_example_repositories(db)
             create_admin_user(db)
             
         print("=" * 50)
@@ -325,8 +352,10 @@ def main():
         print("   • Course roles: _student, _tutor, _lecturer, _maintainer, _owner")
         print("   • Content kinds: assignment, lecture, exercise, exam, unit")
         print("   • Execution backends: temporal")
+        print("   • Example repositories: Default Examples (MinIO)")
         print(f"   • Admin user: username '{os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')}', password '{os.environ.get('EXECUTION_BACKEND_API_PASSWORD', 'admin')}'")
         print("\n🎯 You can now start the application!")
+        print("📚 Upload examples to the 'Default Examples' repository via the web UI!")
         
     except Exception as e:
         print(f"❌ Error during initialization: {e}")

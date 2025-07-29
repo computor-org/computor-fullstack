@@ -74,6 +74,12 @@ export const globalNavigation: NavigationItem[] = [
         permissions: ['manage_roles'],
       },
       {
+        id: 'examples',
+        label: 'Example Library',
+        path: '/admin/examples',
+        permissions: ['admin_access'],
+      },
+      {
         id: 'tasks',
         label: 'Tasks',
         path: '/admin/tasks',

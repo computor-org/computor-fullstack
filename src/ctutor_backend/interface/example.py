@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy_utils import Ltree
 
-from .base import BaseEntityGet, EntityInterface, ListQuery
+from .base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 
 
@@ -22,7 +22,6 @@ class ExampleRepositoryCreate(BaseModel):
     source_url: str = Field(..., description="Repository URL (Git URL, MinIO path, etc.)")
     access_credentials: Optional[str] = Field(None, description="Encrypted credentials")
     default_version: Optional[str] = Field(None, description="Default version to sync from")
-    visibility: str = Field("private", description="public, private, or restricted")
     organization_id: Optional[UUID] = None
 
 
@@ -44,7 +43,6 @@ class ExampleRepositoryList(BaseModel):
     description: Optional[str] = None
     source_type: str
     source_url: str
-    visibility: str
     organization_id: Optional[UUID] = None
     
     model_config = ConfigDict(from_attributes=True)
@@ -56,13 +54,12 @@ class ExampleRepositoryUpdate(BaseModel):
     description: Optional[str] = None
     access_credentials: Optional[str] = None
     default_version: Optional[str] = None
-    visibility: Optional[str] = None
 
 
 class ExampleCreate(BaseModel):
     """Create a new example."""
     example_repository_id: UUID
-    directory: str = Field(..., pattern="^[a-zA-Z0-9_-]+$")
+    directory: str = Field(..., pattern="^[a-zA-Z0-9._-]+$")
     identifier: str = Field(..., description="Hierarchical identifier with dots as separators")
     title: str
     description: Optional[str] = None
@@ -93,7 +90,7 @@ class ExampleGet(BaseEntityGet, ExampleCreate):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ExampleList(BaseModel):
+class ExampleList(BaseEntityList):
     """List view of examples."""
     id: UUID
     directory: str
@@ -193,7 +190,6 @@ class ExampleRepositoryQuery(ListQuery):
     """Query parameters for listing repositories."""
     name: Optional[str] = None
     source_type: Optional[str] = None
-    visibility: Optional[str] = None
     organization_id: Optional[UUID] = None
 
 
@@ -207,8 +203,6 @@ def example_repository_search(db: Session, query, params: Optional[ExampleReposi
         query = query.filter(ExampleRepository.name.ilike(f"%{params.name}%"))
     if params.source_type:
         query = query.filter(ExampleRepository.source_type == params.source_type)
-    if params.visibility:
-        query = query.filter(ExampleRepository.visibility == params.visibility)
     if params.organization_id:
         query = query.filter(ExampleRepository.organization_id == params.organization_id)
     
@@ -274,11 +268,9 @@ class ExampleInterface(EntityInterface):
 class ExampleUploadRequest(BaseModel):
     """Request to upload an example to storage."""
     repository_id: UUID
-    directory: str = Field(..., pattern="^[a-zA-Z0-9_-]+$")
+    directory: str = Field(..., pattern="^[a-zA-Z0-9._-]+$")
     version_tag: str
-    files: Dict[str, str] = Field(..., description="Map of filename to content")
-    meta_yaml: str
-    test_yaml: Optional[str] = None
+    files: Dict[str, str] = Field(..., description="Map of filename to content (must include meta.yaml)")
 
 
 class ExampleDownloadResponse(BaseModel):

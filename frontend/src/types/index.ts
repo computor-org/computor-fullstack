@@ -5,6 +5,9 @@ export * from './generated/roles';
 export * from './generated/courses';
 export * from './generated/auth';
 
+// Local types
+export * from './examples';
+
 // Frontend-specific types (not generated from backend)
 export interface Student {
   id: string;

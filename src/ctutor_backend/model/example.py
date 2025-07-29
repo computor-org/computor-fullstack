@@ -44,12 +44,6 @@ class ExampleRepository(Base):
     default_version = Column(String(100), nullable=True, comment="Default version to sync from (branch for Git, optional for MinIO)")
     
     # Access control
-    visibility = Column(
-        String(20), 
-        nullable=False, 
-        default="private",
-        comment="Repository visibility: public, private, or restricted"
-    )
     organization_id = Column(
         UUID(as_uuid=True), 
         ForeignKey("organization.id"),
@@ -71,10 +65,6 @@ class ExampleRepository(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "visibility IN ('public', 'private', 'restricted')",
-            name="check_visibility"
-        ),
-        CheckConstraint(
             "source_type IN ('git', 'minio', 'github', 's3', 'gitlab')",
             name="check_source_type"
         ),
@@ -84,24 +74,9 @@ class ExampleRepository(Base):
         return f"<ExampleRepository(id={self.id}, name='{self.name}')>"
     
     @property
-    def is_public(self) -> bool:
-        """Check if repository is publicly accessible."""
-        return self.visibility == "public"
-    
-    @property
-    def is_private(self) -> bool:
-        """Check if repository is private."""
-        return self.visibility == "private"
-    
-    @property
-    def is_restricted(self) -> bool:
-        """Check if repository is restricted to specific organizations."""
-        return self.visibility == "restricted"
-    
-    @property
     def needs_credentials(self) -> bool:
         """Check if repository requires access credentials."""
-        return not self.is_public and self.access_credentials is not None
+        return self.access_credentials is not None
 
 
 class Example(Base):
@@ -180,7 +155,7 @@ class Example(Base):
         
         # Check constraints
         CheckConstraint(
-            "directory ~ '^[a-zA-Z0-9_-]+$'",
+            "directory ~ '^[a-zA-Z0-9._-]+$'",
             name="check_directory_format"
         ),
     )

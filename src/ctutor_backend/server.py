@@ -169,7 +169,7 @@ LookUpRouter(CourseRoleInterface).register_routes(app)
 LookUpRouter(RoleInterface).register_routes(app)
 CrudRouter(ExecutionBackendInterface).register_routes(app)
 CrudRouter(ExampleRepositoryInterface).register_routes(app)
-CrudRouter(ExampleInterface).register_routes(app)
+# CrudRouter(ExampleInterface).register_routes(app) # Examples should only be created via upload
 
 CrudRouter(SubmissionGroupInterface).register_routes(app)
 CrudRouter(SubmissionGroupMemberInterface).register_routes(app)

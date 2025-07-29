@@ -28,7 +28,6 @@ Based on the GitLab refactoring progress:
   - `source_url`: Repository URL (Git URL, MinIO path, etc.)
   - `access_credentials`: Encrypted credentials (Git token, MinIO JSON, etc.)
   - `default_version`: Version to sync from (branch for Git, optional for MinIO)
-  - `visibility`: public, private, or restricted
   - `organization_id`: For organization-owned repositories
 - **Storage**: Flat structure - each example in its own directory
 - **Flexibility**: Supports multiple repository types via source_type field

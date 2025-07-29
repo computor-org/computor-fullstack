@@ -146,6 +146,13 @@ class Example(Base):
     created_by_user = relationship("User", foreign_keys=[created_by])
     updated_by_user = relationship("User", foreign_keys=[updated_by])
     
+    # Course content relationships (reverse)
+    course_contents = relationship("CourseContent", foreign_keys="CourseContent.example_id", back_populates="example")
+    
+    # Dependency relationships
+    dependencies = relationship("ExampleDependency", foreign_keys="ExampleDependency.example_id", back_populates="example")
+    dependent_examples = relationship("ExampleDependency", foreign_keys="ExampleDependency.depends_on_example_id", back_populates="depends_on")
+    
     # Constraints
     __table_args__ = (
         # Unique constraint: one example per directory per repository
@@ -165,3 +172,71 @@ class Example(Base):
     def full_path(self) -> str:
         """Get the full path within the repository."""
         return self.directory
+
+
+class ExampleDependency(Base):
+    """
+    Dependency relationship between examples.
+    
+    Tracks when one example depends on another for code, tests, or data.
+    Replaces the old relative path approach with ID-based references.
+    """
+    
+    __tablename__ = "example_dependency"
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    
+    # Dependency relationship
+    example_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("example.id", ondelete="CASCADE"), 
+        nullable=False,
+        comment="Example that has the dependency"
+    )
+    depends_on_example_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("example.id", ondelete="CASCADE"), 
+        nullable=False,
+        comment="Example that is depended upon"
+    )
+    
+    # Dependency metadata
+    dependency_type = Column(
+        String(50), 
+        nullable=False,
+        comment="Type of dependency: test, code, data, template"
+    )
+    version_constraint = Column(
+        String(100), 
+        nullable=True,
+        comment="Version constraint (e.g., '>=1.0.0')"
+    )
+    relative_path = Column(
+        String(255), 
+        nullable=True,
+        comment="Optional: specific file reference within the dependency"
+    )
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    example = relationship("Example", foreign_keys=[example_id], back_populates="dependencies")
+    depends_on = relationship("Example", foreign_keys=[depends_on_example_id], back_populates="dependent_examples")
+    
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "dependency_type IN ('test', 'code', 'data', 'template')",
+            name="check_dependency_type"
+        ),
+        UniqueConstraint(
+            "example_id", "depends_on_example_id", "dependency_type",
+            name="unique_example_dependency"
+        ),
+    )
+    
+    def __repr__(self):
+        return f"<ExampleDependency(example_id={self.example_id}, depends_on={self.depends_on_example_id}, type='{self.dependency_type}')>"

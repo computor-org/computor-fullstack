@@ -182,7 +182,10 @@ class CourseContent(Base):
         ForeignKeyConstraint(['course_id', 'course_content_type_id'], 
                            ['course_content_type.course_id', 'course_content_type.id'], 
                            ondelete='RESTRICT', onupdate='RESTRICT'),
-        Index('course_content_path_key', 'course_id', 'path', unique=True)
+        Index('course_content_path_key', 'course_id', 'path', unique=True),
+        CheckConstraint("path::text ~ '^[a-z0-9_]+(\\.[a-z0-9_]+)*$'", name='course_content_path_format')
+        # Note: Example-submittable validation is enforced by database trigger
+        # validate_course_content_example_submittable_trigger
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -204,6 +207,10 @@ class CourseContent(Base):
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
+    
+    # Example integration columns
+    example_id = Column(UUID, ForeignKey('example.id'), nullable=True)
+    example_version = Column(String(64), nullable=True)
 
     # Relationships
     course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")
@@ -214,6 +221,9 @@ class CourseContent(Base):
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
     course_submission_groups = relationship('CourseSubmissionGroup', back_populates='course_content')
     course_submission_group_members = relationship('CourseSubmissionGroupMember', back_populates='course_content')
+    
+    # Example relationships
+    example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(

@@ -22,13 +22,16 @@ Based on the GitLab refactoring progress:
 ### 1. Current Database Models
 
 #### ExampleRepository Model (`/src/ctutor_backend/model/example.py`)
-- **Purpose**: Represents a Git repository containing multiple examples
+- **Purpose**: Represents a repository containing multiple examples (Git, MinIO, etc.)
 - **Key Fields**:
-  - `source_url`: Git repository URL
-  - `access_token`: Encrypted token for private repos
+  - `source_type`: Type of source ('git', 'minio', 'github', 's3', 'gitlab')
+  - `source_url`: Repository URL (Git URL, MinIO path, etc.)
+  - `access_token`: Encrypted credentials (Git token, MinIO JSON, etc.)
+  - `default_branch`: Branch or version to sync from
   - `visibility`: public, private, or restricted
   - `organization_id`: For organization-owned repositories
 - **Storage**: Flat structure - each example in its own directory
+- **Flexibility**: Supports multiple repository types via source_type field
 
 #### Example Model
 - **Purpose**: Individual example/assignment within a repository
@@ -108,6 +111,27 @@ With the new `feature/minio` branch:
 - **Decoupling**: Complete separation of storage from hierarchy
 - **Performance**: Fast retrieval of specific versions
 - **Scalability**: Better handling of large files and binary content
+
+#### Dual Storage Support
+The ExampleRepository now supports multiple sources via the `source_type` field:
+
+```python
+# Git-based repository (traditional)
+repo1 = ExampleRepository(
+    source_type='git',
+    source_url='https://gitlab.com/org/examples.git',
+    access_token='gitlab_token_xxx',
+    default_branch='main'
+)
+
+# MinIO-based repository (new)
+repo2 = ExampleRepository(
+    source_type='minio',
+    source_url='computor-examples/python-basics',  # bucket/path
+    access_token='{"access_key": "xxx", "secret_key": "yyy"}',  # JSON
+    default_branch='v1.0'  # Version tag
+)
+```
 
 ## Discussion Topics
 

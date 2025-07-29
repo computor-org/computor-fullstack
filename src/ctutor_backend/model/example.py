@@ -31,10 +31,16 @@ class ExampleRepository(Base):
     name = Column(String(255), nullable=False, comment="Human-readable name of the repository")
     description = Column(Text, comment="Description of the repository and its contents")
     
-    # Git repository information
-    source_url = Column(Text, nullable=False, unique=True, comment="Git repository URL")
-    access_token = Column(Text, comment="Encrypted token for accessing private repositories")
-    default_branch = Column(String(100), nullable=False, default="main", comment="Default branch to sync from")
+    # Source repository information
+    source_type = Column(
+        String(20), 
+        nullable=False, 
+        default="git",
+        comment="Type of repository source: git, minio, github, etc."
+    )
+    source_url = Column(Text, nullable=False, unique=True, comment="Repository URL (Git URL, MinIO path, etc.)")
+    access_token = Column(Text, comment="Encrypted access credentials (Git token, MinIO credentials JSON, etc.)")
+    default_branch = Column(String(100), nullable=False, default="main", comment="Default branch/version to sync from")
     
     # Access control
     visibility = Column(
@@ -66,6 +72,10 @@ class ExampleRepository(Base):
         CheckConstraint(
             "visibility IN ('public', 'private', 'restricted')",
             name="check_visibility"
+        ),
+        CheckConstraint(
+            "source_type IN ('git', 'minio', 'github', 's3', 'gitlab')",
+            name="check_source_type"
         ),
     )
     

@@ -39,7 +39,7 @@ class ExampleRepository(Base):
         comment="Type of repository source: git, minio, github, etc."
     )
     source_url = Column(Text, nullable=False, unique=True, comment="Repository URL (Git URL, MinIO path, etc.)")
-    access_token = Column(Text, comment="Encrypted access credentials (Git token, MinIO credentials JSON, etc.)")
+    access_credentials = Column(Text, comment="Encrypted access credentials (Git token, MinIO credentials JSON, etc.)")
     default_branch = Column(String(100), nullable=False, default="main", comment="Default branch/version to sync from")
     
     # Access control
@@ -98,9 +98,9 @@ class ExampleRepository(Base):
         return self.visibility == "restricted"
     
     @property
-    def needs_token(self) -> bool:
-        """Check if repository requires access token."""
-        return not self.is_public and self.access_token is not None
+    def needs_credentials(self) -> bool:
+        """Check if repository requires access credentials."""
+        return not self.is_public and self.access_credentials is not None
 
 
 class Example(Base):

@@ -31,22 +31,17 @@ def upgrade() -> None:
     op.create_table('example_dependency',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
         sa.Column('example_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('depends_on_example_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('dependency_type', sa.String(length=50), nullable=False),
-        sa.Column('version_constraint', sa.String(length=100), nullable=True),
-        sa.Column('relative_path', sa.String(length=255), nullable=True),
+        sa.Column('depends_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
         sa.ForeignKeyConstraint(['example_id'], ['example.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['depends_on_example_id'], ['example.id'], ondelete='CASCADE'),
-        sa.CheckConstraint("dependency_type IN ('test', 'code', 'data', 'template')", name='check_dependency_type'),
-        sa.UniqueConstraint('example_id', 'depends_on_example_id', 'dependency_type', name='unique_example_dependency')
+        sa.ForeignKeyConstraint(['depends_id'], ['example.id'], ondelete='CASCADE'),
+        sa.UniqueConstraint('example_id', 'depends_id', name='unique_example_dependency')
     )
     
     # Add indexes for dependency lookups
     op.create_index('idx_example_dependency_example_id', 'example_dependency', ['example_id'])
-    op.create_index('idx_example_dependency_depends_on', 'example_dependency', ['depends_on_example_id'])
+    op.create_index('idx_example_dependency_depends_id', 'example_dependency', ['depends_id'])
 
     # 3. Add path format validation constraint
     op.create_check_constraint(
@@ -302,7 +297,7 @@ def downgrade() -> None:
     op.drop_constraint('course_content_path_format', 'course_content')
     
     # Drop ExampleDependency table
-    op.drop_index('idx_example_dependency_depends_on', table_name='example_dependency')
+    op.drop_index('idx_example_dependency_depends_id', table_name='example_dependency')
     op.drop_index('idx_example_dependency_example_id', table_name='example_dependency')
     op.drop_table('example_dependency')
     

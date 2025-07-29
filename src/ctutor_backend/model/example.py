@@ -151,7 +151,6 @@ class Example(Base):
     
     # Dependency relationships
     dependencies = relationship("ExampleDependency", foreign_keys="ExampleDependency.example_id", back_populates="example")
-    dependent_examples = relationship("ExampleDependency", foreign_keys="ExampleDependency.depends_on_example_id", back_populates="depends_on")
     
     # Constraints
     __table_args__ = (
@@ -178,8 +177,8 @@ class ExampleDependency(Base):
     """
     Dependency relationship between examples.
     
-    Tracks when one example depends on another for code, tests, or data.
-    Replaces the old relative path approach with ID-based references.
+    Tracks when one example depends on another.
+    Uses a simplified model where dependencies always refer to the current version.
     """
     
     __tablename__ = "example_dependency"
@@ -194,49 +193,27 @@ class ExampleDependency(Base):
         nullable=False,
         comment="Example that has the dependency"
     )
-    depends_on_example_id = Column(
+    depends_id = Column(
         UUID(as_uuid=True), 
         ForeignKey("example.id", ondelete="CASCADE"), 
         nullable=False,
-        comment="Example that is depended upon"
-    )
-    
-    # Dependency metadata
-    dependency_type = Column(
-        String(50), 
-        nullable=False,
-        comment="Type of dependency: test, code, data, template"
-    )
-    version_constraint = Column(
-        String(100), 
-        nullable=True,
-        comment="Version constraint (e.g., '>=1.0.0')"
-    )
-    relative_path = Column(
-        String(255), 
-        nullable=True,
-        comment="Optional: specific file reference within the dependency"
+        comment="Example that this depends on"
     )
     
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     
     # Relationships
     example = relationship("Example", foreign_keys=[example_id], back_populates="dependencies")
-    depends_on = relationship("Example", foreign_keys=[depends_on_example_id], back_populates="dependent_examples")
+    dependency = relationship("Example", foreign_keys=[depends_id])
     
     # Constraints
     __table_args__ = (
-        CheckConstraint(
-            "dependency_type IN ('test', 'code', 'data', 'template')",
-            name="check_dependency_type"
-        ),
         UniqueConstraint(
-            "example_id", "depends_on_example_id", "dependency_type",
+            "example_id", "depends_id",
             name="unique_example_dependency"
         ),
     )
     
     def __repr__(self):
-        return f"<ExampleDependency(example_id={self.example_id}, depends_on={self.depends_on_example_id}, type='{self.dependency_type}')>"
+        return f"<ExampleDependency(example_id={self.example_id}, depends_id={self.depends_id})>"

@@ -29,10 +29,19 @@ from model.execution import ExecutionBackend
 from model.role import Role, UserRole
 from sqlalchemy_utils import Ltree
 from sqlalchemy.orm import Session
+import requests
+import time
 
 # Fake data generators
 from faker import Faker
 fake = Faker()
+
+# Import Temporal client for GitLab operations
+try:
+    from tasks.temporal_client import get_temporal_client
+except ImportError:
+    print("⚠️  Temporal client not available - GitLab operations will be skipped")
+    get_temporal_client = None
 
 # Course content kinds and roles are created by system initialization
 # No need to recreate them here
@@ -58,8 +67,16 @@ def create_users(session, count=50):
     return users
 
 def create_organizations(session, users):
-    """Create organizations."""
+    """Create organizations with GitLab integration."""
     organizations = []
+    
+    # GitLab configuration from environment
+    gitlab_url = os.environ.get('TEST_GITLAB_URL', 'http://localhost:8084')
+    gitlab_token = os.environ.get('TEST_GITLAB_TOKEN')
+    gitlab_parent_id = os.environ.get('TEST_GITLAB_GROUP_ID')
+    
+    if not gitlab_token:
+        print("⚠️  TEST_GITLAB_TOKEN not set - GitLab integration will be skipped")
     
     # Check if main university already exists
     existing_main = session.query(Organization).filter(Organization.path == Ltree('university')).first()
@@ -67,7 +84,15 @@ def create_organizations(session, users):
         print("ℹ️  University organization already exists, using existing one")
         organizations.append(existing_main)
     else:
-        # Create a main university organization
+        # Create a main university organization with GitLab integration
+        properties = {
+            'gitlab': {
+                'url': gitlab_url,
+                'token': gitlab_token,
+                'parent': int(gitlab_parent_id) if gitlab_parent_id else None
+            }
+        } if gitlab_token else {}
+        
         main_org = Organization(
             title="Example University",
             description="A leading institution for computing education",
@@ -79,11 +104,33 @@ def create_organizations(session, users):
             locality='Example City',
             region='Example State',
             country='Example Country',
+            properties=properties,
             created_by=random.choice(users).id
         )
         session.add(main_org)
         session.flush()
         organizations.append(main_org)
+        
+        # Create GitLab group via Temporal if configured
+        if gitlab_token and get_temporal_client:
+            try:
+                print("🔄 Creating GitLab group for university organization...")
+                temporal_client = get_temporal_client()
+                result = temporal_client.execute_workflow(
+                    'create_organization',
+                    {
+                        'organization_id': str(main_org.id),
+                        'organization_name': main_org.title,
+                        'organization_path': str(main_org.path),
+                        'gitlab_config': properties['gitlab']
+                    },
+                    id=f"create_org_{main_org.id}",
+                    task_queue='computor-tasks'
+                )
+                print(f"✅ GitLab organization creation task started: {result.id}")
+            except Exception as e:
+                print(f"⚠️  GitLab organization creation failed: {e}")
+        
         print("✅ Created main university organization")
     
     # Create departments if they don't exist
@@ -303,6 +350,123 @@ def create_course_members(session, courses, course_groups, users):
     print(f"✅ Created {len(course_members)} course members")
     return course_members
 
+def create_course_content_types(session, courses, users):
+    """Create course content types for each course."""
+    course_content_types = []
+    
+    # Get required CourseContentKinds
+    unit_kind = session.query(CourseContentKind).filter(CourseContentKind.id == 'unit').first()
+    assignment_kind = session.query(CourseContentKind).filter(CourseContentKind.id == 'assignment').first()
+    
+    if not all([unit_kind, assignment_kind]):
+        print("❌ Missing CourseContentKind entries! Run migration first.")
+        return course_content_types
+    
+    for course in courses:
+        # Create 'weekly' content type for units
+        weekly_type = CourseContentType(
+            title="Weekly Unit",
+            description="Weekly organizational unit",
+            slug="weekly",
+            color="#4CAF50",  # Green
+            course_content_kind_id=unit_kind.id,
+            course_id=course.id,
+            created_by=random.choice(users).id
+        )
+        session.add(weekly_type)
+        course_content_types.append(weekly_type)
+        
+        # Create 'mandatory' content type for assignments
+        mandatory_type = CourseContentType(
+            title="Mandatory Assignment",
+            description="Mandatory programming assignment",
+            slug="mandatory",
+            color="#2196F3",  # Blue
+            course_content_kind_id=assignment_kind.id,
+            course_id=course.id,
+            created_by=random.choice(users).id
+        )
+        session.add(mandatory_type)
+        course_content_types.append(mandatory_type)
+    
+    session.flush()
+    print(f"✅ Created {len(course_content_types)} course content types")
+    return course_content_types
+
+def create_course_contents(session, courses, course_content_types, users):
+    """Create hierarchical course content with units and assignments."""
+    course_contents = []
+    
+    for course in courses:
+        # Get content types for this course
+        weekly_type = next((ct for ct in course_content_types 
+                           if ct.course_id == course.id and ct.slug == 'weekly'), None)
+        mandatory_type = next((ct for ct in course_content_types 
+                              if ct.course_id == course.id and ct.slug == 'mandatory'), None)
+        
+        if not all([weekly_type, mandatory_type]):
+            print(f"❌ Missing content types for course {course.title}")
+            continue
+        
+        # Create 4-6 weekly units
+        num_weeks = random.randint(4, 6)
+        for week_num in range(1, num_weeks + 1):
+            # Create unit (parent)
+            unit_title = f"Week {week_num}"
+            unit_path = Ltree(f"week_{week_num}")
+            
+            unit = CourseContent(
+                title=unit_title,
+                description=f"Learning unit for week {week_num}",
+                path=unit_path,
+                course_id=course.id,
+                course_content_type_id=weekly_type.id,
+                version_identifier=f"week_{week_num}_v1",
+                position=float(week_num * 10),  # 10, 20, 30, etc.
+                max_group_size=1,
+                # Units don't have examples (example_id=None)
+                created_by=random.choice(users).id
+            )
+            session.add(unit)
+            course_contents.append(unit)
+            
+            # Create 2-6 assignments under this unit
+            num_assignments = random.randint(2, 6)
+            for assignment_num in range(1, num_assignments + 1):
+                assignment_topics = [
+                    "Hello World", "Variables", "Functions", "Loops", "Arrays", 
+                    "Classes", "File I/O", "Exceptions", "Algorithms", "Data Structures"
+                ]
+                topic = random.choice(assignment_topics)
+                
+                assignment_title = f"{topic} Assignment"
+                # Path: week_1.assignment_1, week_1.assignment_2, etc.
+                assignment_path = Ltree(f"week_{week_num}.assignment_{assignment_num}")
+                
+                assignment = CourseContent(
+                    title=assignment_title,
+                    description=f"Programming assignment on {topic.lower()}",
+                    path=assignment_path,
+                    course_id=course.id,
+                    course_content_type_id=mandatory_type.id,
+                    version_identifier=f"week_{week_num}_assignment_{assignment_num}_v1",
+                    position=float(assignment_num * 10),  # 10, 20, 30, etc. within the week
+                    max_group_size=random.randint(1, 3),
+                    max_test_runs=random.randint(5, 20),
+                    max_submissions=random.randint(10, 50),
+                    # Assignments could have examples, but we'll leave them NULL for now
+                    # since we don't have actual examples yet
+                    # example_id=None,
+                    # example_version=None,
+                    created_by=random.choice(users).id
+                )
+                session.add(assignment)
+                course_contents.append(assignment)
+    
+    session.flush()
+    print(f"✅ Created {len(course_contents)} course contents")
+    return course_contents
+
 def clear_fake_data(session):
     """Clear existing fake data (but keep system data)."""
     print("🧹 Clearing existing fake data...")
@@ -353,6 +517,11 @@ def main():
             courses = create_courses(session, course_families, organizations, users, execution_backends)
             course_groups = create_course_groups(session, courses, users)
             course_members = create_course_members(session, courses, course_groups, users)
+            
+            # Create course content hierarchy
+            course_content_types = create_course_content_types(session, courses, users)
+            course_contents = create_course_contents(session, courses, course_content_types, users)
+            
             session.commit()
             
             print("🎉 Fake data seeding completed successfully!")
@@ -364,6 +533,30 @@ def main():
             print(f"  - {len(courses)} courses")
             print(f"  - {len(course_groups)} course groups")
             print(f"  - {len(course_members)} course members")
+            print(f"  - {len(course_content_types)} course content types (weekly, mandatory)")
+            print(f"  - {len(course_contents)} course contents (units with assignments)")
+            
+            # Show some example structure
+            if course_contents:
+                print("\n📋 Sample course content structure:")
+                sample_course = courses[0] if courses else None
+                if sample_course:
+                    sample_contents = [cc for cc in course_contents if cc.course_id == sample_course.id][:10]  # First 10
+                    for content in sample_contents:
+                        indent = "  " * (len(str(content.path).split('.')))
+                        content_type = "📁" if "week_" in str(content.path) and "." not in str(content.path) else "📝"
+                        print(f"    {indent}{content_type} {content.path} - {content.title}")
+            
+            # Show GitLab integration status
+            gitlab_token = os.environ.get('TEST_GITLAB_TOKEN')
+            if gitlab_token and get_temporal_client:
+                print("\n🦊 GitLab Integration:")
+                print(f"  - GitLab URL: {os.environ.get('TEST_GITLAB_URL', 'http://localhost:8084')}")
+                print(f"  - Parent Group ID: {os.environ.get('TEST_GITLAB_GROUP_ID', 'not set')}")
+                print(f"  - Temporal tasks created for organization, course families, and courses")
+                print(f"  - Check Temporal UI at http://localhost:8088 to monitor GitLab creation progress")
+            else:
+                print("\n⚠️  GitLab Integration: Disabled (missing TEST_GITLAB_TOKEN or Temporal client)")
             
         except Exception as e:
             print(f"❌ Error seeding data: {e}")

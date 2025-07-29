@@ -26,7 +26,7 @@ Based on the GitLab refactoring progress:
 - **Key Fields**:
   - `source_type`: Type of source ('git', 'minio', 'github', 's3', 'gitlab')
   - `source_url`: Repository URL (Git URL, MinIO path, etc.)
-  - `access_token`: Encrypted credentials (Git token, MinIO JSON, etc.)
+  - `access_credentials`: Encrypted credentials (Git token, MinIO JSON, etc.)
   - `default_branch`: Branch or version to sync from
   - `visibility`: public, private, or restricted
   - `organization_id`: For organization-owned repositories
@@ -120,7 +120,7 @@ The ExampleRepository now supports multiple sources via the `source_type` field:
 repo1 = ExampleRepository(
     source_type='git',
     source_url='https://gitlab.com/org/examples.git',
-    access_token='gitlab_token_xxx',
+    access_credentials='gitlab_token_xxx',
     default_branch='main'
 )
 
@@ -128,7 +128,7 @@ repo1 = ExampleRepository(
 repo2 = ExampleRepository(
     source_type='minio',
     source_url='computor-examples/python-basics',  # bucket/path
-    access_token='{"access_key": "xxx", "secret_key": "yyy"}',  # JSON
+    access_credentials='{"access_key": "xxx", "secret_key": "yyy"}',  # JSON
     default_branch='v1.0'  # Version tag
 )
 ```

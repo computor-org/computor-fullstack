@@ -467,8 +467,6 @@ def upgrade() -> None:
     sa.Column('version_tag', sa.String(length=64), nullable=False, comment="Version identifier (e.g., 'v1.0', 'v2.0-beta', commit hash)"),
     sa.Column('version_number', sa.Integer(), nullable=False, comment='Sequential version number for ordering'),
     sa.Column('storage_path', sa.Text(), nullable=False, comment='Path in storage system (MinIO path, S3 key, etc.)'),
-    sa.Column('changelog', sa.Text(), nullable=True, comment='Description of changes in this version'),
-    sa.Column('is_stable', sa.Boolean(), nullable=False, server_default='true', comment='Whether this is a stable release'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this version'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),

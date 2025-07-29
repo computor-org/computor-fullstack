@@ -49,8 +49,6 @@ Based on the GitLab refactoring progress:
   - `version_tag`: Version identifier (e.g., 'v1.0', commit hash)
   - `version_number`: Sequential number for ordering
   - `storage_path`: Path in MinIO/S3
-  - `changelog`: Description of changes
-  - `is_stable`: Whether this is a stable release
 - **Use Cases**:
   - Track multiple versions of examples in MinIO
   - Store commit hashes from Git sync

@@ -225,10 +225,6 @@ class ExampleVersion(Base):
         comment="Path in storage system (MinIO path, S3 key, etc.)"
     )
     
-    # Metadata
-    changelog = Column(Text, comment="Description of changes in this version")
-    is_stable = Column(Boolean, nullable=False, default=True, comment="Whether this is a stable release")
-    
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this version")

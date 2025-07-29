@@ -134,9 +134,9 @@ With the new `feature/minio` branch:
 - Replace `testDependencies` paths with Example IDs
 - Create explicit `ExampleDependency` table:
   ```sql
-  example_id -> dependent_example_id
-  dependency_type (test, code, data)
-  version_constraint
+  example_id -> depends_id
+  # Simplified: No dependency types or version constraints
+  # Dependencies always use current version
   ```
 
 ### 3. Synchronization Strategy
@@ -193,21 +193,22 @@ class CourseContent(Base):
     example = relationship("Example", back_populates="course_contents")
 ```
 
-#### New ExampleDependency Model
+#### New ExampleDependency Model (Simplified)
 ```python
 class ExampleDependency(Base):
     __tablename__ = "example_dependency"
     
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
     example_id = Column(UUID(as_uuid=True), ForeignKey("example.id"), nullable=False)
-    depends_on_example_id = Column(UUID(as_uuid=True), ForeignKey("example.id"), nullable=False)
-    dependency_type = Column(String(50), nullable=False)  # 'test', 'code', 'data'
-    version_constraint = Column(String(100))  # e.g., ">=1.0.0"
-    relative_path = Column(String(255))  # Optional: specific file reference
+    depends_id = Column(UUID(as_uuid=True), ForeignKey("example.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     
     # Relationships
     example = relationship("Example", foreign_keys=[example_id], back_populates="dependencies")
-    depends_on = relationship("Example", foreign_keys=[depends_on_example_id])
+    dependency = relationship("Example", foreign_keys=[depends_id])
+    
+    # Note: Dependencies always refer to the current version of the depended-upon example
+    # No version constraints or dependency types - keep it simple
 ```
 
 ### 2. MinIO Storage Structure
@@ -667,7 +668,7 @@ course:
 
 ### Phase 1: Database Schema Updates
 1. Add `example_id` to CourseContent model
-2. Create ExampleDependency table
+2. Create simplified ExampleDependency table (example_id, depends_id)
 3. Update relationships and constraints
 
 ### Phase 2: MinIO Integration

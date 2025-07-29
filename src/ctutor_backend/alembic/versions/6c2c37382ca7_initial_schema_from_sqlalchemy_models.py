@@ -209,7 +209,7 @@ def upgrade() -> None:
     sa.Column('source_type', sa.String(length=20), nullable=False, default='git', comment='Type of repository source: git, minio, github, etc.'),
     sa.Column('source_url', sa.Text(), nullable=False, comment='Repository URL (Git URL, MinIO path, etc.)'),
     sa.Column('access_credentials', sa.Text(), nullable=True, comment='Encrypted access credentials (Git token, MinIO credentials JSON, etc.)'),
-    sa.Column('default_version', sa.String(length=100), nullable=False, server_default='main', comment='Default version to sync from (branch for Git, version tag for MinIO, etc.)'),
+    sa.Column('default_version', sa.String(length=100), nullable=True, comment='Default version to sync from (branch for Git, optional for MinIO)'),
     sa.Column('visibility', sa.String(length=20), nullable=False, server_default='private', comment='Repository visibility: public, private, or restricted'),
     sa.Column('organization_id', postgresql.UUID(), nullable=True, comment='Organization that owns this repository'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -461,6 +461,22 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('course_content_path_key', 'course_content', ['course_id', 'path'], unique=True)
+    op.create_table('example_version',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('example_id', postgresql.UUID(), nullable=False, comment='Reference to the example this version belongs to'),
+    sa.Column('version_tag', sa.String(length=64), nullable=False, comment="Version identifier (e.g., 'v1.0', 'v2.0-beta', commit hash)"),
+    sa.Column('version_number', sa.Integer(), nullable=False, comment='Sequential version number for ordering'),
+    sa.Column('storage_path', sa.Text(), nullable=False, comment='Path in storage system (MinIO path, S3 key, etc.)'),
+    sa.Column('changelog', sa.Text(), nullable=True, comment='Description of changes in this version'),
+    sa.Column('is_stable', sa.Boolean(), nullable=False, server_default='true', comment='Whether this is a stable release'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this version'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['example_id'], ['example.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('example_id', 'version_tag', name='unique_example_version_tag'),
+    sa.UniqueConstraint('example_id', 'version_number', name='unique_example_version_number')
+    )
     op.create_table('example_dependency',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_id', postgresql.UUID(), nullable=False, comment='Example that has the dependency'),
@@ -831,6 +847,7 @@ def downgrade() -> None:
     op.drop_index('course_member_key', table_name='course_member')
     op.drop_table('course_member')
     op.drop_table('example_dependency')
+    op.drop_table('example_version')
     op.drop_index('course_content_path_key', table_name='course_content')
     op.drop_table('course_content')
     op.drop_index('course_group_title_key', table_name='course_group')

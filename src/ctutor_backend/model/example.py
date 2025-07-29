@@ -40,7 +40,7 @@ class ExampleRepository(Base):
     )
     source_url = Column(Text, nullable=False, unique=True, comment="Repository URL (Git URL, MinIO path, etc.)")
     access_credentials = Column(Text, comment="Encrypted access credentials (Git token, MinIO credentials JSON, etc.)")
-    default_version = Column(String(100), nullable=False, default="main", comment="Default version to sync from (branch for Git, version tag for MinIO, etc.)")
+    default_version = Column(String(100), nullable=True, comment="Default version to sync from (branch for Git, optional for MinIO)")
     
     # Access control
     visibility = Column(
@@ -159,6 +159,9 @@ class Example(Base):
     # Course content relationships (reverse)
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.example_id", back_populates="example")
     
+    # Version relationships
+    versions = relationship("ExampleVersion", back_populates="example", cascade="all, delete-orphan")
+    
     # Dependency relationships
     dependencies = relationship("ExampleDependency", foreign_keys="ExampleDependency.example_id", back_populates="example")
     
@@ -181,6 +184,67 @@ class Example(Base):
     def full_path(self) -> str:
         """Get the full path within the repository."""
         return self.directory
+
+
+class ExampleVersion(Base):
+    """
+    Version tracking for examples stored in MinIO or other versioned storage.
+    
+    Each version represents a snapshot of an example at a specific point in time.
+    """
+    
+    __tablename__ = "example_version"
+    
+    # Primary key
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("uuid_generate_v4()"))
+    
+    # Example relationship
+    example_id = Column(
+        UUID(as_uuid=True), 
+        ForeignKey("example.id", ondelete="CASCADE"), 
+        nullable=False,
+        comment="Reference to the example this version belongs to"
+    )
+    
+    # Version information
+    version_tag = Column(
+        String(64), 
+        nullable=False,
+        comment="Version identifier (e.g., 'v1.0', 'v2.0-beta', commit hash)"
+    )
+    version_number = Column(
+        Integer,
+        nullable=False,
+        comment="Sequential version number for ordering"
+    )
+    
+    # Storage information
+    storage_path = Column(
+        Text,
+        nullable=False,
+        comment="Path in storage system (MinIO path, S3 key, etc.)"
+    )
+    
+    # Metadata
+    changelog = Column(Text, comment="Description of changes in this version")
+    is_stable = Column(Boolean, nullable=False, default=True, comment="Whether this is a stable release")
+    
+    # Tracking
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this version")
+    
+    # Relationships
+    example = relationship("Example", back_populates="versions")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    
+    # Constraints
+    __table_args__ = (
+        UniqueConstraint("example_id", "version_tag", name="unique_example_version_tag"),
+        UniqueConstraint("example_id", "version_number", name="unique_example_version_number"),
+    )
+    
+    def __repr__(self):
+        return f"<ExampleVersion(id={self.id}, version_tag='{self.version_tag}')>"
 
 
 class ExampleDependency(Base):

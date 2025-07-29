@@ -43,6 +43,19 @@ Based on the GitLab refactoring progress:
   - `version_identifier`: Hash for change detection
 - **Constraint**: Unique example per directory per repository
 
+#### ExampleVersion Model (New)
+- **Purpose**: Track versions of examples in versioned storage systems
+- **Key Fields**:
+  - `version_tag`: Version identifier (e.g., 'v1.0', commit hash)
+  - `version_number`: Sequential number for ordering
+  - `storage_path`: Path in MinIO/S3
+  - `changelog`: Description of changes
+  - `is_stable`: Whether this is a stable release
+- **Use Cases**:
+  - Track multiple versions of examples in MinIO
+  - Store commit hashes from Git sync
+  - Maintain version history
+
 ### 2. Current CourseContent Structure
 
 #### Hierarchical Models

@@ -5,7 +5,7 @@ This model represents individual examples/assignments within an ExampleRepositor
 Each example is stored in its own directory with a flat structure.
 """
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, ARRAY, ForeignKey, text
+from sqlalchemy import Column, String, Text, Boolean, DateTime, ARRAY, ForeignKey, text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -141,9 +141,6 @@ class Example(Base):
     tags = Column(ARRAY(String), nullable=False, default=[], comment="Tags for searching and filtering")
     
     version_identifier = Column(String(64), comment="Version Identifier (e.g. hash) of example directory contents for change detection")
-    
-    # Status
-    is_active = Column(Boolean, nullable=False, default=True, comment="Whether the example is active")
     
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

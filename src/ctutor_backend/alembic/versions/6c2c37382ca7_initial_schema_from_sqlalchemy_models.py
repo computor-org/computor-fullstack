@@ -234,7 +234,6 @@ def upgrade() -> None:
     sa.Column('category', sa.String(length=100), nullable=True, comment='Category for grouping examples'),
     sa.Column('tags', postgresql.ARRAY(sa.String()), nullable=False, server_default='{}', comment='Tags for searching and filtering'),
     sa.Column('version_identifier', sa.String(length=64), nullable=True, comment='Version Identifier (e.g. hash) of example directory contents for change detection'),
-    sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true', comment='Whether the example is active'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this example record'),

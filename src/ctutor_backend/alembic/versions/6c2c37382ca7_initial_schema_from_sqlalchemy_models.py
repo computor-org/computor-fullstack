@@ -209,7 +209,7 @@ def upgrade() -> None:
     sa.Column('source_type', sa.String(length=20), nullable=False, default='git', comment='Type of repository source: git, minio, github, etc.'),
     sa.Column('source_url', sa.Text(), nullable=False, comment='Repository URL (Git URL, MinIO path, etc.)'),
     sa.Column('access_credentials', sa.Text(), nullable=True, comment='Encrypted access credentials (Git token, MinIO credentials JSON, etc.)'),
-    sa.Column('default_branch', sa.String(length=100), nullable=False, server_default='main', comment='Default branch/version to sync from'),
+    sa.Column('default_version', sa.String(length=100), nullable=False, server_default='main', comment='Default version to sync from (branch for Git, version tag for MinIO, etc.)'),
     sa.Column('visibility', sa.String(length=20), nullable=False, server_default='private', comment='Repository visibility: public, private, or restricted'),
     sa.Column('organization_id', postgresql.UUID(), nullable=True, comment='Organization that owns this repository'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

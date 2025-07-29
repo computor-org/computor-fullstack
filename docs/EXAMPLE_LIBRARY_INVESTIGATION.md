@@ -27,7 +27,7 @@ Based on the GitLab refactoring progress:
   - `source_type`: Type of source ('git', 'minio', 'github', 's3', 'gitlab')
   - `source_url`: Repository URL (Git URL, MinIO path, etc.)
   - `access_credentials`: Encrypted credentials (Git token, MinIO JSON, etc.)
-  - `default_branch`: Branch or version to sync from
+  - `default_version`: Version to sync from (branch for Git, version tag for MinIO, etc.)
   - `visibility`: public, private, or restricted
   - `organization_id`: For organization-owned repositories
 - **Storage**: Flat structure - each example in its own directory
@@ -121,7 +121,7 @@ repo1 = ExampleRepository(
     source_type='git',
     source_url='https://gitlab.com/org/examples.git',
     access_credentials='gitlab_token_xxx',
-    default_branch='main'
+    default_version='main'  # Git branch
 )
 
 # MinIO-based repository (new)
@@ -129,7 +129,7 @@ repo2 = ExampleRepository(
     source_type='minio',
     source_url='computor-examples/python-basics',  # bucket/path
     access_credentials='{"access_key": "xxx", "secret_key": "yyy"}',  # JSON
-    default_branch='v1.0'  # Version tag
+    default_version='v1.0'  # Version tag
 )
 ```
 

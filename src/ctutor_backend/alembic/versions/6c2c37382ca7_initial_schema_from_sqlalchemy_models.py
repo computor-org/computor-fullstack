@@ -228,6 +228,7 @@ def upgrade() -> None:
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_repository_id', postgresql.UUID(), nullable=False, comment='Reference to the repository containing this example'),
     sa.Column('directory', sa.String(length=255), nullable=False, comment="Name of the directory containing this example (e.g., 'hello-world')"),
+    sa.Column('identifier', sqlalchemy_utils.types.ltree.LtreeType(), nullable=False, comment='Hierarchical identifier using dots as separators'),
     sa.Column('title', sa.String(length=255), nullable=False, comment='Human-readable title of the example'),
     sa.Column('description', sa.Text(), nullable=True, comment='Detailed description of the example'),
     sa.Column('subject', sa.String(length=50), nullable=True, comment="Primary programming language (e.g., 'python', 'java')"),
@@ -243,7 +244,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['example_repository_id'], ['example_repository.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('example_repository_id', 'directory', name='unique_example_per_directory')
+    sa.UniqueConstraint('example_repository_id', 'directory', name='unique_example_per_directory'),
+    sa.UniqueConstraint('example_repository_id', 'identifier', name='unique_example_per_identifier')
     )
     op.create_table('profile',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -466,6 +468,8 @@ def upgrade() -> None:
     sa.Column('version_tag', sa.String(length=64), nullable=False, comment="Version identifier (e.g., 'v1.0', 'v2.0-beta', commit hash)"),
     sa.Column('version_number', sa.Integer(), nullable=False, comment='Sequential version number for ordering'),
     sa.Column('storage_path', sa.Text(), nullable=False, comment='Path in storage system (MinIO path, S3 key, etc.)'),
+    sa.Column('meta_yaml', sa.Text(), nullable=False, comment='Content of meta.yaml file for this version'),
+    sa.Column('test_yaml', sa.Text(), nullable=True, comment='Content of test.yaml file for this version (optional)'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this version'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),

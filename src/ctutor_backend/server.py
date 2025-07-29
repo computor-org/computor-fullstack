@@ -51,6 +51,8 @@ from ctutor_backend.api.user import user_router
 from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
+from ctutor_backend.api.examples import examples_router
+from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
 
 async def init_execution_backend_api(db: Session):
 
@@ -166,6 +168,8 @@ course_member_router.register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
 LookUpRouter(RoleInterface).register_routes(app)
 CrudRouter(ExecutionBackendInterface).register_routes(app)
+CrudRouter(ExampleRepositoryInterface).register_routes(app)
+CrudRouter(ExampleInterface).register_routes(app)
 
 CrudRouter(SubmissionGroupInterface).register_routes(app)
 CrudRouter(SubmissionGroupMemberInterface).register_routes(app)
@@ -268,6 +272,12 @@ app.include_router(
 app.include_router(
     storage_router,
     tags=["storage"],
+    dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
+)
+
+app.include_router(
+    examples_router,
+    tags=["examples"],
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
 )
 

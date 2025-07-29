@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
+from sqlalchemy_utils.types.ltree import LtreeType
 
 from .base import Base
 
@@ -131,6 +132,13 @@ class Example(Base):
         comment="Name of the directory containing this example (e.g., 'hello-world')"
     )
     
+    # Hierarchical identifier
+    identifier = Column(
+        LtreeType,
+        nullable=False,
+        comment="Hierarchical identifier using dots as separators"
+    )
+    
     # Example metadata
     title = Column(String(255), nullable=False, comment="Human-readable title of the example")
     description = Column(Text, comment="Detailed description of the example")
@@ -166,6 +174,9 @@ class Example(Base):
     __table_args__ = (
         # Unique constraint: one example per directory per repository
         UniqueConstraint("example_repository_id", "directory", name="unique_example_per_directory"),
+        
+        # Unique constraint: one example per identifier per repository
+        UniqueConstraint("example_repository_id", "identifier", name="unique_example_per_identifier"),
         
         # Check constraints
         CheckConstraint(
@@ -220,6 +231,18 @@ class ExampleVersion(Base):
         Text,
         nullable=False,
         comment="Path in storage system (MinIO path, S3 key, etc.)"
+    )
+    
+    # Content metadata
+    meta_yaml = Column(
+        Text,
+        nullable=False,
+        comment="Content of meta.yaml file for this version"
+    )
+    test_yaml = Column(
+        Text,
+        nullable=True,
+        comment="Content of test.yaml file for this version (optional)"
     )
     
     # Tracking

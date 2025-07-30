@@ -127,10 +127,19 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
           setTaskProgress(100);
           setIsMonitoring(false);
           
-          // Store the created entity information for display
-          if (status.result?.result?.organization_id) {
-            setCreatedEntityId(status.result.result.organization_id);
-            setCreatedEntityName(status.result.result?.name || formData.title);
+          // Fetch the full result when task completes
+          try {
+            const resultResponse = await HierarchyTaskService.getTaskResult(taskId);
+            if (resultResponse.result?.result?.organization_id) {
+              setCreatedEntityId(resultResponse.result.result.organization_id);
+              setCreatedEntityName(resultResponse.result.result?.name || formData.title);
+            } else {
+              setCreatedEntityName(formData.title);
+            }
+          } catch (error) {
+            console.error('Error fetching task result:', error);
+            // Fallback to formData title if result fetch fails
+            setCreatedEntityName(formData.title);
           }
           
           return true;

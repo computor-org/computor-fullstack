@@ -135,10 +135,17 @@ const CourseTaskForm = React.forwardRef<CourseTaskFormHandle, CourseTaskFormProp
           setTaskProgress(100);
           setIsMonitoring(false);
           
-          // Store the created entity information for display
-          if (status.result?.result?.course_id) {
-            setCreatedEntityId(status.result.result.course_id);
-            setCreatedEntityName(status.result.result?.name || formData.title);
+          // Fetch the full result when task completes
+          try {
+            const resultResponse = await HierarchyTaskService.getTaskResult(taskId);
+            if (resultResponse.result?.result?.course_id) {
+              setCreatedEntityId(resultResponse.result.result.course_id);
+              setCreatedEntityName(resultResponse.result.result?.name || formData.title);
+            }
+          } catch (error) {
+            console.error('Error fetching task result:', error);
+            // Fallback to formData title if result fetch fails
+            setCreatedEntityName(formData.title);
           }
           
           return true;

@@ -208,7 +208,7 @@ async def create_course_family_activity(
             
             # Create the builder and course family
             builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
-            result = builder._create_course_family(deployment_config, user_id, organization_id)
+            result = builder._create_course_family(deployment_config, org, user_id)
             
             if result["success"]:
                 response = {
@@ -325,7 +325,7 @@ async def create_course_activity(
             
             # Create the builder and course
             builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
-            result = builder._create_course(deployment_config, user_id, course_family_id)
+            result = builder._create_course(deployment_config, org, family, user_id)
             
             if result["success"]:
                 response = {

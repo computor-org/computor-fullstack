@@ -8,6 +8,9 @@ from temporalio.common import RetryPolicy
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
+from ..generator.gitlab_builder_new import GitLabBuilderNew
+from ..interface.deployments import ComputorDeploymentConfig, OrganizationConfig, GitLabConfig, CourseFamilyConfig, CourseConfig
+from ..database import get_db
 
 
 # Activities
@@ -18,14 +21,70 @@ async def create_organization_activity(
     gitlab_token: str,
     user_id: str
 ) -> Dict[str, Any]:
-    """Activity to create an organization."""
-    # Implementation would go here
-    # For now, return a simple result
-    return {
-        "organization_id": "org-123",
-        "status": "created",
-        "name": org_config.get("name", "New Organization")
-    }
+    """Activity to create an organization using GitLabBuilderNew."""
+    try:
+        # Convert dict to proper config objects
+        gitlab_config = GitLabConfig(
+            url=gitlab_url,
+            token=gitlab_token,
+            parent=org_config.get("gitlab", {}).get("parent"),
+            path=org_config.get("path")
+        )
+        
+        org_config_obj = OrganizationConfig(
+            name=org_config.get("name"),
+            path=org_config.get("path"),
+            description=org_config.get("description", ""),
+            gitlab=gitlab_config
+        )
+        
+        # Create minimal dummy objects for required fields
+        dummy_course_family = CourseFamilyConfig(
+            name="temp",
+            path="temp",
+            description=""
+        )
+        
+        dummy_course = CourseConfig(
+            name="temp", 
+            path="temp",
+            description=""
+        )
+        
+        deployment_config = ComputorDeploymentConfig(
+            organization=org_config_obj,
+            courseFamily=dummy_course_family,
+            course=dummy_course
+        )
+        
+        # Create the builder and organization
+        with get_db() as db:
+            builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
+            result = builder._create_organization(deployment_config, user_id)
+            
+            if result["success"]:
+                return {
+                    "organization_id": result["organization"].id if result["organization"] else None,
+                    "status": "created",
+                    "name": org_config.get("name"),
+                    "gitlab_group_id": result["gitlab_group"].id if result["gitlab_group"] else None,
+                    "gitlab_created": result["gitlab_created"],
+                    "db_created": result["db_created"]
+                }
+            else:
+                return {
+                    "organization_id": None,
+                    "status": "failed",
+                    "name": org_config.get("name"),
+                    "error": result.get("error", "Unknown error occurred")
+                }
+    except Exception as e:
+        return {
+            "organization_id": None,
+            "status": "failed", 
+            "name": org_config.get("name"),
+            "error": str(e)
+        }
 
 
 @activity.defn(name="create_course_family_activity")

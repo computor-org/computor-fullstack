@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-RUN apt-get update && apt-get install -y postgresql-client
+RUN apt-get update && apt-get install -y postgresql-client git
 
 RUN useradd -ms /bin/bash uvicorn
 WORKDIR /home/uvicorn

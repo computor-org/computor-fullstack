@@ -79,6 +79,7 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
         },
       });
       const data = Array.isArray(response) ? response : (response as any).data || [];
+      console.log('Loaded content types:', data);
       setContentTypes(data);
     } catch (err) {
       console.error('Error loading content types:', err);
@@ -101,11 +102,16 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
 
   // Filter available parents based on selected content type
   const getAvailableParents = () => {
-    if (!selectedContentType || !selectedContentType.course_content_kind) {
+    if (!selectedContentType) {
       return existingContent;
     }
 
-    const selectedKind = selectedContentType.course_content_kind;
+    // Find the content kind for this content type
+    const selectedKind = contentKinds.find(kind => kind.id === selectedContentType.course_content_kind_id);
+    if (!selectedKind) {
+      console.warn('Could not find content kind for type:', selectedContentType);
+      return existingContent;
+    }
     
     // If this kind doesn't allow ascendants, it can only be at root level
     if (!selectedKind.has_ascendants) {
@@ -115,8 +121,13 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
     // Filter parents that allow descendants
     return existingContent.filter(content => {
       const contentType = contentTypes.find(ct => ct.id === content.course_content_type_id);
-      if (!contentType || !contentType.course_content_kind) return false;
-      return contentType.course_content_kind.has_descendants;
+      if (!contentType) return false;
+      
+      // Find the content kind for the parent
+      const parentKind = contentKinds.find(kind => kind.id === contentType.course_content_kind_id);
+      if (!parentKind) return false;
+      
+      return parentKind.has_descendants;
     });
   };
 
@@ -231,39 +242,40 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
                 <MenuItem key={type.id} value={type.id}>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Box sx={{ color: type.color || 'action.active' }}>
-                      {type.course_content_kind && getContentIcon(type.course_content_kind.id)}
+                      {getContentIcon(type.course_content_kind_id)}
                     </Box>
                     <Typography>{type.title || type.slug}</Typography>
-                    {type.course_content_kind && (
-                      <Chip
-                        label={type.course_content_kind.id}
-                        size="small"
-                        variant="outlined"
-                      />
-                    )}
+                    <Chip
+                      label={type.course_content_kind_id}
+                      size="small"
+                      variant="outlined"
+                    />
                   </Stack>
                 </MenuItem>
               ))}
             </Select>
-            {selectedContentType && selectedContentType.course_content_kind && (
-              <FormHelperText>
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  {selectedContentType.course_content_kind.submittable && (
-                    <Chip label="Submittable" size="small" color="info" variant="outlined" />
-                  )}
-                  {selectedContentType.course_content_kind.has_ascendants ? (
-                    <Chip label="Can have parent" size="small" color="success" variant="outlined" />
-                  ) : (
-                    <Chip label="Must be at root level" size="small" color="warning" variant="outlined" />
-                  )}
-                  {selectedContentType.course_content_kind.has_descendants ? (
-                    <Chip label="Can have children" size="small" color="success" variant="outlined" />
-                  ) : (
-                    <Chip label="Cannot have children" size="small" color="warning" variant="outlined" />
-                  )}
-                </Stack>
-              </FormHelperText>
-            )}
+            {selectedContentType && (() => {
+              const kind = contentKinds.find(k => k.id === selectedContentType.course_content_kind_id);
+              return kind && (
+                <FormHelperText>
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {kind.submittable && (
+                      <Chip label="Submittable" size="small" color="info" variant="outlined" />
+                    )}
+                    {kind.has_ascendants ? (
+                      <Chip label="Can have parent" size="small" color="success" variant="outlined" />
+                    ) : (
+                      <Chip label="Must be at root level" size="small" color="warning" variant="outlined" />
+                    )}
+                    {kind.has_descendants ? (
+                      <Chip label="Can have children" size="small" color="success" variant="outlined" />
+                    ) : (
+                      <Chip label="Cannot have children" size="small" color="warning" variant="outlined" />
+                    )}
+                  </Stack>
+                </FormHelperText>
+              );
+            })()}
           </FormControl>
 
           <TextField
@@ -283,7 +295,17 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
             rows={3}
           />
 
-          {selectedContentType && selectedContentType.course_content_kind?.has_ascendants && (
+          {/* Debug info */}
+          {selectedContentType && (
+            <Alert severity="info" sx={{ my: 1 }}>
+              Debug: Content type "{selectedContentType.title}" - 
+              Kind ID: {selectedContentType.course_content_kind_id} - 
+              Kind found: {contentKinds.find(k => k.id === selectedContentType.course_content_kind_id) ? 'YES' : 'NO'} - 
+              has_ascendants: {contentKinds.find(k => k.id === selectedContentType.course_content_kind_id)?.has_ascendants?.toString() || 'UNDEFINED'}
+            </Alert>
+          )}
+
+          {selectedContentType && contentKinds.find(k => k.id === selectedContentType.course_content_kind_id)?.has_ascendants && (
             <FormControl fullWidth>
               <InputLabel>Parent (Optional)</InputLabel>
               <Select

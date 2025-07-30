@@ -206,7 +206,7 @@ def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Ses
                 CourseContent.course_id == updated_item.course_id
             ).params(pattern=f'{old_path}.%').all()
             
-            # Update paths of all descendants
+            # Update paths of all descendants using direct SQL update
             for descendant in descendants:
                 old_descendant_path = str(descendant.path)
                 
@@ -215,9 +215,18 @@ def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Ses
                     # Remove the old parent path and add the new parent path
                     relative_path = old_descendant_path[len(old_path):]  # includes the leading '.'
                     new_descendant_path = new_path + relative_path
-                    descendant.path = Ltree(new_descendant_path)
+                    
+                    # Use direct SQL update to ensure it gets committed
+                    db.execute(
+                        text("UPDATE course_content SET path = :new_path WHERE id = :content_id"),
+                        {"new_path": new_descendant_path, "content_id": descendant.id}
+                    )
             
-            # Note: Don't commit here - let the main update_db function handle the commit
+            # Force commit the descendant changes immediately
+            db.commit()
+            
+            # Refresh the updated_item to ensure it's still attached to the session
+            db.refresh(updated_item)
                 
         except Exception as e:
             print(f"Error in post_update: {e}")

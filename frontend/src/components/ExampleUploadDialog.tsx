@@ -17,11 +17,18 @@ import {
   Alert,
   LinearProgress,
   Chip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Checkbox,
+  FormHelperText,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   InsertDriveFile as FileIcon,
   Archive as ZipIcon,
+  Folder as FolderIcon,
 } from '@mui/icons-material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,9 +42,6 @@ const JSZip = require('jszip');
 
 const uploadSchema = z.object({
   repository_id: z.string().min(1, 'Repository is required'),
-  directory: z.string()
-    .min(1, 'Directory is required')
-    .regex(/^[a-zA-Z0-9._-]+$/, 'Directory must contain only letters, numbers, dots, underscores, and hyphens'),
   version_tag: z.string().min(1, 'Version tag is required'),
 });
 
@@ -46,6 +50,16 @@ type UploadFormData = z.infer<typeof uploadSchema>;
 interface FileUpload {
   name: string;
   content: string;
+}
+
+interface DetectedExample {
+  directory: string;
+  title: string;
+  description?: string;
+  slug: string;
+  files: FileUpload[];
+  metaYaml: string;
+  testYaml?: string;
 }
 
 interface ExampleUploadDialogProps {
@@ -61,10 +75,12 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [files, setFiles] = useState<FileUpload[]>([]);
+  const [detectedExamples, setDetectedExamples] = useState<DetectedExample[]>([]);
+  const [selectedExamples, setSelectedExamples] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [directoryAutoDetected, setDirectoryAutoDetected] = useState(false);
+  const [zipProcessing, setZipProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
   const {
     control,
@@ -77,12 +93,18 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
     resolver: zodResolver(uploadSchema),
     defaultValues: {
       repository_id: '',
-      directory: '',
       version_tag: 'v1.0',
     },
   });
 
   const selectedRepository = repositories.find(r => r.id === watch('repository_id'));
+
+  // Auto-select first repository when dialog opens
+  React.useEffect(() => {
+    if (open && repositories.length > 0 && !watch('repository_id')) {
+      setValue('repository_id', repositories[0].id);
+    }
+  }, [open, repositories, setValue, watch]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFiles = event.target.files;
@@ -105,101 +127,119 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
   };
 
   const handleZipFile = async (zipFile: File) => {
-    const zip = new JSZip();
-    const zipContent = await zipFile.arrayBuffer();
-    const loadedZip = await zip.loadAsync(zipContent);
-
-    const extractedFiles: FileUpload[] = [];
-    let detectedDirectory: string | null = null;
-
-    // First pass: detect directory structure and common root
-    const allPaths = Object.keys(loadedZip.files).filter(path => !path.startsWith('__MACOSX/') && !path.includes('/.'));
+    setZipProcessing(true);
+    setError(null);
     
-    if (allPaths.length > 0) {
-      // Check if all files are in a common directory
-      const firstPath = allPaths[0];
-      if (firstPath.includes('/')) {
-        const possibleRoot = firstPath.split('/')[0];
-        const allInSameRoot = allPaths.every(path => path.startsWith(possibleRoot + '/') || path === possibleRoot);
-        
-        if (allInSameRoot) {
-          detectedDirectory = possibleRoot;
-        }
-      }
-      
-      // If no common root, try to extract from filename or meta.yaml
-      if (!detectedDirectory) {
-        // Check if there's a meta.yaml with slug
-        const metaPath = allPaths.find(path => path.endsWith('meta.yaml'));
-        if (metaPath) {
-          try {
-            const metaEntry = loadedZip.files[metaPath] as any;
-            const metaContent = await metaEntry.async('string');
-            const metaData = yaml.load ? yaml.load(metaContent) as any : null;
-            if (metaData && metaData.slug) {
-              detectedDirectory = metaData.slug;
-            }
-          } catch (err) {
-            console.warn('Failed to parse meta.yaml for directory detection');
-          }
-        }
-      }
-      
-      // Fallback: use zip filename without extension
-      if (!detectedDirectory) {
-        detectedDirectory = zipFile.name.replace(/\.zip$/i, '');
-      }
-    }
+    try {
+      const zip = new JSZip();
+      const zipContent = await zipFile.arrayBuffer();
+      const loadedZip = await zip.loadAsync(zipContent);
 
-    // Second pass: extract files
-    for (const [relativePath, zipEntry] of Object.entries(loadedZip.files)) {
-      const entry = zipEntry as any;
-      if (!entry.dir && !relativePath.startsWith('__MACOSX/') && !relativePath.includes('/.')) {
+      // Find all directories that contain meta.yaml files
+      const allPaths = Object.keys(loadedZip.files).filter(path => 
+        !path.startsWith('__MACOSX/') && !path.includes('/.')
+      );
+      
+      const metaYamlPaths = allPaths.filter(path => path.endsWith('meta.yaml'));
+      
+      if (metaYamlPaths.length === 0) {
+        throw new Error('No meta.yaml files found in the ZIP archive. Please ensure your example directories contain meta.yaml files.');
+      }
+
+      const examples: DetectedExample[] = [];
+
+      // Process each directory with meta.yaml
+      for (const metaPath of metaYamlPaths) {
         try {
-          const content = await entry.async('string');
-          let fileName = relativePath;
-          
-          // Remove common directory prefix if detected
-          if (detectedDirectory && relativePath.startsWith(detectedDirectory + '/')) {
-            fileName = relativePath.substring(detectedDirectory.length + 1);
+          // Get directory name from meta.yaml path
+          const directoryPath = metaPath.replace('/meta.yaml', '');
+          const directoryName = directoryPath.includes('/') ? 
+            directoryPath.split('/').pop()! : directoryPath;
+
+          // Read meta.yaml content
+          const metaEntry = loadedZip.files[metaPath] as any;
+          const metaContent = await metaEntry.async('string');
+          const metaData = yaml.load(metaContent) as any;
+
+          if (!metaData) {
+            console.warn(`Failed to parse meta.yaml in ${directoryPath}`);
+            continue;
           }
-          
-          // Only include supported file types
-          if (isSupportedFile(fileName)) {
-            extractedFiles.push({
-              name: fileName,
-              content: content,
-            });
+
+          // Find all files in this directory
+          const directoryFiles: FileUpload[] = [];
+          const directoryPrefix = directoryPath === directoryName ? directoryName + '/' : directoryPath + '/';
+
+          for (const [filePath, zipEntry] of Object.entries(loadedZip.files)) {
+            const entry = zipEntry as any;
+            if (!entry.dir && filePath.startsWith(directoryPrefix) && 
+                !filePath.startsWith('__MACOSX/') && !filePath.includes('/.')) {
+              
+              const relativePath = filePath.substring(directoryPrefix.length);
+              
+              // Skip meta.yaml and test.yaml as they're handled separately
+              if (relativePath === 'meta.yaml' || relativePath === 'test.yaml') {
+                continue;
+              }
+
+              // Only include supported file types
+              if (isSupportedFile(relativePath)) {
+                try {
+                  const content = await entry.async('string');
+                  directoryFiles.push({
+                    name: relativePath,
+                    content: content,
+                  });
+                } catch (err) {
+                  console.warn(`Failed to extract ${filePath}:`, err);
+                }
+              }
+            }
           }
+
+          // Check for test.yaml
+          let testYaml: string | undefined;
+          const testYamlPath = directoryPrefix + 'test.yaml';
+          if (loadedZip.files[testYamlPath]) {
+            try {
+              const testEntry = loadedZip.files[testYamlPath] as any;
+              testYaml = await testEntry.async('string');
+            } catch (err) {
+              console.warn(`Failed to read test.yaml in ${directoryPath}`);
+            }
+          }
+
+          // Create detected example
+          examples.push({
+            directory: directoryName,
+            title: metaData.title || directoryName.replace(/[-_]/g, ' '),
+            description: metaData.description,
+            slug: metaData.slug || directoryName,
+            files: directoryFiles,
+            metaYaml: metaContent,
+            testYaml: testYaml,
+          });
+
         } catch (err) {
-          console.warn(`Failed to extract ${relativePath}:`, err);
+          console.warn(`Failed to process directory for ${metaPath}:`, err);
         }
       }
-    }
 
-    if (extractedFiles.length === 0) {
-      throw new Error('No supported files found in zip archive');
-    }
+      if (examples.length === 0) {
+        throw new Error('No valid examples found. Please ensure your directories contain proper meta.yaml files.');
+      }
 
-    // Auto-populate directory field if detected
-    if (detectedDirectory) {
-      setValue('directory', detectedDirectory);
-      setDirectoryAutoDetected(true);
-    }
+      setDetectedExamples(examples);
+      
+      // Auto-select all examples
+      const allSlugs = new Set(examples.map(ex => ex.slug));
+      setSelectedExamples(allSlugs);
 
-    // Replace existing files with extracted ones
-    setFiles(prev => {
-      const newFiles = [...prev];
-      extractedFiles.forEach(newFile => {
-        const existingIndex = newFiles.findIndex(f => f.name === newFile.name);
-        if (existingIndex >= 0) {
-          newFiles[existingIndex] = newFile;
-        } else {
-          newFiles.push(newFile);
-        }
-      });
-      return newFiles;
-    });
+    } catch (err) {
+      throw err;
+    } finally {
+      setZipProcessing(false);
+    }
   };
 
   const isSupportedFile = (fileName: string): boolean => {
@@ -207,8 +247,23 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
     return supportedExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
   };
 
-  const handleRemoveFile = (fileName: string) => {
-    setFiles(files.filter(f => f.name !== fileName));
+  const handleExampleToggle = (slug: string) => {
+    const newSelected = new Set(selectedExamples);
+    if (newSelected.has(slug)) {
+      newSelected.delete(slug);
+    } else {
+      newSelected.add(slug);
+    }
+    setSelectedExamples(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedExamples.size === detectedExamples.length) {
+      setSelectedExamples(new Set());
+    } else {
+      const allSlugs = new Set(detectedExamples.map(ex => ex.slug));
+      setSelectedExamples(allSlugs);
+    }
   };
 
   const onSubmit = async (data: UploadFormData) => {
@@ -222,38 +277,91 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
       return;
     }
 
-    // Validate that meta.yaml is included
-    if (!files.some(f => f.name === 'meta.yaml')) {
-      setError('meta.yaml file is required');
+    if (detectedExamples.length === 0) {
+      setError('No examples detected. Please upload a ZIP file with directories containing meta.yaml files.');
+      return;
+    }
+
+    if (selectedExamples.size === 0) {
+      setError('Please select at least one example to upload.');
       return;
     }
 
     setUploading(true);
     setError(null);
+    setUploadProgress({ current: 0, total: selectedExamples.size });
 
     try {
-      // Convert files array to Record<string, string>
-      const filesMap = files.reduce((acc, file) => {
-        acc[file.name] = file.content;
-        return acc;
-      }, {} as Record<string, string>);
+      const uploadPromises = [];
+      const selectedExamplesList = detectedExamples.filter(ex => selectedExamples.has(ex.slug));
+      let completedCount = 0;
+      
+      // Create upload promises with example information for better error tracking
+      for (const example of selectedExamplesList) {
+        // Convert files array to Record<string, string>
+        const filesMap: Record<string, string> = {};
+        for (const file of example.files) {
+          filesMap[file.name] = file.content;
+        }
+        
+        // Add meta.yaml and test.yaml
+        filesMap['meta.yaml'] = example.metaYaml;
+        if (example.testYaml) {
+          filesMap['test.yaml'] = example.testYaml;
+        }
 
-      const uploadRequest: ExampleUploadRequest = {
-        repository_id: data.repository_id,
-        directory: data.directory,
-        version_tag: data.version_tag,
-        files: filesMap,
-      };
+        const uploadRequest: ExampleUploadRequest = {
+          repository_id: data.repository_id,
+          directory: example.directory,
+          version_tag: data.version_tag,
+          files: filesMap,
+        };
 
-      // Make actual API call to upload example
-      const result = await apiClient.post('/examples/upload', uploadRequest);
-      console.log('Upload successful:', result);
+        uploadPromises.push({
+          example,
+          promise: apiClient.post('/examples/upload', uploadRequest).then(result => {
+            completedCount++;
+            setUploadProgress({ current: completedCount, total: selectedExamplesList.length });
+            return result;
+          })
+        });
+      }
 
-      // Reset form and close dialog
-      reset();
-      setFiles([]);
-      setDirectoryAutoDetected(false);
-      onSuccess();
+      // Wait for all uploads to complete with better error handling
+      const results = await Promise.allSettled(uploadPromises.map(up => up.promise));
+      
+      // Check results and provide detailed feedback
+      const successful = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+      
+      if (failed > 0) {
+        // Collect error details
+        const failedExamples = [];
+        for (let i = 0; i < results.length; i++) {
+          if (results[i].status === 'rejected') {
+            const reason = (results[i] as PromiseRejectedResult).reason;
+            failedExamples.push(`${uploadPromises[i].example.title}: ${reason.message || reason}`);
+          }
+        }
+        
+        if (successful > 0) {
+          // Partial success
+          setError(`Uploaded ${successful} of ${selectedExamplesList.length} examples. Failed: ${failedExamples.join('; ')}`);
+        } else {
+          // All failed
+          throw new Error(`All uploads failed. ${failedExamples.join('; ')}`);
+        }
+      }
+      
+      console.log(`Successfully uploaded ${successful} examples`);
+
+      // Reset form and close dialog only if at least some uploads succeeded
+      if (successful > 0) {
+        reset();
+        setDetectedExamples([]);
+        setSelectedExamples(new Set());
+        onSuccess();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
@@ -264,9 +372,10 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
   const handleClose = () => {
     if (!uploading) {
       reset();
-      setFiles([]);
+      setDetectedExamples([]);
+      setSelectedExamples(new Set());
       setError(null);
-      setDirectoryAutoDetected(false);
+      setUploadProgress(null);
       onClose();
     }
   };
@@ -277,8 +386,10 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
       onClose={handleClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: { height: '80vh' }
+      slotProps={{
+        paper: {
+          sx: { height: '80vh' }
+        }
       }}
     >
       <form onSubmit={handleSubmit(onSubmit)}>
@@ -333,47 +444,22 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
               )}
             />
 
-            {/* Directory and Version */}
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Controller
-                name="directory"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Directory"
-                    fullWidth
-                    error={!!errors.directory}
-                    helperText={
-                      directoryAutoDetected 
-                        ? "Auto-detected from ZIP structure" 
-                        : errors.directory?.message || "Directory name for this example"
-                    }
-                    placeholder="hello-world"
-                    disabled={uploading}
-                    InputProps={{
-                      style: directoryAutoDetected ? { backgroundColor: '#f5f5f5' } : {}
-                    }}
-                  />
-                )}
-              />
-
-              <Controller
-                name="version_tag"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    {...field}
-                    label="Version Tag"
-                    fullWidth
-                    error={!!errors.version_tag}
-                    helperText={errors.version_tag?.message}
-                    placeholder="v1.0"
-                    disabled={uploading}
-                  />
-                )}
-              />
-            </Box>
+            {/* Version Tag */}
+            <Controller
+              name="version_tag"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  {...field}
+                  label="Version Tag"
+                  fullWidth
+                  error={!!errors.version_tag}
+                  helperText={errors.version_tag?.message}
+                  placeholder="v1.0"
+                  disabled={uploading}
+                />
+              )}
+            />
 
             {/* Zip File Upload */}
             <Box>
@@ -396,52 +482,103 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
                 />
               </Button>
               
-              {files.length > 0 && (
-                <Paper variant="outlined" sx={{ p: 1, maxHeight: 150, overflow: 'auto' }}>
-                  {files.map((file, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        py: 0.5,
-                      }}
+              {zipProcessing && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="body2" gutterBottom>
+                    Processing ZIP file...
+                  </Typography>
+                  <LinearProgress />
+                </Box>
+              )}
+              
+              {/* Detected Examples */}
+              {detectedExamples.length > 0 && (
+                <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="subtitle2">
+                      Detected Examples ({detectedExamples.length})
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={handleSelectAll}
+                      disabled={uploading}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FileIcon fontSize="small" />
-                        <Typography variant="body2">{file.name}</Typography>
-                        <Chip 
-                          label={`${file.content.length} chars`} 
-                          size="small" 
-                          variant="outlined"
+                      {selectedExamples.size === detectedExamples.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </Box>
+                  
+                  <List dense>
+                    {detectedExamples.map((example, index) => (
+                      <ListItem key={index} sx={{ px: 0 }}>
+                        <ListItemIcon>
+                          <Checkbox
+                            checked={selectedExamples.has(example.slug)}
+                            onChange={() => handleExampleToggle(example.slug)}
+                            disabled={uploading}
+                          />
+                        </ListItemIcon>
+                        <ListItemIcon>
+                          <FolderIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Box>
+                              <Typography variant="body2" component="span" sx={{ fontWeight: 'medium' }}>
+                                {example.title}
+                              </Typography>
+                              <Chip 
+                                label={example.directory} 
+                                size="small" 
+                                variant="outlined"
+                                sx={{ ml: 1, fontFamily: 'monospace' }}
+                              />
+                            </Box>
+                          }
+                          secondary={
+                            <Box sx={{ mt: 0.5 }}>
+                              {example.description && (
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  {example.description}
+                                </Typography>
+                              )}
+                              <Typography variant="caption" color="text.secondary">
+                                {example.files.length} files • Slug: {example.slug}
+                              </Typography>
+                            </Box>
+                          }
                         />
-                      </Box>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleRemoveFile(file.name)}
-                        disabled={uploading}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  ))}
+                      </ListItem>
+                    ))}
+                  </List>
                 </Paper>
               )}
             </Box>
 
+            {/* Upload Progress */}
+            {uploading && uploadProgress && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="body2" gutterBottom>
+                  Uploading examples: {uploadProgress.current} of {uploadProgress.total}
+                </Typography>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={(uploadProgress.current / uploadProgress.total) * 100} 
+                />
+              </Box>
+            )}
+
             {/* Instructions */}
             <Alert severity="info">
               <Typography variant="body2">
-                <strong>Directory Upload:</strong> Create a ZIP archive of your complete example directory.
+                <strong>Automatic Detection:</strong> Upload a ZIP archive containing one or more example directories.
                 <br />
-                <strong>Required:</strong> Your ZIP must contain a <code>meta.yaml</code> file with example metadata.
+                <strong>Required:</strong> Each example directory must contain a <code>meta.yaml</code> file with metadata.
                 <br />
                 <strong>Optional:</strong> Include a <code>test.yaml</code> file for automated testing.
                 <br />
                 <strong>Supported Files:</strong> .py, .js, .java, .cpp, .c, .h, .txt, .md, .yaml, .yml, .json
                 <br />
-                The system will automatically extract and parse your example files.
+                The system will automatically detect all examples and let you choose which ones to upload.
               </Typography>
             </Alert>
           </Box>
@@ -454,10 +591,13 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
           <Button
             type="submit"
             variant="contained"
-            disabled={uploading || !selectedRepository || selectedRepository.source_type === 'git'}
+            disabled={uploading || !selectedRepository || selectedRepository.source_type === 'git' || selectedExamples.size === 0}
             startIcon={<ZipIcon />}
           >
-            {uploading ? 'Uploading...' : 'Upload Directory'}
+            {uploading 
+              ? `Uploading ${selectedExamples.size} example${selectedExamples.size === 1 ? '' : 's'}...` 
+              : `Upload ${selectedExamples.size} Example${selectedExamples.size === 1 ? '' : 's'}`
+            }
           </Button>
         </DialogActions>
       </form>

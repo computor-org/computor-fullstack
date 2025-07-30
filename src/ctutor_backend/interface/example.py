@@ -273,6 +273,13 @@ class ExampleUploadRequest(BaseModel):
     files: Dict[str, str] = Field(..., description="Map of filename to content (must include meta.yaml)")
 
 
+class ExampleBatchUploadRequest(BaseModel):
+    """Request to upload multiple examples to storage."""
+    repository_id: UUID
+    version_tag: str
+    examples: List[Dict[str, Any]] = Field(..., description="List of examples with directory and files")
+
+
 class ExampleDownloadResponse(BaseModel):
     """Response containing downloaded example files."""
     example_id: UUID

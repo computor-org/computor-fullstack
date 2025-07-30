@@ -68,6 +68,7 @@ interface ExampleVersion {
   created_at: string;
   meta_yaml?: string;
   test_yaml?: string;
+  storage_path?: string;
 }
 
 const ExampleDetailPage: React.FC = () => {
@@ -76,10 +77,12 @@ const ExampleDetailPage: React.FC = () => {
   
   const [example, setExample] = useState<Example | null>(null);
   const [versions, setVersions] = useState<ExampleVersion[]>([]);
+  const [fullVersionDetails, setFullVersionDetails] = useState<Record<string, ExampleVersion>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -153,8 +156,45 @@ const ExampleDetailPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+  const loadVersionDetails = async (versionId: string) => {
+    try {
+      const data = await apiClient.get<ExampleVersion>(`/examples/versions/${versionId}`);
+      setFullVersionDetails(prev => ({
+        ...prev,
+        [versionId]: data
+      }));
+    } catch (err) {
+      console.error(`Error loading version ${versionId} details:`, err);
+    }
+  };
+
+  const loadAllVersionDetails = async () => {
+    if (versions.length === 0 || Object.keys(fullVersionDetails).length === versions.length) {
+      return; // Already loaded or no versions
+    }
+    
+    setLoadingMetadata(true);
+    try {
+      await Promise.all(
+        versions.map(version => {
+          if (!fullVersionDetails[version.id]) {
+            return loadVersionDetails(version.id);
+          }
+          return Promise.resolve();
+        })
+      );
+    } finally {
+      setLoadingMetadata(false);
+    }
+  };
+
+  const handleTabChange = async (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    
+    // Load full version details when metadata tab is selected
+    if (newValue === 2) {
+      await loadAllVersionDetails();
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -196,7 +236,7 @@ const ExampleDetailPage: React.FC = () => {
       <Box>
         <Button
           startIcon={<BackIcon />}
-          onClick={() => navigate('/examples')}
+          onClick={() => navigate('/admin/examples')}
           sx={{ mb: 2 }}
         >
           Back to Examples
@@ -214,7 +254,7 @@ const ExampleDetailPage: React.FC = () => {
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
         <Button
           startIcon={<BackIcon />}
-          onClick={() => navigate('/examples')}
+          onClick={() => navigate('/admin/examples')}
           sx={{ mr: 2 }}
         >
           Back to Examples
@@ -378,51 +418,67 @@ const ExampleDetailPage: React.FC = () => {
           Version Metadata
         </Typography>
         
-        {versions.map((version) => {
-          const metaData = version.meta_yaml ? parseMetaYaml(version.meta_yaml) : null;
-          const testData = version.test_yaml ? parseTestYaml(version.test_yaml) : null;
-          
-          return (
-            <Accordion key={version.id}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>
-                  Version {version.version_tag} - Metadata
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Grid container spacing={2}>
-                  {metaData && (
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        meta.yaml
-                      </Typography>
-                      <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
-                        <pre style={{ fontSize: '0.8rem', margin: 0 }}>
-                          {version.meta_yaml}
-                        </pre>
-                      </Paper>
-                    </Grid>
-                  )}
-                  {testData && (
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        test.yaml
-                      </Typography>
-                      <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
-                        <pre style={{ fontSize: '0.8rem', margin: 0 }}>
-                          {version.test_yaml}
-                        </pre>
-                      </Paper>
-                    </Grid>
-                  )}
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
-          );
-        })}
-        
-        {versions.length === 0 && (
+        {loadingMetadata ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : versions.length === 0 ? (
           <Alert severity="info">No metadata available.</Alert>
+        ) : (
+          versions.map((version) => {
+            const fullVersion = fullVersionDetails[version.id] || version;
+            const metaData = fullVersion.meta_yaml ? parseMetaYaml(fullVersion.meta_yaml) : null;
+            const testData = fullVersion.test_yaml ? parseTestYaml(fullVersion.test_yaml) : null;
+            
+            return (
+              <Accordion key={version.id}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography>
+                    Version {version.version_tag} - Metadata
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    {fullVersion.meta_yaml ? (
+                      <Grid item xs={12} md={testData ? 6 : 12}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          meta.yaml
+                        </Typography>
+                        <Paper variant="outlined" sx={{ p: 2, maxHeight: 400, overflow: 'auto' }}>
+                          <pre style={{ fontSize: '0.8rem', margin: 0 }}>
+                            {fullVersion.meta_yaml}
+                          </pre>
+                        </Paper>
+                      </Grid>
+                    ) : (
+                      <Grid item xs={12}>
+                        <Alert severity="warning">No meta.yaml found for this version.</Alert>
+                      </Grid>
+                    )}
+                    {fullVersion.test_yaml && (
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" gutterBottom>
+                          test.yaml
+                        </Typography>
+                        <Paper variant="outlined" sx={{ p: 2, maxHeight: 400, overflow: 'auto' }}>
+                          <pre style={{ fontSize: '0.8rem', margin: 0 }}>
+                            {fullVersion.test_yaml}
+                          </pre>
+                        </Paper>
+                      </Grid>
+                    )}
+                    {fullVersion.storage_path && (
+                      <Grid item xs={12}>
+                        <Typography variant="caption" color="text.secondary">
+                          Storage Path: {fullVersion.storage_path}
+                        </Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                </AccordionDetails>
+              </Accordion>
+            );
+          })
         )}
       </TabPanel>
     </Box>

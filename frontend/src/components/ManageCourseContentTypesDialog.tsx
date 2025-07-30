@@ -255,7 +255,10 @@ const ManageCourseContentTypesDialog: React.FC<ManageCourseContentTypesDialogPro
                           <Chip
                             label={type.slug}
                             size="small"
-                            variant="outlined"
+                            sx={{
+                              backgroundColor: type.color || 'action.selected',
+                              color: 'white',
+                            }}
                           />
                         </Stack>
                       }

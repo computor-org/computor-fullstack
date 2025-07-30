@@ -501,6 +501,7 @@ export interface CourseContentUpdate {
   path?: string | null;
   title?: string | null;
   description?: string | null;
+  course_content_type_id?: string | null;
   properties?: CourseContentProperties | null;
   version_identifier?: string | null;
   position?: number | null;

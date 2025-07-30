@@ -120,7 +120,23 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
         position: formData.position,
       };
 
-      // Note: Content type cannot be changed after creation
+      // Check if content type changed
+      if (formData.contentTypeId !== content.course_content_type_id) {
+        // Verify the new content type has the same kind
+        const newContentType = contentTypes.find(ct => ct.id === formData.contentTypeId);
+        const oldContentType = contentTypes.find(ct => ct.id === content.course_content_type_id);
+        
+        if (newContentType && oldContentType) {
+          if (newContentType.course_content_kind_id !== oldContentType.course_content_kind_id) {
+            setError('Cannot change to a content type with a different kind.');
+            setLoading(false);
+            return;
+          }
+          
+          // Include content type change in update
+          updateData.course_content_type_id = formData.contentTypeId;
+        }
+      }
 
       await apiClient.patch(`/course-contents/${content.id}`, updateData);
       
@@ -172,24 +188,43 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
             </Alert>
           )}
 
-          {selectedContentType && (
-            <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Content Type (cannot be changed)
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box sx={{ color: selectedContentType.color || 'action.active' }}>
-                  {getContentIcon(selectedContentType.course_content_kind_id)}
-                </Box>
-                <Typography>{selectedContentType.title || selectedContentType.slug}</Typography>
-                <Chip
-                  label={selectedContentType.course_content_kind_id}
-                  size="small"
-                  variant="outlined"
-                />
-              </Stack>
-              {selectedKind && (
-                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 1 }}>
+          <FormControl fullWidth>
+            <InputLabel>Content Type</InputLabel>
+            <Select
+              value={formData.contentTypeId}
+              onChange={(e) => setFormData({ ...formData, contentTypeId: e.target.value })}
+              label="Content Type"
+            >
+              {contentTypes
+                .filter(type => {
+                  // Only show content types with the same kind
+                  const currentContentType = content ? contentTypes.find(ct => ct.id === content.course_content_type_id) : null;
+                  if (!currentContentType) return true;
+                  return type.course_content_kind_id === currentContentType.course_content_kind_id;
+                })
+                .map((type) => (
+                  <MenuItem key={type.id} value={type.id}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Box sx={{ color: type.color || 'action.active' }}>
+                        {getContentIcon(type.course_content_kind_id)}
+                      </Box>
+                      <Typography>{type.title || type.slug}</Typography>
+                      <Chip
+                        label={type.course_content_kind_id}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </Stack>
+                  </MenuItem>
+                ))
+              }
+            </Select>
+            {selectedKind && (
+              <FormHelperText>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  <Typography variant="caption" color="text.secondary">
+                    Only showing types with kind: {selectedKind.id}
+                  </Typography>
                   {selectedKind.submittable && (
                     <Chip label="Submittable" size="small" color="info" variant="outlined" />
                   )}
@@ -199,9 +234,9 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
                     <Chip label="Cannot have children" size="small" color="warning" variant="outlined" />
                   )}
                 </Stack>
-              )}
-            </Box>
-          )}
+              </FormHelperText>
+            )}
+          </FormControl>
 
           <TextField
             label="Title"

@@ -94,6 +94,7 @@ class CourseContentUpdate(BaseModel):
     path: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    course_content_type_id: Optional[str] = None
     properties: Optional[CourseContentProperties] = None
     version_identifier: Optional[str] = None
     position: Optional[float] = None

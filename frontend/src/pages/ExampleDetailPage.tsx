@@ -83,6 +83,7 @@ const ExampleDetailPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -90,6 +91,17 @@ const ExampleDetailPage: React.FC = () => {
       loadVersions();
     }
   }, [id]);
+
+  // Load metadata after versions are loaded and select first version
+  useEffect(() => {
+    if (versions.length > 0) {
+      // Auto-select the first version if none is selected
+      if (!selectedVersionId) {
+        setSelectedVersionId(versions[0].id);
+      }
+      loadAllVersionDetails();
+    }
+  }, [versions, selectedVersionId]);
 
   const loadExampleDetail = async () => {
     try {
@@ -158,7 +170,9 @@ const ExampleDetailPage: React.FC = () => {
 
   const loadVersionDetails = async (versionId: string) => {
     try {
+      console.log(`Loading version details for ${versionId}...`);
       const data = await apiClient.get<ExampleVersion>(`/examples/versions/${versionId}`);
+      console.log(`Loaded version details for ${versionId}:`, data);
       setFullVersionDetails(prev => ({
         ...prev,
         [versionId]: data
@@ -169,32 +183,38 @@ const ExampleDetailPage: React.FC = () => {
   };
 
   const loadAllVersionDetails = async () => {
+    console.log(`loadAllVersionDetails called. Versions count: ${versions.length}`);
+    console.log('Versions:', versions);
+    console.log('Already loaded details:', Object.keys(fullVersionDetails));
+    
     if (versions.length === 0 || Object.keys(fullVersionDetails).length === versions.length) {
+      console.log('Skipping load - already loaded or no versions');
       return; // Already loaded or no versions
     }
     
     setLoadingMetadata(true);
     try {
+      console.log('Starting to load version details...');
       await Promise.all(
         versions.map(version => {
           if (!fullVersionDetails[version.id]) {
+            console.log(`Loading details for version ${version.id}`);
             return loadVersionDetails(version.id);
           }
+          console.log(`Already have details for version ${version.id}`);
           return Promise.resolve();
         })
       );
+      console.log('All version details loaded');
+    } catch (error) {
+      console.error('Error loading version details:', error);
     } finally {
       setLoadingMetadata(false);
     }
   };
 
-  const handleTabChange = async (_: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    
-    // Load full version details when metadata tab is selected
-    if (newValue === 2) {
-      await loadAllVersionDetails();
-    }
   };
 
   const formatDate = (dateString: string) => {
@@ -341,12 +361,12 @@ const ExampleDetailPage: React.FC = () => {
         </CardContent>
       </Card>
 
+
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab label={`Versions (${versions.length})`} />
           <Tab label="Dependencies" />
-          <Tab label="Metadata" />
         </Tabs>
       </Box>
 
@@ -372,21 +392,48 @@ const ExampleDetailPage: React.FC = () => {
               </TableHead>
               <TableBody>
                 {versions.map((version) => (
-                  <TableRow key={version.id}>
+                  <TableRow 
+                    key={version.id}
+                    hover
+                    selected={selectedVersionId === version.id}
+                    onClick={() => setSelectedVersionId(version.id)}
+                    sx={{ 
+                      cursor: 'pointer',
+                      '&.Mui-selected': {
+                        backgroundColor: 'action.selected',
+                      },
+                      '&.Mui-selected:hover': {
+                        backgroundColor: 'action.selected',
+                      }
+                    }}
+                  >
                     <TableCell>
                       <Chip 
                         label={`v${version.version_number}`} 
                         size="small" 
-                        color="primary"
+                        color={selectedVersionId === version.id ? "primary" : "default"}
+                        variant={selectedVersionId === version.id ? "filled" : "outlined"}
                       />
                     </TableCell>
-                    <TableCell>{version.version_tag}</TableCell>
+                    <TableCell>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: selectedVersionId === version.id ? 'medium' : 'normal'
+                        }}
+                      >
+                        {version.version_tag}
+                      </Typography>
+                    </TableCell>
                     <TableCell>{formatDate(version.created_at)}</TableCell>
                     <TableCell>
                       <Tooltip title="Download Version">
                         <IconButton
                           size="small"
-                          onClick={() => handleDownload(version.id, version.version_tag)}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row selection when clicking download
+                            handleDownload(version.id, version.version_tag);
+                          }}
                           disabled={downloading === version.id}
                         >
                           {downloading === version.id ? (
@@ -423,40 +470,72 @@ const ExampleDetailPage: React.FC = () => {
         )}
       </TabPanel>
 
-      {/* Metadata Tab */}
-      <TabPanel value={tabValue} index={2}>
-        <Typography variant="h6" gutterBottom>
-          Version Metadata
-        </Typography>
-        
-        {loadingMetadata ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
+      {/* Version Metadata Section - Below Tabs */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">
+              Version Metadata
+            </Typography>
+            
+            {/* Version Selector */}
+            {versions.length > 0 && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Select Version:
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {versions.map((version) => (
+                    <Chip
+                      key={version.id}
+                      label={version.version_tag}
+                      variant={selectedVersionId === version.id ? "filled" : "outlined"}
+                      color={selectedVersionId === version.id ? "primary" : "default"}
+                      clickable
+                      onClick={() => setSelectedVersionId(version.id)}
+                      size="small"
+                    />
+                  ))}
+                </Box>
+              </Box>
+            )}
           </Box>
-        ) : versions.length === 0 ? (
-          <Alert severity="info">No metadata available.</Alert>
-        ) : (
-          versions.map((version) => {
-            const fullVersion = fullVersionDetails[version.id] || version;
-            const metaData = fullVersion.meta_yaml ? parseMetaYaml(fullVersion.meta_yaml) : null;
-            const testData = fullVersion.test_yaml ? parseTestYaml(fullVersion.test_yaml) : null;
+          
+          {versions.length === 0 ? (
+            <Alert severity="info">No versions available.</Alert>
+          ) : !selectedVersionId ? (
+            <Alert severity="info">Select a version to view metadata.</Alert>
+          ) : (() => {
+            const selectedVersion = versions.find(v => v.id === selectedVersionId);
+            const fullVersion = fullVersionDetails[selectedVersionId];
+            const hasFullData = fullVersion && fullVersion.meta_yaml !== undefined;
+            
+            if (!selectedVersion) {
+              return <Alert severity="error">Selected version not found.</Alert>;
+            }
             
             return (
-              <Accordion key={version.id}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography>
-                    Version {version.version_tag} - Metadata
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Grid container spacing={2}>
+              <Box>
+                <Typography variant="subtitle1" gutterBottom sx={{ mb: 2 }}>
+                  {selectedVersion.version_tag} ({formatDate(selectedVersion.created_at)})
+                </Typography>
+                
+                {!hasFullData ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress size={24} />
+                    <Typography variant="body2" sx={{ ml: 2 }}>
+                      Loading metadata...
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Grid container spacing={3}>
                     {fullVersion.meta_yaml ? (
-                      <Grid item xs={12} md={testData ? 6 : 12}>
+                      <Grid item xs={12} md={fullVersion.test_yaml ? 6 : 12}>
                         <Typography variant="subtitle2" gutterBottom>
                           meta.yaml
                         </Typography>
                         <Paper variant="outlined" sx={{ p: 2, maxHeight: 400, overflow: 'auto' }}>
-                          <pre style={{ fontSize: '0.8rem', margin: 0 }}>
+                          <pre style={{ fontSize: '0.8rem', margin: 0, whiteSpace: 'pre-wrap' }}>
                             {fullVersion.meta_yaml}
                           </pre>
                         </Paper>
@@ -472,7 +551,7 @@ const ExampleDetailPage: React.FC = () => {
                           test.yaml
                         </Typography>
                         <Paper variant="outlined" sx={{ p: 2, maxHeight: 400, overflow: 'auto' }}>
-                          <pre style={{ fontSize: '0.8rem', margin: 0 }}>
+                          <pre style={{ fontSize: '0.8rem', margin: 0, whiteSpace: 'pre-wrap' }}>
                             {fullVersion.test_yaml}
                           </pre>
                         </Paper>
@@ -486,12 +565,12 @@ const ExampleDetailPage: React.FC = () => {
                       </Grid>
                     )}
                   </Grid>
-                </AccordionDetails>
-              </Accordion>
+                )}
+              </Box>
             );
-          })
-        )}
-      </TabPanel>
+          })()}
+        </CardContent>
+      </Card>
     </Box>
   );
 };

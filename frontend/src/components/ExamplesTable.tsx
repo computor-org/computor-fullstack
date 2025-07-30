@@ -242,11 +242,29 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
     {
       id: 'updated_at',
       label: 'Last Updated',
-      render: (_, example) => (
-        <Typography variant="body2">
-          {new Date(example.updated_at).toLocaleDateString()}
-        </Typography>
-      ),
+      render: (_, example) => {
+        // Handle missing or invalid dates
+        if (!example.updated_at) {
+          return <Typography variant="body2" color="text.secondary">—</Typography>;
+        }
+        
+        const date = new Date(example.updated_at);
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          return <Typography variant="body2" color="text.secondary">—</Typography>;
+        }
+        
+        return (
+          <Typography variant="body2">
+            {date.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Typography>
+        );
+      },
     },
     {
       id: 'actions',

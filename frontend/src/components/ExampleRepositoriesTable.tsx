@@ -3,7 +3,6 @@ import {
   Box,
   Chip,
   IconButton,
-  Tooltip,
   Menu,
   MenuItem,
   ListItemIcon,
@@ -198,11 +197,29 @@ const ExampleRepositoriesTable: React.FC<ExampleRepositoriesTableProps> = ({
     {
       id: 'updated_at',
       label: 'Last Updated',
-      render: (_, repository) => (
-        <Typography variant="body2">
-          {new Date(repository.updated_at).toLocaleDateString()}
-        </Typography>
-      ),
+      render: (_, repository) => {
+        // Handle missing or invalid dates
+        if (!repository.updated_at) {
+          return <Typography variant="body2" color="text.secondary">—</Typography>;
+        }
+        
+        const date = new Date(repository.updated_at);
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+          return <Typography variant="body2" color="text.secondary">—</Typography>;
+        }
+        
+        return (
+          <Typography variant="body2">
+            {date.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </Typography>
+        );
+      },
     },
     {
       id: 'actions',

@@ -35,9 +35,9 @@ const OrganizationCreatePage: React.FC = () => {
     }
   };
 
-  const handleTaskComplete = () => {
-    // Navigate to the organizations list after successful creation
-    navigate('/admin/organizations');
+  const handleTaskComplete = (organizationId: string) => {
+    // Navigate to the specific organization page after successful creation
+    navigate(`/admin/organizations/${organizationId}`);
   };
 
   const handleCancel = () => {
@@ -75,7 +75,14 @@ const OrganizationCreatePage: React.FC = () => {
         // Check if task just completed successfully
         if (newState.taskStatus === 'completed' && 
             formState.taskStatus !== 'completed') {
-          handleTaskComplete();
+          // Wait a bit for the entity ID to be available
+          if (newState.createdEntityId) {
+            handleTaskComplete(newState.createdEntityId);
+          } else {
+            // Fallback to list page if no ID available
+            console.log('No entity ID available, navigating to list');
+            navigate('/admin/organizations');
+          }
         }
         
         setFormState(newState);

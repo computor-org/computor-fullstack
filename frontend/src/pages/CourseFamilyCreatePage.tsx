@@ -36,9 +36,9 @@ const CourseFamilyCreatePage: React.FC = () => {
     }
   };
 
-  const handleTaskComplete = () => {
-    // Navigate to the course families list after successful creation
-    navigate('/admin/course-families');
+  const handleTaskComplete = (courseFamilyId: string) => {
+    // Navigate to the specific course family page after successful creation
+    navigate(`/admin/course-families/${courseFamilyId}`);
   };
 
   const handleCancel = () => {
@@ -76,7 +76,14 @@ const CourseFamilyCreatePage: React.FC = () => {
         // Check if task just completed successfully
         if (newState.taskStatus === 'completed' && 
             formState.taskStatus !== 'completed') {
-          handleTaskComplete();
+          // Wait a bit for the entity ID to be available
+          if (newState.createdEntityId) {
+            handleTaskComplete(newState.createdEntityId);
+          } else {
+            // Fallback to list page if no ID available
+            console.log('No entity ID available, navigating to list');
+            navigate('/admin/course-families');
+          }
         }
         
         setFormState(newState);

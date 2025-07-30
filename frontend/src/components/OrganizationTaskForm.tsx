@@ -130,10 +130,13 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
           // Fetch the full result when task completes
           try {
             const resultResponse = await HierarchyTaskService.getTaskResult(taskId);
+            console.log('Organization task result:', resultResponse);
             if (resultResponse.result?.result?.organization_id) {
+              console.log('Setting organization ID:', resultResponse.result.result.organization_id);
               setCreatedEntityId(resultResponse.result.result.organization_id);
               setCreatedEntityName(resultResponse.result.result?.name || formData.title);
             } else {
+              console.log('No organization_id found in result');
               setCreatedEntityName(formData.title);
             }
           } catch (error) {

@@ -104,7 +104,6 @@ async def list_db(permissions: Principal, db: Session, params: ListQuery, interf
     return query_result, total
 
 def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity: Any, db_type: Any, response_type: BaseModel, db_item = None, post_update: Any = None):
-
     if id != None:
 
         query = check_permissions(permissions,db_type,"update",db)
@@ -122,7 +121,12 @@ def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity
 
     old_db_item = response_type(**db_item.__dict__)
 
-    # TODO: manage Ltree patches
+    # Handle Ltree columns specially
+    mapper = inspect(db_type)
+    for column in mapper.columns.keys():
+        if isinstance(mapper.columns[column].type, LtreeType):
+            if column in entity.keys() and entity[column] != None and isinstance(entity[column], str):
+                entity[column] = Ltree(entity[column])
 
     try:
         for key in entity.keys():
@@ -139,8 +143,12 @@ def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity
 
     except Exception as e:
         db.rollback()
-        print(e.args)
-        raise BadRequestException(detail=e.args)
+        print(f"Exception in update_db: {e}")
+        print(f"Exception type: {type(e)}")
+        print(f"Exception args: {e.args}")
+        import traceback
+        traceback.print_exc()
+        raise BadRequestException(detail=str(e))
 
 def delete_db(permissions: Principal, db: Session, id: UUID | str, db_type: Any):
 

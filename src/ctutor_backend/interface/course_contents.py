@@ -191,6 +191,39 @@ def post_create(course_content: CourseContent, db: Session):
         db.commit()
         db.refresh(submission_group_member)
 
+def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Session):
+    """Handle path updates for course content descendants after parent is updated"""
+    # Check if path has changed
+    if str(old_item.path) != str(updated_item.path):
+        old_path = str(old_item.path)
+        new_path = str(updated_item.path)
+        
+        try:
+            # Find all descendants using text() to avoid relationship loading issues
+            from sqlalchemy import text
+            descendants = db.query(CourseContent).filter(
+                text("course_content.path::text LIKE :pattern"),
+                CourseContent.course_id == updated_item.course_id
+            ).params(pattern=f'{old_path}.%').all()
+            
+            # Update paths of all descendants
+            for descendant in descendants:
+                old_descendant_path = str(descendant.path)
+                
+                # Replace the old parent path with the new parent path
+                if old_descendant_path.startswith(old_path + '.'):
+                    # Remove the old parent path and add the new parent path
+                    relative_path = old_descendant_path[len(old_path):]  # includes the leading '.'
+                    new_descendant_path = new_path + relative_path
+                    descendant.path = Ltree(new_descendant_path)
+            
+            # Note: Don't commit here - let the main update_db function handle the commit
+                
+        except Exception as e:
+            print(f"Error in post_update: {e}")
+            db.rollback()
+            raise
+
 class CourseContentInterface(EntityInterface):
     create = CourseContentCreate
     get = CourseContentGet
@@ -202,3 +235,4 @@ class CourseContentInterface(EntityInterface):
     model = CourseContent
     cache_ttl = 300  # 5 minutes cache for course content data
     post_create = post_create
+    post_update = post_update

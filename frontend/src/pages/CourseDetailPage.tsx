@@ -34,13 +34,15 @@ import {
   Code as CodeIcon,
   CalendarToday as CalendarTodayIcon,
   Person as PersonIcon,
+  MoveDown as MoveDownIcon,
 } from '@mui/icons-material';
-import { CourseGet, CourseContentGet, CourseContentTypeGet } from '../types/generated/courses';
+import { CourseGet, CourseContentGet, CourseContentTypeGet, CourseContentKindGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
 import AddCourseContentDialog from '../components/AddCourseContentDialog';
 import ManageCourseContentTypesDialog from '../components/ManageCourseContentTypesDialog';
 import EditCourseContentDialog from '../components/EditCourseContentDialog';
 import DeleteCourseContentDialog from '../components/DeleteCourseContentDialog';
+import MoveCourseContentDialog from '../components/MoveCourseContentDialog';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -54,8 +56,10 @@ const CourseDetailPage: React.FC = () => {
   const [manageTypesOpen, setManageTypesOpen] = useState(false);
   const [editContentOpen, setEditContentOpen] = useState(false);
   const [deleteContentOpen, setDeleteContentOpen] = useState(false);
+  const [moveContentOpen, setMoveContentOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<CourseContentGet | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  const [contentKinds, setContentKinds] = useState<CourseContentKindGet[]>([]);
 
   // Load course details
   const loadCourse = async () => {
@@ -92,8 +96,9 @@ const CourseDetailPage: React.FC = () => {
       console.log('Course content loaded:', sortedContent);
       setCourseContent(sortedContent);
       
-      // Load content types
+      // Load content types and kinds
       await loadContentTypes();
+      await loadContentKinds();
       
     } catch (err: any) {
       console.error('Error loading course:', err);
@@ -117,6 +122,20 @@ const CourseDetailPage: React.FC = () => {
       setContentTypes(data);
     } catch (err) {
       console.error('Error loading content types:', err);
+    }
+  };
+
+  const loadContentKinds = async () => {
+    try {
+      const response = await apiClient.get<CourseContentKindGet[]>('/course-content-kinds', {
+        params: {
+          limit: 100,
+        },
+      });
+      const data = Array.isArray(response) ? response : (response as any).data || [];
+      setContentKinds(data);
+    } catch (err) {
+      console.error('Error loading content kinds:', err);
     }
   };
 
@@ -231,8 +250,21 @@ const CourseDetailPage: React.FC = () => {
             setSelectedContent(item);
             setEditContentOpen(true);
           }}
+          title="Edit"
         >
           <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton 
+          size="small" 
+          sx={{ ml: 0.5 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedContent(item);
+            setMoveContentOpen(true);
+          }}
+          title="Move"
+        >
+          <MoveDownIcon fontSize="small" />
         </IconButton>
         <IconButton 
           size="small" 
@@ -243,6 +275,7 @@ const CourseDetailPage: React.FC = () => {
             setSelectedContent(item);
             setDeleteContentOpen(true);
           }}
+          title="Delete"
         >
           <DeleteIcon fontSize="small" />
         </IconButton>
@@ -632,6 +665,26 @@ const CourseDetailPage: React.FC = () => {
           allContent={courseContent}
           onContentDeleted={() => {
             setDeleteContentOpen(false);
+            setSelectedContent(null);
+            loadCourse();
+          }}
+        />
+      )}
+
+      {/* Move Content Dialog */}
+      {course && selectedContent && (
+        <MoveCourseContentDialog
+          open={moveContentOpen}
+          onClose={() => {
+            setMoveContentOpen(false);
+            setSelectedContent(null);
+          }}
+          content={selectedContent}
+          allContent={courseContent}
+          contentTypes={contentTypes}
+          contentKinds={contentKinds}
+          onContentMoved={() => {
+            setMoveContentOpen(false);
             setSelectedContent(null);
             loadCourse();
           }}

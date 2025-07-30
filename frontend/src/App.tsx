@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import { Settings, Login, Logout } from '@mui/icons-material';
 import Dashboard from './pages/Dashboard';
-import StudentsPage from './pages/StudentsPage';
 import CoursesPage from './pages/CoursesPage';
 import SSODebug from './pages/SSODebug';
 import Tasks from './pages/Tasks';
@@ -219,7 +218,6 @@ function AuthenticatedAppContent() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/students" element={<StudentsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/admin/courses" element={<CoursesPage />} />
           <Route path="/admin/courses/create" element={<CourseCreatePage />} />
@@ -240,7 +238,6 @@ function AuthenticatedAppContent() {
           <Route path="/admin/examples" element={<ExamplesPage />} />
           <Route path="/admin/examples/:id" element={<ExampleDetailPage />} />
           <Route path="/course/:courseId" element={<Dashboard />} />
-          <Route path="/course/:courseId/students" element={<StudentsPage />} />
           <Route path="/admin/*" element={<Dashboard />} />
           <Route path="/debug/sso" element={<SSODebug />} />
         </Routes>

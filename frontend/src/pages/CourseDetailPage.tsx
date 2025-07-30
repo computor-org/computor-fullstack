@@ -26,6 +26,8 @@ import {
   Quiz as QuizIcon,
   MenuBook as MenuBookIcon,
   School as SchoolIcon,
+  ExpandMore as ExpandMoreIcon,
+  ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
 import { CourseGet, CourseContentGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
@@ -41,6 +43,7 @@ const CourseDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [addContentOpen, setAddContentOpen] = useState(false);
   const [manageTypesOpen, setManageTypesOpen] = useState(false);
+  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
 
   // Load course details
   const loadCourse = async () => {
@@ -106,9 +109,28 @@ const CourseDetailPage: React.FC = () => {
     }
   };
 
+  const hasChildren = (item: CourseContentGet) => {
+    return courseContent.some(content => 
+      content.path.startsWith(item.path + '.') && 
+      content.path.split('.').length === item.path.split('.').length + 1
+    );
+  };
+
+  const toggleExpand = (path: string) => {
+    const newExpanded = new Set(expandedPaths);
+    if (newExpanded.has(path)) {
+      newExpanded.delete(path);
+    } else {
+      newExpanded.add(path);
+    }
+    setExpandedPaths(newExpanded);
+  };
+
   const renderContentItem = (item: CourseContentGet, level: number = 0) => {
     const pathParts = item.path.split('.');
     const isChild = pathParts.length > 1;
+    const hasChildContent = hasChildren(item);
+    const isExpanded = expandedPaths.has(item.path);
     
     return (
       <Box
@@ -122,14 +144,33 @@ const CourseDetailPage: React.FC = () => {
           borderRadius: 1,
           '&:hover': {
             backgroundColor: 'action.hover',
-            cursor: 'pointer',
           },
         }}
       >
-        <Box sx={{ mr: 2, color: item.course_content_type?.color || 'action.active' }}>
+        {/* Expand/Collapse button */}
+        <Box sx={{ width: 30, mr: 1 }}>
+          {hasChildContent && (
+            <IconButton
+              size="small"
+              onClick={() => toggleExpand(item.path)}
+              sx={{ p: 0.5 }}
+            >
+              {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+            </IconButton>
+          )}
+        </Box>
+
+        <Box 
+          sx={{ 
+            mr: 2, 
+            color: item.course_content_type?.color || 'action.active',
+            cursor: 'pointer',
+          }}
+          onClick={() => {/* TODO: Navigate to content detail */}}
+        >
           {getContentIcon(item.course_content_kind_id)}
         </Box>
-        <Box sx={{ flexGrow: 1 }}>
+        <Box sx={{ flexGrow: 1, cursor: 'pointer' }} onClick={() => {/* TODO: Navigate to content detail */}}>
           <Typography variant="body1">
             {item.title || pathParts[pathParts.length - 1]}
           </Typography>
@@ -161,8 +202,26 @@ const CourseDetailPage: React.FC = () => {
     const hierarchy: React.ReactElement[] = [];
     const processedPaths = new Set<string>();
     
+    // Check if item should be visible based on parent expansion state
+    const isVisible = (item: CourseContentGet): boolean => {
+      const pathParts = item.path.split('.');
+      
+      // Root items are always visible
+      if (pathParts.length === 1) return true;
+      
+      // Check if all parent paths are expanded
+      for (let i = 1; i < pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i).join('.');
+        if (!expandedPaths.has(parentPath)) {
+          return false;
+        }
+      }
+      
+      return true;
+    };
+    
     items.forEach((item) => {
-      if (!processedPaths.has(item.path)) {
+      if (!processedPaths.has(item.path) && isVisible(item)) {
         const level = item.path.split('.').length - 1;
         hierarchy.push(renderContentItem(item, level));
         processedPaths.add(item.path);
@@ -298,6 +357,28 @@ const CourseDetailPage: React.FC = () => {
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h5">Course Content</Typography>
           <Stack direction="row" spacing={1}>
+            {courseContent.length > 0 && (
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => {
+                  if (expandedPaths.size > 0) {
+                    setExpandedPaths(new Set());
+                  } else {
+                    // Expand all parent nodes
+                    const allParentPaths = new Set<string>();
+                    courseContent.forEach(item => {
+                      if (hasChildren(item)) {
+                        allParentPaths.add(item.path);
+                      }
+                    });
+                    setExpandedPaths(allParentPaths);
+                  }
+                }}
+              >
+                {expandedPaths.size > 0 ? 'Collapse All' : 'Expand All'}
+              </Button>
+            )}
             <Button
               variant="outlined"
               onClick={() => setManageTypesOpen(true)}

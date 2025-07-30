@@ -24,6 +24,8 @@ import {
   Quiz as QuizIcon,
   MenuBook as MenuBookIcon,
   School as SchoolIcon,
+  ArrowRight as ArrowRightIcon,
+  SubdirectoryArrowRight as SubdirectoryArrowRightIcon,
 } from '@mui/icons-material';
 import { apiClient } from '../services/apiClient';
 import { CourseContentGet, CourseContentCreate, CourseContentTypeGet, CourseContentKindGet } from '../types/generated/courses';
@@ -245,9 +247,21 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
             </Select>
             {selectedContentType && selectedContentType.course_content_kind && (
               <FormHelperText>
-                {selectedContentType.course_content_kind.submittable && 'Submittable • '}
-                {selectedContentType.course_content_kind.has_ascendants ? 'Can have parent • ' : 'Must be at root level • '}
-                {selectedContentType.course_content_kind.has_descendants ? 'Can have children' : 'Cannot have children'}
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {selectedContentType.course_content_kind.submittable && (
+                    <Chip label="Submittable" size="small" color="info" variant="outlined" />
+                  )}
+                  {selectedContentType.course_content_kind.has_ascendants ? (
+                    <Chip label="Can have parent" size="small" color="success" variant="outlined" />
+                  ) : (
+                    <Chip label="Must be at root level" size="small" color="warning" variant="outlined" />
+                  )}
+                  {selectedContentType.course_content_kind.has_descendants ? (
+                    <Chip label="Can have children" size="small" color="success" variant="outlined" />
+                  ) : (
+                    <Chip label="Cannot have children" size="small" color="warning" variant="outlined" />
+                  )}
+                </Stack>
               </FormHelperText>
             )}
           </FormControl>
@@ -283,19 +297,48 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
                 label="Parent (Optional)"
               >
                 <MenuItem value="">
-                  <em>None (Root level)</em>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box sx={{ width: 24 }} />
+                    <Typography color="text.secondary" fontStyle="italic">
+                      None (Root level)
+                    </Typography>
+                  </Stack>
                 </MenuItem>
-                {getAvailableParents().map((content) => {
-                  const depth = content.path.split('.').length - 1;
-                  return (
-                    <MenuItem key={content.id} value={content.id}>
-                      <Box sx={{ ml: depth * 2 }}>
-                        {'  '.repeat(depth)}
-                        {content.title || content.path}
-                      </Box>
-                    </MenuItem>
-                  );
-                })}
+                {getAvailableParents()
+                  .sort((a, b) => {
+                    // Sort by path to maintain hierarchy
+                    return a.path.localeCompare(b.path);
+                  })
+                  .map((content) => {
+                    const depth = content.path.split('.').length - 1;
+                    const contentType = contentTypes.find(ct => ct.id === content.course_content_type_id);
+                    const contentKind = contentType?.course_content_kind;
+                    
+                    return (
+                      <MenuItem key={content.id} value={content.id}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
+                          <Box sx={{ ml: depth * 3, display: 'flex', alignItems: 'center' }}>
+                            {depth > 0 && <SubdirectoryArrowRightIcon fontSize="small" color="action" />}
+                            <Box sx={{ color: contentType?.color || 'action.active', ml: 0.5 }}>
+                              {contentKind && getContentIcon(contentKind.id)}
+                            </Box>
+                          </Box>
+                          <Typography>
+                            {content.title || content.path}
+                          </Typography>
+                          {contentKind && !contentKind.has_descendants && (
+                            <Chip 
+                              label="Cannot have children" 
+                              size="small" 
+                              color="warning"
+                              variant="outlined"
+                              sx={{ ml: 'auto' }}
+                            />
+                          )}
+                        </Stack>
+                      </MenuItem>
+                    );
+                  })}
               </Select>
             </FormControl>
           )}
@@ -311,12 +354,60 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
 
           {formData.title && (
             <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary">
-                Path Preview:
+              <Typography variant="subtitle2" gutterBottom>
+                Hierarchy Preview
               </Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                {generatePath()}
-              </Typography>
+              <Stack spacing={1}>
+                {selectedParent && (
+                  <>
+                    {/* Show parent hierarchy */}
+                    {(() => {
+                      const parentParts = selectedParent.path.split('.');
+                      return parentParts.map((part, index) => {
+                        const isLast = index === parentParts.length - 1;
+                        const parentContentAtLevel = existingContent.find(c => 
+                          c.path === parentParts.slice(0, index + 1).join('.')
+                        );
+                        
+                        return (
+                          <Stack key={index} direction="row" spacing={1} alignItems="center" sx={{ ml: index * 3 }}>
+                            {index > 0 && <SubdirectoryArrowRightIcon fontSize="small" color="action" />}
+                            <Typography variant="body2" color={isLast ? "text.primary" : "text.secondary"}>
+                              {parentContentAtLevel?.title || part}
+                            </Typography>
+                          </Stack>
+                        );
+                      });
+                    })()}
+                  </>
+                )}
+                
+                {/* Show new content */}
+                <Stack 
+                  direction="row" 
+                  spacing={1} 
+                  alignItems="center" 
+                  sx={{ 
+                    ml: selectedParent ? (selectedParent.path.split('.').length) * 3 : 0,
+                    p: 1,
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                    borderRadius: 1,
+                  }}
+                >
+                  {selectedParent && <SubdirectoryArrowRightIcon fontSize="small" />}
+                  <Box sx={{ color: 'inherit' }}>
+                    {selectedContentType && getContentIcon(selectedContentType.course_content_kind?.id || 'folder')}
+                  </Box>
+                  <Typography variant="body2" fontWeight="bold">
+                    {formData.title} (New)
+                  </Typography>
+                </Stack>
+                
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  Path: <code>{generatePath()}</code>
+                </Typography>
+              </Stack>
             </Box>
           )}
         </Stack>

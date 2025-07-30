@@ -30,6 +30,7 @@ import {
 import { CourseGet, CourseContentGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
 import AddCourseContentDialog from '../components/AddCourseContentDialog';
+import ManageCourseContentTypesDialog from '../components/ManageCourseContentTypesDialog';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +40,7 @@ const CourseDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addContentOpen, setAddContentOpen] = useState(false);
+  const [manageTypesOpen, setManageTypesOpen] = useState(false);
 
   // Load course details
   const loadCourse = async () => {
@@ -295,13 +297,21 @@ const CourseDetailPage: React.FC = () => {
       <Paper sx={{ p: 3 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h5">Course Content</Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setAddContentOpen(true)}
-          >
-            Add Content
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="outlined"
+              onClick={() => setManageTypesOpen(true)}
+            >
+              Manage Types
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setAddContentOpen(true)}
+            >
+              Add Content
+            </Button>
+          </Stack>
         </Stack>
         
         <Divider sx={{ mb: 2 }} />
@@ -332,6 +342,18 @@ const CourseDetailPage: React.FC = () => {
           onContentAdded={() => {
             setAddContentOpen(false);
             loadCourse();
+          }}
+        />
+      )}
+
+      {/* Manage Content Types Dialog */}
+      {course && (
+        <ManageCourseContentTypesDialog
+          open={manageTypesOpen}
+          onClose={() => setManageTypesOpen(false)}
+          courseId={course.id}
+          onTypesChanged={() => {
+            // This will trigger refresh in AddCourseContentDialog
           }}
         />
       )}

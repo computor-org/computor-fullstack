@@ -207,6 +207,12 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
             </Alert>
           )}
 
+          {contentTypes.length === 0 && (
+            <Alert severity="info">
+              No content types available. Please create content types first using the "Manage Types" button.
+            </Alert>
+          )}
+
           <FormControl fullWidth required>
             <InputLabel>Content Type</InputLabel>
             <Select

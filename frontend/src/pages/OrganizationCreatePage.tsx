@@ -36,8 +36,8 @@ const OrganizationCreatePage: React.FC = () => {
   };
 
   const handleTaskComplete = (organizationId: string) => {
-    // Navigate to the newly created organization's detail page
-    navigate(`/admin/organizations/${organizationId}`);
+    // No longer automatically redirecting - success UI shows navigation button instead
+    console.log(`Organization created with ID: ${organizationId}`);
   };
 
   const handleCancel = () => {
@@ -54,6 +54,8 @@ const OrganizationCreatePage: React.FC = () => {
     taskProgress: 0,
     taskError: null as string | null,
     taskId: null as string | null,
+    createdEntityId: null as string | null,
+    createdEntityName: null as string | null,
   });
 
   // Update form state when ref changes
@@ -66,6 +68,8 @@ const OrganizationCreatePage: React.FC = () => {
           taskProgress: formRef.current.taskProgress,
           taskError: formRef.current.taskError,
           taskId: formRef.current.taskId,
+          createdEntityId: formRef.current.createdEntityId,
+          createdEntityName: formRef.current.createdEntityName,
         });
       }
     }, 100);
@@ -111,8 +115,23 @@ const OrganizationCreatePage: React.FC = () => {
             </Alert>
           )}
           {formState.taskStatus === 'completed' && (
-            <Alert severity="success">
-              Organization created successfully!
+            <Alert 
+              severity="success" 
+              action={
+                formState.createdEntityId && (
+                  <Button 
+                    color="inherit" 
+                    size="small"
+                    variant="outlined"
+                    onClick={() => window.open(`/admin/organizations/${formState.createdEntityId}`, '_blank')}
+                    sx={{ ml: 1 }}
+                  >
+                    View Organization
+                  </Button>
+                )
+              }
+            >
+              Organization "{formState.createdEntityName || 'Unnamed'}" created successfully!
             </Alert>
           )}
         </>

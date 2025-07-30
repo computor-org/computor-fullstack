@@ -32,6 +32,7 @@ from ctutor_backend.interface.course_families import CourseFamilyInterface
 from ctutor_backend.interface.course_groups import CourseGroupInterface
 from ctutor_backend.interface.course_roles import CourseRoleInterface
 from ctutor_backend.interface.course_content_types import CourseContentTypeInterface
+from ctutor_backend.interface.course_content_kind import CourseContentKindInterface
 from ctutor_backend.api.course_execution_backend import course_execution_backend_router
 from ctutor_backend.api.courses import course_router
 from ctutor_backend.api.system import system_router
@@ -181,6 +182,7 @@ app.include_router(
     dependencies=[Depends(get_current_permissions)]
 )
 
+CrudRouter(CourseContentKindInterface).register_routes(app)
 CrudRouter(CourseContentTypeInterface).register_routes(app)
 
 course_content_router.register_routes(app)

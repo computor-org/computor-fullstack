@@ -88,6 +88,14 @@ const ManageCourseContentTypesDialog: React.FC<ManageCourseContentTypesDialogPro
     if (open) {
       loadContentTypes();
       loadContentKinds();
+      // Reset form when opening
+      setCreateForm({
+        contentKindId: '',
+        title: '',
+        slug: '',
+        description: '',
+        color: '#2196f3',
+      });
     }
   }, [open, courseId]);
 
@@ -285,6 +293,12 @@ const ManageCourseContentTypesDialog: React.FC<ManageCourseContentTypesDialogPro
             <Typography variant="body2" color="text.secondary">
               Create a new content type for your course based on available content kinds.
             </Typography>
+
+            {contentKinds.length === 0 && (
+              <Alert severity="warning">
+                No content kinds available. Please check the API endpoint or database initialization.
+              </Alert>
+            )}
 
             <FormControl fullWidth required>
               <InputLabel>Content Kind</InputLabel>

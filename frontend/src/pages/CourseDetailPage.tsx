@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { CourseGet, CourseContentGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
+import AddCourseContentDialog from '../components/AddCourseContentDialog';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,50 +38,51 @@ const CourseDetailPage: React.FC = () => {
   const [courseContent, setCourseContent] = useState<CourseContentGet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [addContentOpen, setAddContentOpen] = useState(false);
 
   // Load course details
-  useEffect(() => {
-    const loadCourse = async () => {
-      if (!id) return;
+  const loadCourse = async () => {
+    if (!id) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
       
-      try {
-        setLoading(true);
-        setError(null);
+      // Load course details
+      const courseData = await apiClient.get<CourseGet>(`/courses/${id}`);
+      setCourse(courseData);
+      
+      // Load course content
+      const contentResponse = await apiClient.get<CourseContentGet[]>('/course-contents', {
+        params: {
+          course_id: id,
+          limit: 100,
+        },
+      });
+      const contentData = Array.isArray(contentResponse) ? contentResponse : (contentResponse as any).data || [];
+      
+      // Sort by path to ensure hierarchical order
+      const sortedContent = contentData.sort((a: CourseContentGet, b: CourseContentGet) => {
+        // First sort by path depth (parents before children)
+        const depthA = a.path.split('.').length;
+        const depthB = b.path.split('.').length;
+        if (depthA !== depthB) return depthA - depthB;
         
-        // Load course details
-        const courseData = await apiClient.get<CourseGet>(`/courses/${id}`);
-        setCourse(courseData);
-        
-        // Load course content
-        const contentResponse = await apiClient.get<CourseContentGet[]>('/course-contents', {
-          params: {
-            course_id: id,
-            limit: 100,
-          },
-        });
-        const contentData = Array.isArray(contentResponse) ? contentResponse : (contentResponse as any).data || [];
-        
-        // Sort by path to ensure hierarchical order
-        const sortedContent = contentData.sort((a: CourseContentGet, b: CourseContentGet) => {
-          // First sort by path depth (parents before children)
-          const depthA = a.path.split('.').length;
-          const depthB = b.path.split('.').length;
-          if (depthA !== depthB) return depthA - depthB;
-          
-          // Then sort by position within same level
-          return a.position - b.position;
-        });
-        
-        setCourseContent(sortedContent);
-        
-      } catch (err: any) {
-        console.error('Error loading course:', err);
-        setError(err.message || 'Failed to load course');
-      } finally {
-        setLoading(false);
-      }
-    };
+        // Then sort by position within same level
+        return a.position - b.position;
+      });
+      
+      setCourseContent(sortedContent);
+      
+    } catch (err: any) {
+      console.error('Error loading course:', err);
+      setError(err.message || 'Failed to load course');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadCourse();
   }, [id]);
 
@@ -296,7 +298,7 @@ const CourseDetailPage: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<AddIcon />}
-            onClick={() => {/* TODO: Add content */}}
+            onClick={() => setAddContentOpen(true)}
           >
             Add Content
           </Button>
@@ -319,6 +321,20 @@ const CourseDetailPage: React.FC = () => {
           </Box>
         )}
       </Paper>
+
+      {/* Add Content Dialog */}
+      {course && (
+        <AddCourseContentDialog
+          open={addContentOpen}
+          onClose={() => setAddContentOpen(false)}
+          courseId={course.id}
+          existingContent={courseContent}
+          onContentAdded={() => {
+            setAddContentOpen(false);
+            loadCourse();
+          }}
+        />
+      )}
     </Box>
   );
 };

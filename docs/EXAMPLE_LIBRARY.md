@@ -26,8 +26,17 @@ The Example Library is a comprehensive system for managing, organizing, and dist
 #### UI Pages
 - **ExamplesPage**: Main dashboard with tabs for Examples and Repositories
 - **ExampleDetailPage**: Detailed view with versions, dependencies, and metadata
+  - Fixed navigation to return to `/admin/examples`
+  - On-demand metadata loading when metadata tab is selected
+  - Displays full `meta.yaml` and `test.yaml` content
+  - Shows storage path information
+  - Loading states for better UX
 - **ExamplesTable**: Advanced data table with search, filtering, and actions
 - **ExampleUploadDialog**: ZIP upload with automatic example detection
+  - Batch upload support for multiple examples
+  - Progress tracking with determinate progress bar
+  - Partial failure handling
+  - Auto-selection of first repository
 
 ## Key Features
 
@@ -37,12 +46,17 @@ Examples can only be created through the upload process, ensuring all examples h
 - Enforces presence of `meta.yaml` file
 - Automatic parsing of metadata during upload
 
-### 2. Automatic Directory Detection
+### 2. Automatic Directory Detection & Batch Upload
 The upload dialog automatically scans ZIP files for example directories:
 - Detects all directories containing `meta.yaml` files
 - Allows selection of multiple examples from a single ZIP
 - No manual directory input required
 - Extracts metadata from each detected example
+- Shows title, description, and slug for each detected example
+- Provides "Select All" / "Deselect All" functionality
+- Displays real-time upload progress (X of Y examples)
+- Handles partial failures gracefully - successful uploads complete even if some fail
+- Auto-selects the first repository in the dropdown for convenience
 
 ### 3. Metadata Management
 Each example requires a `meta.yaml` file with:
@@ -100,11 +114,15 @@ Optional `test.yaml` for automated testing configuration.
 3. **Upload via UI**:
    - Navigate to Administration → Examples
    - Click "Upload Example"
-   - Select repository and version tag
-   - Upload ZIP file
-   - System automatically detects all examples
-   - Select which examples to upload
+   - Repository is auto-selected if only one exists
+   - Enter version tag (defaults to v1.0)
+   - Upload ZIP file containing one or more example directories
+   - System automatically detects all examples with meta.yaml
+   - Review detected examples with their metadata
+   - Select/deselect examples to upload (all selected by default)
    - Click "Upload X Examples"
+   - Monitor real-time progress
+   - Handle any partial failures gracefully
 
 ### Downloading Examples
 
@@ -202,6 +220,28 @@ interface ExampleUploadRequest {
 4. **Bulk Operations**: Mass updates and migrations
 5. **Version Comparison**: Diff view between versions
 6. **Search Improvements**: Full-text search across example content
+
+## Recent Enhancements (2025-07-30)
+
+### Batch Upload Improvements
+- **Multi-Example Detection**: ZIP files are scanned for all directories containing meta.yaml
+- **Selective Upload**: Choose which examples to upload from detected list
+- **Progress Tracking**: Real-time progress bar showing "X of Y examples uploaded"
+- **Error Resilience**: Uses Promise.allSettled for partial failure handling
+- **Auto-Selection**: First repository is automatically selected in dropdown
+- **Better UX**: Clear feedback for successful and failed uploads
+
+### Detail Page Improvements
+- **Navigation Fix**: Back button correctly returns to /admin/examples
+- **Metadata Loading**: On-demand loading when metadata tab is selected
+- **Full Content Display**: Shows complete meta.yaml and test.yaml content
+- **Loading States**: Spinner while fetching metadata
+- **Storage Info**: Displays storage path for each version
+
+### Technical Improvements
+- **TypeScript**: Updated Dialog component to use slotProps instead of deprecated PaperProps
+- **Performance**: Metadata loaded only when needed, not with initial page load
+- **Error Handling**: Detailed error messages for each failed upload
 
 ## Troubleshooting
 

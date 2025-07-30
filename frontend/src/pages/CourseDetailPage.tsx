@@ -286,32 +286,37 @@ const CourseDetailPage: React.FC = () => {
   // Build hierarchy from flat list
   const buildHierarchy = (items: CourseContentGet[]) => {
     const hierarchy: React.ReactElement[] = [];
-    const processedPaths = new Set<string>();
     
-    // Check if item should be visible based on parent expansion state
-    const isVisible = (item: CourseContentGet): boolean => {
-      const pathParts = item.path.split('.');
+    // Recursive function to render an item and its children
+    const renderItemAndChildren = (item: CourseContentGet, level: number = 0): void => {
+      // Render the current item
+      hierarchy.push(renderContentItem(item, level));
       
-      // Root items are always visible
-      if (pathParts.length === 1) return true;
-      
-      // Check if all parent paths are expanded
-      for (let i = 1; i < pathParts.length; i++) {
-        const parentPath = pathParts.slice(0, i).join('.');
-        if (!expandedPaths.has(parentPath)) {
-          return false;
-        }
+      // If this item is expanded, render its immediate children
+      if (expandedPaths.has(item.path)) {
+        const children = items
+          .filter(child => {
+            const childParts = child.path.split('.');
+            const itemParts = item.path.split('.');
+            // Check if this is a direct child (one level deeper and starts with parent path)
+            return childParts.length === itemParts.length + 1 && 
+                   child.path.startsWith(item.path + '.');
+          })
+          .sort((a, b) => a.position - b.position); // Sort children by position
+        
+        children.forEach(child => {
+          renderItemAndChildren(child, level + 1);
+        });
       }
-      
-      return true;
     };
     
-    items.forEach((item) => {
-      if (!processedPaths.has(item.path) && isVisible(item)) {
-        const level = item.path.split('.').length - 1;
-        hierarchy.push(renderContentItem(item, level));
-        processedPaths.add(item.path);
-      }
+    // Start with root items (no dots in path)
+    const rootItems = items
+      .filter(item => !item.path.includes('.'))
+      .sort((a, b) => a.position - b.position);
+    
+    rootItems.forEach(item => {
+      renderItemAndChildren(item, 0);
     });
     
     return hierarchy;

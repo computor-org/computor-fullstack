@@ -24,7 +24,7 @@ import ExamplesTable from '../components/ExamplesTable';
 import ExampleRepositoriesTable from '../components/ExampleRepositoriesTable';
 import ExampleRepositoryForm from '../components/ExampleRepositoryForm';
 import ExampleUploadDialog from '../components/ExampleUploadDialog';
-import { Example, ExampleRepository } from '../types/examples';
+import { ExampleList, ExampleRepositoryGet, ExampleRepositoryCreate } from '../types/generated/examples';
 import { apiClient } from '../services/apiClient';
 
 interface TabPanelProps {
@@ -53,12 +53,12 @@ const ExamplesPage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   
   // Examples state
-  const [examples, setExamples] = useState<Example[]>([]);
+  const [examples, setExamples] = useState<ExampleList[]>([]);
   
   // Repositories state
-  const [repositories, setRepositories] = useState<ExampleRepository[]>([]);
+  const [repositories, setRepositories] = useState<ExampleRepositoryGet[]>([]);
   const [isRepositoryFormOpen, setIsRepositoryFormOpen] = useState(false);
-  const [editingRepository, setEditingRepository] = useState<ExampleRepository | null>(null);
+  const [editingRepository, setEditingRepository] = useState<ExampleRepositoryGet | null>(null);
   
   // Upload state
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -100,7 +100,7 @@ const ExamplesPage: React.FC = () => {
 
   const loadExamples = async () => {
     try {
-      const data = await apiClient.get<Example[]>('/examples');
+      const data = await apiClient.get<ExampleList[]>('/examples');
       setExamples(data);
     } catch (err) {
       console.error('Error fetching examples:', err);
@@ -110,7 +110,7 @@ const ExamplesPage: React.FC = () => {
 
   const loadRepositories = async () => {
     try {
-      const data = await apiClient.get<ExampleRepository[]>('/example-repositories');
+      const data = await apiClient.get<ExampleRepositoryGet[]>('/example-repositories');
       setRepositories(data);
     } catch (err) {
       console.error('Error fetching repositories:', err);
@@ -123,8 +123,9 @@ const ExamplesPage: React.FC = () => {
     setStats({
       totalExamples: examples.length,
       totalRepositories: repositories.length,
-      totalVersions: examples.reduce((sum, example) => sum + (example.versions?.length || 0), 0),
+      totalVersions: 0, // Version count not available in list view
       recentUploads: examples.filter(e => {
+        if (!e.created_at) return false;
         const createdAt = new Date(e.created_at);
         const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         return createdAt > dayAgo;
@@ -155,7 +156,7 @@ const ExamplesPage: React.FC = () => {
     setIsRepositoryFormOpen(true);
   };
 
-  const handleEditRepository = (repository: ExampleRepository) => {
+  const handleEditRepository = (repository: ExampleRepositoryGet) => {
     setEditingRepository(repository);
     setIsRepositoryFormOpen(true);
   };
@@ -173,7 +174,7 @@ const ExamplesPage: React.FC = () => {
     }
   };
 
-  const handleSaveRepository = async (repositoryData: Omit<ExampleRepository, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleSaveRepository = async (repositoryData: ExampleRepositoryCreate) => {
     try {
       if (editingRepository) {
         // TODO: Implement API call
@@ -186,7 +187,7 @@ const ExamplesPage: React.FC = () => {
       } else {
         // TODO: Implement API call
         // const response = await apiClient.post('/example-repositories', repositoryData);
-        const newRepository: ExampleRepository = {
+        const newRepository: ExampleRepositoryGet = {
           ...repositoryData,
           id: Date.now().toString(),
           created_at: new Date().toISOString(),

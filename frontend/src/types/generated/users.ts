@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.314330
+ * Generated on: 2025-07-30T13:24:26.736006
 
  * Category: Users
 
@@ -89,7 +89,7 @@ export interface UserCreate {
   /** User's family name */
   family_name?: string | null;
   /** User's email address */
-  email?: any | null;
+  email?: string | null;
   /** User number/identifier */
   number?: string | null;
   /** Type of user account */
@@ -114,7 +114,7 @@ export interface UserGet {
   /** User's family name */
   family_name?: string | null;
   /** User's email address */
-  email?: any | null;
+  email?: string | null;
   /** User number/identifier */
   number?: string | null;
   /** Type of user account */
@@ -156,7 +156,7 @@ export interface UserUpdate {
   /** User's family name */
   family_name?: string | null;
   /** User's email address */
-  email?: any | null;
+  email?: string | null;
   /** User number/identifier */
   number?: string | null;
   /** Unique username */
@@ -169,7 +169,7 @@ export interface AccountCreate {
   /** Authentication provider name */
   provider: string;
   /** Type of authentication account */
-  type: any;
+  type: string;
   /** Account ID from the provider */
   provider_account_id: string;
   /** Associated user ID */
@@ -190,7 +190,7 @@ export interface AccountGet {
   /** Authentication provider name */
   provider: string;
   /** Type of authentication account */
-  type: any;
+  type: string;
   /** Account ID from the provider */
   provider_account_id: string;
   /** Associated user ID */
@@ -209,7 +209,7 @@ export interface AccountList {
   /** Authentication provider name */
   provider: string;
   /** Type of authentication account */
-  type: any;
+  type: string;
   /** Account ID from the provider */
   provider_account_id: string;
   /** Associated user ID */
@@ -220,7 +220,7 @@ export interface AccountUpdate {
   /** Authentication provider name */
   provider?: string | null;
   /** Type of authentication account */
-  type?: any | null;
+  type?: string | null;
   /** Account ID from the provider */
   provider_account_id?: string | null;
   /** Provider-specific properties */

@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.330911
+ * Generated on: 2025-07-30T13:24:26.743989
 
  * Category: Organizations
 

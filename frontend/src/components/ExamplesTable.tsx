@@ -20,12 +20,12 @@ import {
 } from '@mui/icons-material';
 
 import { DataTable, Column } from './common/DataTable';
-import { Example, ExampleRepository, ExampleDownloadResponse } from '../types/examples';
+import { ExampleList, ExampleRepositoryGet, ExampleDownloadResponse, ExampleGet } from '../types/generated/examples';
 import { apiClient } from '../services/apiClient';
 
 interface ExamplesTableProps {
-  data: Example[];
-  repositories: ExampleRepository[];
+  data: ExampleList[];
+  repositories: ExampleRepositoryGet[];
   loading?: boolean;
   onDelete: (exampleId: string) => void;
   onRefresh?: () => void;
@@ -43,7 +43,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchValue, setSearchValue] = useState('');
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedExample, setSelectedExample] = useState<Example | null>(null);
+  const [selectedExample, setSelectedExample] = useState<ExampleList | null>(null);
 
   // Filter data based on search
   const filteredData = data.filter(example =>
@@ -52,7 +52,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
     example.directory.toLowerCase().includes(searchValue.toLowerCase()) ||
     (example.subject && example.subject.toLowerCase().includes(searchValue.toLowerCase())) ||
     (example.category && example.category.toLowerCase().includes(searchValue.toLowerCase())) ||
-    example.tags.some(tag => tag.toLowerCase().includes(searchValue.toLowerCase()))
+    (example.tags && example.tags.some(tag => tag.toLowerCase().includes(searchValue.toLowerCase())))
   );
 
   // Get paginated data
@@ -66,7 +66,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
     return repo?.name || 'Unknown Repository';
   };
 
-  const handleActionClick = (event: React.MouseEvent<HTMLElement>, example: Example) => {
+  const handleActionClick = (event: React.MouseEvent<HTMLElement>, example: ExampleList) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedExample(example);
   };
@@ -88,7 +88,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
     if (selectedExample) {
       try {
         // First, get the full example details with versions
-        const fullExample = await apiClient.get<Example>(`/examples/${selectedExample.id}`);
+        const fullExample = await apiClient.get<ExampleGet>(`/examples/${selectedExample.id}`);
         
         if (!fullExample.versions || fullExample.versions.length === 0) {
           alert('No versions available for download');
@@ -147,7 +147,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
     handleActionClose();
   };
 
-  const columns: Column<Example>[] = [
+  const columns: Column<ExampleList>[] = [
     {
       id: 'title',
       label: 'Title',
@@ -219,7 +219,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
       label: 'Tags',
       render: (_, example) => (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxWidth: 200 }}>
-          {example.tags.slice(0, 3).map((tag, index) => (
+          {(example.tags || []).slice(0, 3).map((tag, index) => (
             <Chip
               key={index}
               label={tag}
@@ -228,9 +228,9 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
               sx={{ fontSize: '0.75rem' }}
             />
           ))}
-          {example.tags.length > 3 && (
+          {(example.tags || []).length > 3 && (
             <Chip
-              label={`+${example.tags.length - 3}`}
+              label={`+${(example.tags || []).length - 3}`}
               size="small"
               variant="outlined"
               sx={{ fontSize: '0.75rem' }}

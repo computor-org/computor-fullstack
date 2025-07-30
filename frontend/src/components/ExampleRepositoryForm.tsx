@@ -17,7 +17,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-import { ExampleRepository } from '../types/examples';
+import { ExampleRepositoryGet, ExampleRepositoryCreate } from '../types/generated/examples';
 
 const repositorySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -34,8 +34,8 @@ const repositorySchema = z.object({
 type RepositoryFormData = z.infer<typeof repositorySchema>;
 
 interface ExampleRepositoryFormProps {
-  repository: ExampleRepository | null;
-  onSave: (data: Omit<ExampleRepository, 'id' | 'created_at' | 'updated_at'>) => void;
+  repository: ExampleRepositoryGet | null;
+  onSave: (data: ExampleRepositoryCreate) => void;
   onCancel: () => void;
 }
 
@@ -54,7 +54,7 @@ const ExampleRepositoryForm: React.FC<ExampleRepositoryFormProps> = ({
     defaultValues: {
       name: repository?.name || '',
       description: repository?.description || '',
-      source_type: repository?.source_type || 'minio',
+      source_type: (repository?.source_type as 'git' | 'minio' | 'github' | 's3' | 'gitlab') || 'minio',
       source_url: repository?.source_url || '',
       access_credentials: repository?.access_credentials || '',
       default_version: repository?.default_version || '',
@@ -110,7 +110,7 @@ const ExampleRepositoryForm: React.FC<ExampleRepositoryFormProps> = ({
   };
 
   const onSubmit = (data: RepositoryFormData) => {
-    onSave(data as Omit<ExampleRepository, 'id' | 'created_at' | 'updated_at'>);
+    onSave(data as ExampleRepositoryCreate);
   };
 
   return (

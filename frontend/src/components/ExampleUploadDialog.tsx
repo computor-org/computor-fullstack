@@ -35,7 +35,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import * as yaml from 'js-yaml';
 
-import { ExampleRepository, ExampleUploadRequest } from '../types/examples';
+import { ExampleRepositoryGet, ExampleUploadRequest } from '../types/generated/examples';
 import { apiClient } from '../services/apiClient';
 
 const JSZip = require('jszip');
@@ -64,7 +64,7 @@ interface DetectedExample {
 
 interface ExampleUploadDialogProps {
   open: boolean;
-  repositories: ExampleRepository[];
+  repositories: ExampleRepositoryGet[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -429,7 +429,7 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
                         <Box>
                           <Typography variant="body1">{repo.name}</Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {repo.source_type.toUpperCase()} • {repo.source_url}
+                            {repo.source_type?.toUpperCase() || 'UNKNOWN'} • {repo.source_url}
                           </Typography>
                         </Box>
                       </MenuItem>

@@ -4,9 +4,7 @@ export * from './generated/organizations';
 export * from './generated/roles';
 export * from './generated/courses';
 export * from './generated/auth';
-
-// Local types
-export * from './examples';
+export * from './generated/examples';
 
 // Frontend-specific types (not generated from backend)
 export interface Student {

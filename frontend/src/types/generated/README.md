@@ -33,4 +33,4 @@ import { User, Account } from '@/types/generated/users';
 import { LoginRequest, AuthResponse } from '@/types/generated/auth';
 ```
 
-Generated on: 2025-07-15T01:06:07.839327
+Generated on: 2025-07-30T13:24:26.755588

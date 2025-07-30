@@ -20,12 +20,12 @@ import {
 } from '@mui/icons-material';
 
 import { DataTable, Column } from './common/DataTable';
-import { ExampleRepository } from '../types/examples';
+import { ExampleRepositoryGet } from '../types/generated/examples';
 
 interface ExampleRepositoriesTableProps {
-  data: ExampleRepository[];
+  data: ExampleRepositoryGet[];
   loading?: boolean;
-  onEdit: (repository: ExampleRepository) => void;
+  onEdit: (repository: ExampleRepositoryGet) => void;
   onDelete: (repositoryId: string) => void;
   onRefresh?: () => void;
 }
@@ -41,12 +41,12 @@ const ExampleRepositoriesTable: React.FC<ExampleRepositoriesTableProps> = ({
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchValue, setSearchValue] = useState('');
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedRepository, setSelectedRepository] = useState<ExampleRepository | null>(null);
+  const [selectedRepository, setSelectedRepository] = useState<ExampleRepositoryGet | null>(null);
 
   // Filter data based on search
   const filteredData = data.filter(repository =>
     repository.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-    repository.source_type.toLowerCase().includes(searchValue.toLowerCase()) ||
+    (repository.source_type && repository.source_type.toLowerCase().includes(searchValue.toLowerCase())) ||
     repository.source_url.toLowerCase().includes(searchValue.toLowerCase()) ||
     (repository.description && repository.description.toLowerCase().includes(searchValue.toLowerCase()))
   );
@@ -87,7 +87,7 @@ const ExampleRepositoriesTable: React.FC<ExampleRepositoriesTableProps> = ({
     }
   };
 
-  const handleActionClick = (event: React.MouseEvent<HTMLElement>, repository: ExampleRepository) => {
+  const handleActionClick = (event: React.MouseEvent<HTMLElement>, repository: ExampleRepositoryGet) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedRepository(repository);
   };
@@ -119,7 +119,7 @@ const ExampleRepositoriesTable: React.FC<ExampleRepositoriesTableProps> = ({
     handleActionClose();
   };
 
-  const columns: Column<ExampleRepository>[] = [
+  const columns: Column<ExampleRepositoryGet>[] = [
     {
       id: 'name',
       label: 'Name',
@@ -139,9 +139,9 @@ const ExampleRepositoriesTable: React.FC<ExampleRepositoriesTableProps> = ({
       label: 'Source Type',
       render: (_, repository) => (
         <Chip
-          icon={getSourceTypeIcon(repository.source_type)}
-          label={repository.source_type.toUpperCase()}
-          color={getSourceTypeColor(repository.source_type)}
+          icon={getSourceTypeIcon(repository.source_type || 'unknown')}
+          label={(repository.source_type || 'unknown').toUpperCase()}
+          color={getSourceTypeColor(repository.source_type || 'unknown')}
           variant="outlined"
           size="small"
         />

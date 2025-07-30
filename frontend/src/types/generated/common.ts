@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.334683
+ * Generated on: 2025-07-30T13:24:26.750421
 
  * Category: Common
 
@@ -11,8 +11,6 @@
 
 
 import type { CourseContentGet, CourseSignupResponse } from './courses';
-
-import type { UserGet } from './users';
 
 
 
@@ -874,30 +872,4 @@ export interface GitlabSignup {
 
 export interface GitlabSignupResponse {
   courses?: CourseSignupResponse[];
-}
-
-export interface StudentCreate {
-  user_id?: (string | string) | null;
-  user?: UserGet | null;
-  course_group_id?: (string | string) | null;
-  course_group_title?: string | null;
-  role?: string | null;
-}
-
-export interface ReleaseStudentsCreate {
-  students?: StudentCreate[];
-  course_id: any;
-}
-
-export interface TUGStudentExport {
-  course_group_title: string;
-  family_name: string;
-  given_name: string;
-  matriculation_number: string;
-  created_at: string;
-  email: string;
-}
-
-export interface StatusQuery {
-  course_id?: string | null;
 }

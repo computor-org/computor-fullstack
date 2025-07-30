@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.326009
+ * Generated on: 2025-07-30T13:24:26.737943
 
  * Category: Courses
 
@@ -10,7 +10,7 @@
 
 
 
-import type { ComputorDeploymentConfig, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet } from './common';
+import type { CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet } from './common';
 
 import type { OrganizationGet } from './organizations';
 
@@ -579,27 +579,6 @@ export interface CourseSignupResponse {
   course_title: string;
   role: string;
   repository: string;
-}
-
-export interface ReleaseCourseCreate {
-  course_id?: string | null;
-  gitlab_url?: string | null;
-  descendants?: boolean | null;
-  deployment?: ComputorDeploymentConfig | null;
-}
-
-export interface ReleaseCourseContentCreate {
-  release_dir?: string | null;
-  course_id?: string | null;
-  gitlab_url?: string | null;
-  ascendants?: boolean;
-  descendants?: boolean;
-  release_dir_list?: string[];
-}
-
-export interface CourseReleaseUpdate {
-  course?: CourseUpdate | null;
-  course_content_types: CourseContentTypeCreate[];
 }
 
 export interface CourseContentMessage {

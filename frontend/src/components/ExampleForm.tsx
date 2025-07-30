@@ -19,7 +19,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
-import { Example, ExampleRepository } from '../types/examples';
+import { ExampleGet, ExampleRepositoryGet, ExampleCreate } from '../types/generated/examples';
 
 const exampleSchema = z.object({
   example_repository_id: z.string().min(1, 'Repository is required'),
@@ -38,9 +38,9 @@ const exampleSchema = z.object({
 type ExampleFormData = z.infer<typeof exampleSchema>;
 
 interface ExampleFormProps {
-  example: Example | null;
-  repositories: ExampleRepository[];
-  onSave: (data: Omit<Example, 'id' | 'created_at' | 'updated_at'>) => void;
+  example: ExampleGet | null;
+  repositories: ExampleRepositoryGet[];
+  onSave: (data: ExampleCreate) => void;
   onCancel: () => void;
 }
 
@@ -94,7 +94,7 @@ const ExampleForm: React.FC<ExampleFormProps> = ({
   };
 
   const onSubmit = (data: ExampleFormData) => {
-    onSave(data as Omit<Example, 'id' | 'created_at' | 'updated_at'>);
+    onSave(data as ExampleCreate);
   };
 
   return (
@@ -118,7 +118,7 @@ const ExampleForm: React.FC<ExampleFormProps> = ({
                       <Box>
                         <Typography variant="body1">{repo.name}</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {repo.source_type.toUpperCase()} • {repo.source_url}
+                          {repo.source_type?.toUpperCase() || 'UNKNOWN'} • {repo.source_url}
                         </Typography>
                       </Box>
                     </MenuItem>

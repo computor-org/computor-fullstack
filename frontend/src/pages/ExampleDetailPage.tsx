@@ -37,7 +37,7 @@ import {
 } from '@mui/icons-material';
 import * as yaml from 'js-yaml';
 
-import { Example, ExampleRepository, ExampleDownloadResponse } from '../types/examples';
+import { ExampleGet, ExampleRepositoryGet, ExampleDownloadResponse, ExampleVersionGet } from '../types/generated/examples';
 import { apiClient } from '../services/apiClient';
 
 interface TabPanelProps {
@@ -61,23 +61,14 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-interface ExampleVersion {
-  id: string;
-  version_tag: string;
-  version_number: number;
-  created_at: string;
-  meta_yaml?: string;
-  test_yaml?: string;
-  storage_path?: string;
-}
 
 const ExampleDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
-  const [example, setExample] = useState<Example | null>(null);
-  const [versions, setVersions] = useState<ExampleVersion[]>([]);
-  const [fullVersionDetails, setFullVersionDetails] = useState<Record<string, ExampleVersion>>({});
+  const [example, setExample] = useState<ExampleGet | null>(null);
+  const [versions, setVersions] = useState<ExampleVersionGet[]>([]);
+  const [fullVersionDetails, setFullVersionDetails] = useState<Record<string, ExampleVersionGet>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
@@ -105,7 +96,7 @@ const ExampleDetailPage: React.FC = () => {
 
   const loadExampleDetail = async () => {
     try {
-      const data = await apiClient.get<Example>(`/examples/${id}`);
+      const data = await apiClient.get<ExampleGet>(`/examples/${id}`);
       setExample(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load example');
@@ -114,7 +105,7 @@ const ExampleDetailPage: React.FC = () => {
 
   const loadVersions = async () => {
     try {
-      const data = await apiClient.get<ExampleVersion[]>(`/examples/${id}/versions`);
+      const data = await apiClient.get<ExampleVersionGet[]>(`/examples/${id}/versions`);
       setVersions(data);
     } catch (err) {
       console.error('Error loading versions:', err);
@@ -171,7 +162,7 @@ const ExampleDetailPage: React.FC = () => {
   const loadVersionDetails = async (versionId: string) => {
     try {
       console.log(`Loading version details for ${versionId}...`);
-      const data = await apiClient.get<ExampleVersion>(`/examples/versions/${versionId}`);
+      const data = await apiClient.get<ExampleVersionGet>(`/examples/versions/${versionId}`);
       console.log(`Loaded version details for ${versionId}:`, data);
       setFullVersionDetails(prev => ({
         ...prev,
@@ -345,7 +336,7 @@ const ExampleDetailPage: React.FC = () => {
                     {example.repository.description}
                   </Typography>
                   <Chip 
-                    label={example.repository.source_type.toUpperCase()} 
+                    label={example.repository.source_type?.toUpperCase() || 'UNKNOWN'} 
                     size="small" 
                     color="primary" 
                     variant="outlined"

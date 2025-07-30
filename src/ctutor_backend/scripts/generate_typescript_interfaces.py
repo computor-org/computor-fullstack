@@ -263,6 +263,7 @@ class TypeScriptGenerator:
             'roles': [],
             'sso': [],
             'tasks': [],
+            'examples': [],
             'common': [],
         }
         
@@ -301,6 +302,8 @@ class TypeScriptGenerator:
                 category = 'sso'
             elif 'task' in module_name or 'task' in model_name or 'job' in model_name:
                 category = 'tasks'
+            elif 'example' in module_name or 'example' in model_name:
+                category = 'examples'
             
             model_categories[category].append(model)
             model_to_category[model.__name__] = category

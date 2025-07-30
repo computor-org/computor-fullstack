@@ -101,6 +101,9 @@ async def create_organization_activity(
             logger.info(f"Organization creation result: {result}")
             
             if result["success"]:
+                # Commit the transaction to save the organization
+                db.commit()
+                
                 response = {
                     "organization_id": result["organization"].id if result["organization"] else None,
                     "status": "created",
@@ -211,6 +214,9 @@ async def create_course_family_activity(
             result = builder._create_course_family(deployment_config, org, user_id)
             
             if result["success"]:
+                # Commit the transaction to save the course family
+                db.commit()
+                
                 response = {
                     "course_family_id": result["course_family"].id if result["course_family"] else None,
                     "status": "created",
@@ -328,6 +334,9 @@ async def create_course_activity(
             result = builder._create_course(deployment_config, org, family, user_id)
             
             if result["success"]:
+                # Commit the transaction to save the course
+                db.commit()
+                
                 response = {
                     "course_id": result["course"].id if result["course"] else None,
                     "status": "created",

@@ -188,8 +188,8 @@ async def create_course_family_activity(
             
             # Create minimal dummy objects for required fields
             dummy_org = OrganizationConfig(
-                name=org.title or org.path,  # Organizations use 'title' not 'name'
-                path=org.path,
+                name=org.title or str(org.path),  # Organizations use 'title' not 'name'
+                path=str(org.path),  # Convert Ltree to string
                 description=org.description or "",
                 gitlab=gitlab_config
             )
@@ -305,15 +305,15 @@ async def create_course_activity(
             
             # Create config objects for required fields
             org_config = OrganizationConfig(
-                name=org.title or org.path,  # Organizations use 'title' not 'name'
-                path=org.path,
+                name=org.title or str(org.path),  # Organizations use 'title' not 'name'
+                path=str(org.path),  # Convert Ltree to string
                 description=org.description or "",
                 gitlab=gitlab_config
             )
             
             family_config_obj = CourseFamilyConfig(
-                name=family.title or family.path,  # Course families use 'title' not 'name'
-                path=family.path,
+                name=family.title or str(family.path),  # Course families use 'title' not 'name'
+                path=str(family.path),  # Convert Ltree to string
                 description=family.description or ""
             )
             

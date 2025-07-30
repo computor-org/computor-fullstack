@@ -15,6 +15,7 @@ import {
   IconButton,
   Breadcrumbs,
   Link,
+  Grid,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -28,6 +29,11 @@ import {
   School as SchoolIcon,
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
+  Business as BusinessIcon,
+  AccountTree as AccountTreeIcon,
+  Code as CodeIcon,
+  CalendarToday as CalendarTodayIcon,
+  Person as PersonIcon,
 } from '@mui/icons-material';
 import { CourseGet, CourseContentGet, CourseContentTypeGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
@@ -355,49 +361,158 @@ const CourseDetailPage: React.FC = () => {
         </Stack>
       </Stack>
 
-      {/* Course Info Card */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary">
-                Path
+      {/* Course Info Cards */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {/* Main Course Info */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Course Information
               </Typography>
-              <Typography variant="body1">{course.path}</Typography>
-            </Box>
-            
-            {course.description && (
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Description
-                </Typography>
-                <Typography variant="body1">{course.description}</Typography>
-              </Box>
-            )}
-            
-            <Box>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Details
-              </Typography>
-              <Stack direction="row" spacing={2} flexWrap="wrap">
-                <Chip
-                  label={`Course Family: ${course.course_family_id}`}
-                  size="small"
-                  icon={<SchoolIcon />}
-                />
-                {course.properties?.gitlab?.group_id && (
-                  <Chip
-                    label="GitLab Enabled"
-                    size="small"
-                    color="success"
-                    variant="outlined"
-                  />
+              <Divider sx={{ mb: 2 }} />
+              <Stack spacing={2}>
+                <Box>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <AccountTreeIcon fontSize="small" color="action" />
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Path
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace' }}>
+                    {course.path}
+                  </Typography>
+                </Box>
+                
+                {course.description && (
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      Description
+                    </Typography>
+                    <Typography variant="body1">{course.description}</Typography>
+                  </Box>
                 )}
+                
+                {course.version_identifier && (
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                      <CodeIcon fontSize="small" color="action" />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Version
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body1">{course.version_identifier}</Typography>
+                  </Box>
+                )}
+                
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Technical Details
+                  </Typography>
+                  <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                    {course.properties?.gitlab?.group_id && (
+                      <Chip
+                        label={`GitLab Group: ${course.properties.gitlab.group_id}`}
+                        size="small"
+                        color="success"
+                        variant="outlined"
+                        icon={<CodeIcon />}
+                      />
+                    )}
+                    <Chip
+                      label={`ID: ${course.id}`}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Stack>
+                </Box>
               </Stack>
-            </Box>
-          </Stack>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Organization & Course Family Info */}
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Hierarchy
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              <Stack spacing={3}>
+                {/* Organization */}
+                {course.course_family?.organization && (
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <BusinessIcon fontSize="small" color="primary" />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Organization
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body1" fontWeight="medium">
+                      {course.course_family.organization.title || course.course_family.organization.path}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {course.course_family.organization.path}
+                    </Typography>
+                  </Box>
+                )}
+                
+                {/* Course Family */}
+                {course.course_family && (
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <SchoolIcon fontSize="small" color="primary" />
+                      <Typography variant="subtitle2" color="text.secondary">
+                        Course Family
+                      </Typography>
+                    </Stack>
+                    <Typography variant="body1" fontWeight="medium">
+                      {course.course_family.title || course.course_family.path}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {course.course_family.path}
+                    </Typography>
+                  </Box>
+                )}
+                
+                {/* Timestamps */}
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Metadata
+                  </Typography>
+                  <Stack spacing={1}>
+                    {course.created_at && (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <CalendarTodayIcon fontSize="small" color="action" />
+                        <Typography variant="caption" color="text.secondary">
+                          Created: {new Date(course.created_at).toLocaleDateString()}
+                        </Typography>
+                      </Stack>
+                    )}
+                    {course.updated_at && (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <CalendarTodayIcon fontSize="small" color="action" />
+                        <Typography variant="caption" color="text.secondary">
+                          Updated: {new Date(course.updated_at).toLocaleDateString()}
+                        </Typography>
+                      </Stack>
+                    )}
+                    {course.created_by && (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <PersonIcon fontSize="small" color="action" />
+                        <Typography variant="caption" color="text.secondary">
+                          Created by: {course.created_by}
+                        </Typography>
+                      </Stack>
+                    )}
+                  </Stack>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Course Content Section */}
       <Paper sx={{ p: 3 }}>

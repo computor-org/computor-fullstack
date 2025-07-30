@@ -29,20 +29,26 @@ import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
 } from '@mui/icons-material';
-import { CourseGet, CourseContentGet } from '../types/generated/courses';
+import { CourseGet, CourseContentGet, CourseContentTypeGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
 import AddCourseContentDialog from '../components/AddCourseContentDialog';
 import ManageCourseContentTypesDialog from '../components/ManageCourseContentTypesDialog';
+import EditCourseContentDialog from '../components/EditCourseContentDialog';
+import DeleteCourseContentDialog from '../components/DeleteCourseContentDialog';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [course, setCourse] = useState<CourseGet | null>(null);
   const [courseContent, setCourseContent] = useState<CourseContentGet[]>([]);
+  const [contentTypes, setContentTypes] = useState<CourseContentTypeGet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [addContentOpen, setAddContentOpen] = useState(false);
   const [manageTypesOpen, setManageTypesOpen] = useState(false);
+  const [editContentOpen, setEditContentOpen] = useState(false);
+  const [deleteContentOpen, setDeleteContentOpen] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<CourseContentGet | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
 
   // Load course details
@@ -77,13 +83,34 @@ const CourseDetailPage: React.FC = () => {
         return a.position - b.position;
       });
       
+      console.log('Course content loaded:', sortedContent);
       setCourseContent(sortedContent);
+      
+      // Load content types
+      await loadContentTypes();
       
     } catch (err: any) {
       console.error('Error loading course:', err);
       setError(err.message || 'Failed to load course');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadContentTypes = async () => {
+    if (!id) return;
+    
+    try {
+      const response = await apiClient.get<CourseContentTypeGet[]>('/course-content-types', {
+        params: {
+          course_id: id,
+          limit: 100,
+        },
+      });
+      const data = Array.isArray(response) ? response : (response as any).data || [];
+      setContentTypes(data);
+    } catch (err) {
+      console.error('Error loading content types:', err);
     }
   };
 
@@ -190,8 +217,28 @@ const CourseDetailPage: React.FC = () => {
             }}
           />
         )}
-        <IconButton size="small" sx={{ ml: 1 }}>
+        <IconButton 
+          size="small" 
+          sx={{ ml: 1 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedContent(item);
+            setEditContentOpen(true);
+          }}
+        >
           <EditIcon fontSize="small" />
+        </IconButton>
+        <IconButton 
+          size="small" 
+          sx={{ ml: 0.5 }}
+          color="error"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSelectedContent(item);
+            setDeleteContentOpen(true);
+          }}
+        >
+          <DeleteIcon fontSize="small" />
         </IconButton>
       </Box>
     );
@@ -435,6 +482,43 @@ const CourseDetailPage: React.FC = () => {
           courseId={course.id}
           onTypesChanged={() => {
             // This will trigger refresh in AddCourseContentDialog
+            loadContentTypes();
+          }}
+        />
+      )}
+
+      {/* Edit Content Dialog */}
+      {course && selectedContent && (
+        <EditCourseContentDialog
+          open={editContentOpen}
+          onClose={() => {
+            setEditContentOpen(false);
+            setSelectedContent(null);
+          }}
+          content={selectedContent}
+          contentTypes={contentTypes}
+          onContentUpdated={() => {
+            setEditContentOpen(false);
+            setSelectedContent(null);
+            loadCourse();
+          }}
+        />
+      )}
+
+      {/* Delete Content Dialog */}
+      {course && selectedContent && (
+        <DeleteCourseContentDialog
+          open={deleteContentOpen}
+          onClose={() => {
+            setDeleteContentOpen(false);
+            setSelectedContent(null);
+          }}
+          content={selectedContent}
+          allContent={courseContent}
+          onContentDeleted={() => {
+            setDeleteContentOpen(false);
+            setSelectedContent(null);
+            loadCourse();
           }}
         />
       )}

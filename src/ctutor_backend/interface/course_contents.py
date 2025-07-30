@@ -81,6 +81,8 @@ class CourseContentList(BaseModel):
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
     
+    course_content_type: Optional[CourseContentTypeGet] = None
+    
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
@@ -191,7 +193,7 @@ def post_create(course_content: CourseContent, db: Session):
 class CourseContentInterface(EntityInterface):
     create = CourseContentCreate
     get = CourseContentGet
-    list = CourseContentList
+    list = CourseContentGet  # Use CourseContentGet for list to include relationships
     update = CourseContentUpdate
     query = CourseContentQuery
     search = course_content_search

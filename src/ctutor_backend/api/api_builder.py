@@ -105,15 +105,17 @@ class CrudRouter:
     def delete(self):
         async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)):
 
+            entity_deleted = None
             if len(self.on_deleted) > 0:
-
                 entity_deleted = await get_id_db(permissions, db, id, self.dto)
 
-                # Clear related cache entries
+            # Clear related cache entries
             await self._clear_entity_cache(cache, self.dto.model.__tablename__)
 
-            for task in self.on_created:
-                background_tasks.add_task(task, entity_deleted, db, permissions)
+            # Run on_deleted tasks (not on_created)
+            for task in self.on_deleted:
+                if entity_deleted:
+                    background_tasks.add_task(task, entity_deleted, db, permissions)
 
             return delete_db(permissions, db, id, self.dto.model)
 

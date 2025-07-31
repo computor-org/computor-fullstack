@@ -43,17 +43,7 @@ import {
 } from '@mui/icons-material';
 import { apiClient } from '../services/apiClient';
 import { CourseContentGet } from '../types/generated/courses';
-
-interface ExampleInfo {
-  id: string;
-  title: string;
-  description?: string;
-  category?: string;
-  language?: string;
-  tags?: string[];
-  latest_version?: string;
-  repository_id: string;
-}
+import { ExampleList } from '../types/generated/examples';
 
 interface DeploymentPreview {
   example: {
@@ -130,14 +120,24 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
       if (selectedCategory) params.category = selectedCategory;
       if (selectedLanguage) params.language = selectedLanguage;
 
-      const response = await apiClient.get<{
-        examples: ExampleInfo[];
-        total: number;
-        filters: { categories: string[]; languages: string[] };
-      }>(`/api/v1/courses/${courseId}/available-examples`, { params });
+      // Fetch examples from the standard examples endpoint
+      const examplesData = await apiClient.get<ExampleInfo[]>('/examples', { params });
 
-      setExamples(response.examples || []);
-      setFilters(response.filters || { categories: [], languages: [] });
+      setExamples(examplesData || []);
+      
+      // Extract unique categories and languages from the examples
+      const categories = new Set<string>();
+      const languages = new Set<string>();
+      
+      examplesData.forEach(example => {
+        if (example.category) categories.add(example.category);
+        if (example.language) languages.add(example.language);
+      });
+      
+      setFilters({
+        categories: Array.from(categories).sort(),
+        languages: Array.from(languages).sort()
+      });
     } catch (err: any) {
       console.error('Error loading examples:', err);
       setError(err.message || 'Failed to load examples');
@@ -152,17 +152,30 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
       setLoadingPreview(true);
       setError(null);
 
-      const response = await apiClient.get<DeploymentPreview>(
-        `/api/v1/courses/${courseId}/examples/${example.id}/deployment-preview`,
-        {
-          params: {
-            version: selectedVersion,
-            target_path: content.path,
-          },
-        }
-      );
-
-      setPreview(response);
+      // For now, create a simple preview based on the example data
+      // In the future, this could call a preview endpoint
+      const preview: DeploymentPreview = {
+        example: {
+          id: example.id,
+          title: example.title,
+          description: example.subject,
+          category: example.category,
+          language: undefined, // Not available in ExampleList
+        },
+        version: {
+          id: example.id,
+          version_tag: selectedVersion,
+          created_at: example.created_at || new Date().toISOString(),
+        },
+        dependencies: [],
+        conflicts: [],
+        file_structure: {
+          files: ['meta.yaml', 'README.md'],
+          size_mb: 0.1,
+        },
+      };
+      
+      setPreview(preview);
     } catch (err: any) {
       console.error('Error loading preview:', err);
       setError(err.message || 'Failed to load deployment preview');
@@ -179,19 +192,13 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
       setDeploying(true);
       setError(null);
 
+      // Use the new two-step process: assign example to course content
       const response = await apiClient.post<{
-        workflow_id: string;
-        status: string;
-        deployments_requested: number;
-      }>(`/api/v1/courses/${courseId}/deploy-examples`, {
-        deployments: [
-          {
-            course_content_id: content.id,
-            example_id: selectedExample.id,
-            example_version: selectedVersion,
-            target_path: content.path,
-          },
-        ],
+        id: string;
+        deployment_status: string;
+      }>(`/course-contents/${content.id}/assign-example`, {
+        example_id: selectedExample.id,
+        example_version: selectedVersion,
       });
 
       setSuccess(true);

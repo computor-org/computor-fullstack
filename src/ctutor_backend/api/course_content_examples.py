@@ -82,6 +82,7 @@ class GenerateTemplateResponse(BaseModel):
 
 # Create router
 course_content_examples_router = APIRouter(
+    prefix="/courses",
     tags=["course-content-examples"]
 )
 

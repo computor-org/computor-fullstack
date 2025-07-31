@@ -286,7 +286,6 @@ app.include_router(
 
 app.include_router(
     course_content_examples_router,
-    prefix="/api/v1",
     tags=["course-content-examples"],
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
 )

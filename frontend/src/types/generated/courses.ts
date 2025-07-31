@@ -480,6 +480,14 @@ export interface CourseContentGet {
   max_submissions?: number | null;
   execution_backend_id?: string | null;
   course_content_type?: CourseContentTypeGet | null;
+  // Example deployment fields
+  example_id?: string | null;
+  example_version?: string | null;
+  deployed_at?: string | null;
+  deployment_status?: string | null;
+  deployment_task_id?: string | null;
+  is_customized?: boolean | null;
+  last_customized_at?: string | null;
 }
 
 export interface CourseContentList {

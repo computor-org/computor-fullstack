@@ -53,6 +53,7 @@ from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.examples import examples_router
+from ctutor_backend.api.example_deployment import example_deployment_router
 from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
 
 async def init_execution_backend_api(db: Session):
@@ -281,6 +282,12 @@ app.include_router(
     examples_router,
     tags=["examples"],
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
+)
+
+app.include_router(
+    example_deployment_router,
+    tags=["example-deployment"],
+    dependencies=[Depends(get_current_permissions)]
 )
 
 @app.head("/", status_code=204)

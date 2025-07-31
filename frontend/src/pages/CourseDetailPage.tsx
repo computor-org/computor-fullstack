@@ -35,6 +35,7 @@ import {
   CalendarToday as CalendarTodayIcon,
   Person as PersonIcon,
   MoveDown as MoveDownIcon,
+  CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 import { CourseGet, CourseContentGet, CourseContentTypeGet, CourseContentKindGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
@@ -43,6 +44,8 @@ import ManageCourseContentTypesDialog from '../components/ManageCourseContentTyp
 import EditCourseContentDialog from '../components/EditCourseContentDialog';
 import DeleteCourseContentDialog from '../components/DeleteCourseContentDialog';
 import MoveCourseContentDialog from '../components/MoveCourseContentDialog';
+import DeployExampleDialog from '../components/DeployExampleDialog';
+import DeploymentStatusChip from '../components/DeploymentStatusChip';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +60,7 @@ const CourseDetailPage: React.FC = () => {
   const [editContentOpen, setEditContentOpen] = useState(false);
   const [deleteContentOpen, setDeleteContentOpen] = useState(false);
   const [moveContentOpen, setMoveContentOpen] = useState(false);
+  const [deployExampleOpen, setDeployExampleOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<CourseContentGet | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
   const [contentKinds, setContentKinds] = useState<CourseContentKindGet[]>([]);
@@ -239,8 +243,34 @@ const CourseDetailPage: React.FC = () => {
             sx={{
               backgroundColor: item.course_content_type.color || 'action.selected',
               color: 'white',
+              mr: 1,
             }}
           />
+        )}
+        {/* Show deployment status if example is deployed */}
+        {item.example_id && (
+          <DeploymentStatusChip
+            courseId={course.id}
+            deploymentTaskId={item.deployment_task_id}
+            deploymentStatus={item.deployment_status}
+            exampleVersion={item.example_version}
+          />
+        )}
+        {/* Only show deploy button for assignment type content */}
+        {item.course_content_kind_id === 'assignment' && (
+          <IconButton 
+            size="small" 
+            sx={{ ml: 1 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedContent(item);
+              setDeployExampleOpen(true);
+            }}
+            title="Deploy Example"
+            color="primary"
+          >
+            <CloudUploadIcon fontSize="small" />
+          </IconButton>
         )}
         <IconButton 
           size="small" 
@@ -690,6 +720,24 @@ const CourseDetailPage: React.FC = () => {
           contentKinds={contentKinds}
           onContentMoved={() => {
             setMoveContentOpen(false);
+            setSelectedContent(null);
+            loadCourse();
+          }}
+        />
+      )}
+
+      {/* Deploy Example Dialog */}
+      {course && selectedContent && (
+        <DeployExampleDialog
+          open={deployExampleOpen}
+          onClose={() => {
+            setDeployExampleOpen(false);
+            setSelectedContent(null);
+          }}
+          courseId={course.id}
+          content={selectedContent}
+          onDeploymentStarted={() => {
+            setDeployExampleOpen(false);
             setSelectedContent(null);
             loadCourse();
           }}

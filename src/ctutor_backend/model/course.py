@@ -1,7 +1,7 @@
 from typing import List, TYPE_CHECKING
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
-    Enum, Float, ForeignKey, ForeignKeyConstraint, Index, 
+    Float, ForeignKey, ForeignKeyConstraint, Index, 
     Integer, String, text, select
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -211,6 +211,15 @@ class CourseContent(Base):
     # Example integration columns
     example_id = Column(UUID, ForeignKey('example.id'), nullable=True)
     example_version = Column(String(64), nullable=True)
+    
+    # Deployment tracking
+    deployed_at = Column(DateTime(True), nullable=True)
+    deployment_status = Column(String(32), server_default=text("'pending'"))  # pending, deploying, deployed, failed
+    deployment_task_id = Column(String(128), nullable=True)  # Temporal workflow ID
+    
+    # Customization tracking
+    is_customized = Column(Boolean, server_default=text("false"))  # True if modified after deployment
+    last_customized_at = Column(DateTime(True), nullable=True)
 
     # Relationships
     course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")

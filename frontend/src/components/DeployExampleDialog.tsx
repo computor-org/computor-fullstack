@@ -256,9 +256,9 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
         <Stack direction="row" alignItems="center" spacing={2}>
           <CloudUploadIcon />
           <Box>
-            <Typography variant="h6">Deploy Example to {content.title || content.path}</Typography>
+            <Typography variant="h6">Assign Example to {content.title || content.path}</Typography>
             <Typography variant="caption" color="text.secondary">
-              Select an example from the library to deploy to this course content
+              Select an example from the library to assign to this course content
             </Typography>
           </Box>
         </Stack>
@@ -278,10 +278,10 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
           >
             <CheckIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
             <Typography variant="h5" gutterBottom>
-              Deployment Started!
+              Example Assigned!
             </Typography>
             <Typography variant="body1" color="text.secondary">
-              The example is being deployed to your course repository...
+              The example has been assigned to the course content.
             </Typography>
           </Box>
         ) : (
@@ -541,7 +541,7 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
           disabled={!selectedExample || deploying || success}
           startIcon={deploying ? <CircularProgress size={20} /> : <CloudUploadIcon />}
         >
-          {deploying ? 'Deploying...' : 'Deploy Example'}
+          {deploying ? 'Assigning...' : 'Assign Example'}
         </Button>
       </DialogActions>
     </Dialog>

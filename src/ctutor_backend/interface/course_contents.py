@@ -57,6 +57,13 @@ class CourseContentGet(BaseEntityGet):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    
+    # Example deployment fields
+    example_id: Optional[str] = None
+    example_version: Optional[str] = None
+    deployment_status: Optional[str] = None
+    deployment_task_id: Optional[str] = None
+    deployed_at: Optional[datetime] = None
 
     course_content_type: Optional[CourseContentTypeGet] = None
 
@@ -80,6 +87,13 @@ class CourseContentList(BaseModel):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    
+    # Example deployment fields
+    example_id: Optional[str] = None
+    example_version: Optional[str] = None
+    deployment_status: Optional[str] = None
+    deployment_task_id: Optional[str] = None
+    deployed_at: Optional[datetime] = None
     
     course_content_type: Optional[CourseContentTypeGet] = None
     

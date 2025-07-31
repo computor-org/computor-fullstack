@@ -17,6 +17,7 @@ from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session
 
 from .temporal_base import BaseWorkflow, WorkflowResult
+from .temporal_hierarchy_management import transform_localhost_url
 from ..database import get_db
 from ..model.course import Course, CourseContent
 from ..model.example import Example, ExampleVersion
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 @activity.defn(name="generate_student_template_v2")
-async def generate_student_template_v2(course_id: str) -> Dict[str, Any]:
+async def generate_student_template_v2(course_id: str, student_template_url: str) -> Dict[str, Any]:
     """
     Generate student template repository directly from Example Library.
     
@@ -47,13 +48,10 @@ async def generate_student_template_v2(course_id: str) -> Dict[str, Any]:
         if not course:
             raise ValueError(f"Course {course_id} not found")
         
-        # Get repository URL
-        properties = course.properties or {}
-        gitlab_data = properties.get('gitlab', {})
-        student_template_url = gitlab_data.get('student_template_url')
-        
-        if not student_template_url:
-            raise ValueError("Missing student template repository URL in course properties")
+        # Use the URL passed from the API
+        # Transform localhost to Docker host IP if running in container
+        student_template_url = transform_localhost_url(student_template_url)
+        logger.info(f"Using student template URL: {student_template_url}")
         
         # Create temporary directories
         temp_dir = tempfile.mkdtemp(prefix='student-template-gen-')
@@ -158,7 +156,7 @@ async def generate_student_template_v2(course_id: str) -> Dict[str, Any]:
                         logger.error(f"Failed to download {obj.object_name}: {e}")
                 
                 # Process example for student template
-                target_path = Path(template_staging_path) / content.path.replace('.', '/')
+                target_path = Path(template_staging_path) / str(content.path).replace('.', '/')
                 result = await process_example_for_student_template_v2(
                     example_files, target_path, content, version
                 )
@@ -195,8 +193,8 @@ async def generate_student_template_v2(course_id: str) -> Dict[str, Any]:
             f.write(f"Welcome to {course.title}!\n\n")
             f.write(f"This repository contains templates for your assignments.\n\n")
             f.write(f"## Course Information\n\n")
-            f.write(f"- **Organization**: {course.path.split('.')[0]}\n")
-            f.write(f"- **Course Family**: {course.path.split('.')[1] if len(course.path.split('.')) > 1 else 'N/A'}\n")
+            f.write(f"- **Organization**: {str(course.path).split('.')[0]}\n")
+            f.write(f"- **Course Family**: {str(course.path).split('.')[1] if len(str(course.path).split('.')) > 1 else 'N/A'}\n")
             f.write(f"- **Course**: {course.title}\n\n")
             f.write(f"## Contents\n\n")
             f.write(f"This repository contains {processed_count} assignments organized by topic.\n\n")
@@ -253,7 +251,7 @@ async def generate_student_template_v2(course_id: str) -> Dict[str, Any]:
         
         # Update CourseContent deployment status
         for content in course_contents:
-            if not any(content.path in error for error in errors):
+            if not any(str(content.path) in error for error in errors):
                 content.deployment_status = 'released'
                 content.deployed_at = datetime.now(timezone.utc)
         
@@ -356,7 +354,7 @@ async def process_example_for_student_template_v2(
             # Create student-specific meta.yaml (without test references)
             student_meta = {
                 'kind': meta_yaml.get('kind', 'assignment'),
-                'slug': meta_yaml.get('slug', course_content.path.split('.')[-1]),
+                'slug': meta_yaml.get('slug', str(course_content.path).split('.')[-1]),
                 'name': meta_yaml.get('name', course_content.title),
                 'deployedFrom': {
                     'exampleId': str(course_content.example_id),
@@ -413,6 +411,7 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         Args:
             params: Dictionary containing:
                 - course_id: Course UUID
+                - student_template_url: GitLab repository URL for student-template
                 - commit_message: Optional custom commit message
                 
         Returns:
@@ -423,7 +422,7 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         # Generate student template
         result = await workflow.execute_activity(
             generate_student_template_v2,
-            params['course_id'],
+            args=[params['course_id'], params['student_template_url']],
             start_to_close_timeout=timedelta(minutes=15),
             retry_policy=RetryPolicy(maximum_attempts=3)
         )

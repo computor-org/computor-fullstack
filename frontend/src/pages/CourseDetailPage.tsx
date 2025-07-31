@@ -36,6 +36,7 @@ import {
   Person as PersonIcon,
   MoveDown as MoveDownIcon,
   CloudUpload as CloudUploadIcon,
+  Publish as PublishIcon,
 } from '@mui/icons-material';
 import { CourseGet, CourseContentGet, CourseContentTypeGet, CourseContentKindGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
@@ -66,17 +67,10 @@ const CourseDetailPage: React.FC = () => {
   const [contentKinds, setContentKinds] = useState<CourseContentKindGet[]>([]);
 
   // Load course details
-  const loadCourse = async () => {
+  const loadCourseContent = async () => {
     if (!id) return;
     
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Load course details
-      const courseData = await apiClient.get<CourseGet>(`/courses/${id}`);
-      setCourse(courseData);
-      
       // Load course content
       const contentResponse = await apiClient.get<CourseContentGet[]>('/course-contents', {
         params: {
@@ -97,8 +91,25 @@ const CourseDetailPage: React.FC = () => {
         return a.position - b.position;
       });
       
-      console.log('Course content loaded:', sortedContent);
       setCourseContent(sortedContent);
+    } catch (err: any) {
+      console.error('Error loading course content:', err);
+    }
+  };
+
+  const loadCourse = async () => {
+    if (!id) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Load course details
+      const courseData = await apiClient.get<CourseGet>(`/courses/${id}`);
+      setCourse(courseData);
+      
+      // Load course content
+      await loadCourseContent();
       
       // Load content types and kinds
       await loadContentTypes();
@@ -172,6 +183,50 @@ const CourseDetailPage: React.FC = () => {
     );
   };
 
+  const handleGenerateStudentTemplate = async () => {
+    if (!course) return;
+    
+    try {
+      const response = await apiClient.post(`/courses/${course.id}/generate-student-template`, {
+        commit_message: `Update student template - ${new Date().toLocaleDateString()}`
+      });
+      
+      // Show success message
+      alert('Student template generation started! Check the workflow status for progress.');
+      
+      // Reload course content to update deployment status
+      await loadCourseContent();
+    } catch (err: any) {
+      console.error('Error generating student template:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to generate student template';
+      
+      // Check for specific error about missing GitLab configuration
+      if (errorMessage.includes('GitLab') || errorMessage.includes('student-template')) {
+        // Fetch GitLab status for more info
+        try {
+          const status = await apiClient.get<{
+            course_id: string;
+            has_gitlab_config: boolean;
+            has_student_template_url: boolean;
+            recommendations: string[];
+            missing_items: string[];
+          }>(`/courses/${course.id}/gitlab-status`);
+          console.log('GitLab status:', status);
+          
+          let message = `Cannot generate template: ${errorMessage}\n\n`;
+          if (status.recommendations && status.recommendations.length > 0) {
+            message += `Recommendations:\n${status.recommendations.join('\n')}`;
+          }
+          alert(message);
+        } catch {
+          alert(`Cannot generate template: ${errorMessage}\n\nMake sure the course has GitLab integration enabled and repositories created.`);
+        }
+      } else {
+        alert(`Error: ${errorMessage}`);
+      }
+    }
+  };
+
   const toggleExpand = (path: string) => {
     const newExpanded = new Set(expandedPaths);
     if (newExpanded.has(path)) {
@@ -221,15 +276,40 @@ const CourseDetailPage: React.FC = () => {
             mr: 2, 
             color: item.course_content_type?.color || 'action.active',
             cursor: 'pointer',
+            position: 'relative',
           }}
           onClick={() => {/* TODO: Navigate to content detail */}}
         >
           {getContentIcon(item.course_content_kind_id)}
+          {/* Show a small badge if example is assigned */}
+          {item.example_id && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: item.deployment_status === 'released' ? 'success.main' : 'warning.main',
+                border: '1px solid',
+                borderColor: 'background.paper',
+              }}
+            />
+          )}
         </Box>
         <Box sx={{ flexGrow: 1, cursor: 'pointer' }} onClick={() => {/* TODO: Navigate to content detail */}}>
-          <Typography variant="body1">
-            {item.title || pathParts[pathParts.length - 1]}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Typography variant="body1">
+              {item.title || pathParts[pathParts.length - 1]}
+            </Typography>
+            {/* Show example name if assigned */}
+            {item.example_id && (
+              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                (has example)
+              </Typography>
+            )}
+          </Stack>
           {item.description && (
             <Typography variant="body2" color="text.secondary">
               {item.description}
@@ -585,7 +665,18 @@ const CourseDetailPage: React.FC = () => {
       {/* Course Content Section */}
       <Paper sx={{ p: 3 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Typography variant="h5">Course Content</Typography>
+          <Box>
+            <Typography variant="h5">Course Content</Typography>
+            {/* Show summary of assigned examples */}
+            {courseContent.filter(c => c.example_id).length > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                {courseContent.filter(c => c.example_id).length} example{courseContent.filter(c => c.example_id).length !== 1 ? 's' : ''} assigned
+                {courseContent.filter(c => c.deployment_status === 'pending_release').length > 0 && (
+                  <> • {courseContent.filter(c => c.deployment_status === 'pending_release').length} pending release</>
+                )}
+              </Typography>
+            )}
+          </Box>
           <Stack direction="row" spacing={1}>
             {courseContent.length > 0 && (
               <Button
@@ -621,6 +712,15 @@ const CourseDetailPage: React.FC = () => {
               onClick={() => setAddContentOpen(true)}
             >
               Add Content
+            </Button>
+            {/* Always show Generate Student Template button */}
+            <Button
+              variant="contained"
+              color="secondary"
+              startIcon={<PublishIcon />}
+              onClick={handleGenerateStudentTemplate}
+            >
+              Generate Student Template
             </Button>
           </Stack>
         </Stack>

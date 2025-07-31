@@ -80,6 +80,7 @@ const DeploymentStatusChip: React.FC<DeploymentStatusChipProps> = ({
           icon: checking ? <CircularProgress size={16} /> : <PendingIcon />,
         };
       case 'deployed':
+      case 'released':
         return {
           label: `Example: ${exampleVersion || 'deployed'}`,
           color: 'success' as const,
@@ -92,8 +93,9 @@ const DeploymentStatusChip: React.FC<DeploymentStatusChipProps> = ({
           icon: <ErrorIcon />,
         };
       case 'pending':
+      case 'pending_release':
         return {
-          label: 'Pending deployment',
+          label: 'Pending release',
           color: 'default' as const,
           icon: <PendingIcon />,
         };

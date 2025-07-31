@@ -9,13 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
 from datetime import datetime, timezone
-from uuid import UUID
 
 from ..api.auth import get_current_permissions
 from ..database import get_db
 from ..interface.permissions import Principal
-from ..model.course import Course, CourseContent
-from ..model.example import Example, ExampleVersion
+from ..model.course import Course, CourseContent, CourseFamily
+from ..model.example import Example, ExampleVersion, ExampleDependency
 from ..redis_cache import get_redis_client
 from ..tasks.temporal_client import get_temporal_client
 from aiocache import BaseCache
@@ -82,7 +81,6 @@ class GenerateTemplateResponse(BaseModel):
 
 # Create router
 course_content_examples_router = APIRouter(
-    prefix="/courses",
     tags=["course-content-examples"]
 )
 
@@ -164,7 +162,7 @@ async def assign_example_to_content(
         version_tag = request.example_version
     
     # Update course content
-    content.example_id = UUID(request.example_id)
+    content.example_id = request.example_id  # Keep as string, SQLAlchemy will handle UUID conversion
     content.example_version = version_tag
     content.deployment_status = "pending_release"
     
@@ -246,7 +244,7 @@ async def bulk_assign_examples(
             is_update = content.example_id is not None
             
             # Assign example
-            content.example_id = UUID(example_id) if example_id else None
+            content.example_id = example_id if example_id else None
             content.example_version = example_version
             content.deployment_status = "pending_release"
             
@@ -433,18 +431,55 @@ async def generate_student_template(
             detail="Not authorized to generate template for this course"
         )
     
-    # Check if student-template repository URL exists
-    if not course.properties or "gitlab" not in course.properties:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Course missing GitLab configuration"
-        )
+    # Get student-template URL
+    student_template_url = None
     
-    gitlab_props = course.properties.get("gitlab", {})
-    if "student_template_url" not in gitlab_props:
+    # First check if course has GitLab properties
+    if course.properties and "gitlab" in course.properties:
+        course_gitlab = course.properties["gitlab"]
+        
+        # Option 1: Direct URL stored (backward compatibility)
+        if "student_template_url" in course_gitlab:
+            student_template_url = course_gitlab["student_template_url"]
+        
+        # Option 2: Construct from course's full_path
+        elif "full_path" in course_gitlab:
+            # Get GitLab URL from organization
+            if not course.course_family_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Course missing course family reference"
+                )
+            
+            family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
+            if not family or not family.organization_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Course family or organization not found"
+                )
+            
+            from ..model.organization import Organization
+            org = db.query(Organization).filter(Organization.id == family.organization_id).first()
+            if not org or not org.properties or "gitlab" not in org.properties:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Organization missing GitLab configuration"
+                )
+            
+            gitlab_url = org.properties["gitlab"].get("url")
+            if not gitlab_url:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Organization missing GitLab URL"
+                )
+            
+            # Construct URL: {gitlab_url}/{course_full_path}/student-template
+            student_template_url = f"{gitlab_url}/{course_gitlab['full_path']}/student-template"
+    
+    if not student_template_url:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Course missing student-template repository URL"
+            detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
         )
     
     # Count contents to process
@@ -458,6 +493,7 @@ async def generate_student_template(
     # Prepare workflow parameters
     workflow_params = {
         "course_id": course_id,
+        "student_template_url": student_template_url,
         "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
     }
     
@@ -823,3 +859,87 @@ async def get_course_contents_with_examples(
         await cache.set(cache_key, result, ttl=300)  # Cache for 5 minutes
     
     return result
+
+
+@course_content_examples_router.get(
+    "/courses/{course_id}/gitlab-status",
+    response_model=Dict[str, Any]
+)
+async def get_course_gitlab_status(
+    course_id: str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Check GitLab configuration status for a course.
+    
+    Returns information about GitLab integration and what's missing.
+    """
+    # Get course
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    # Check GitLab configuration
+    status = {
+        "course_id": course_id,
+        "has_gitlab_config": False,
+        "has_group_id": False,
+        "has_student_template_url": False,
+        "gitlab_config": {},
+        "missing_items": [],
+        "recommendations": []
+    }
+    
+    if course.properties and "gitlab" in course.properties:
+        status["has_gitlab_config"] = True
+        gitlab_props = course.properties["gitlab"]
+        
+        # Check for group ID
+        if "group_id" in gitlab_props:
+            status["has_group_id"] = True
+            status["gitlab_config"]["group_id"] = gitlab_props["group_id"]
+        else:
+            status["missing_items"].append("GitLab group ID")
+            
+        # Check for student template URL
+        if "student_template_url" in gitlab_props:
+            status["has_student_template_url"] = True
+            status["gitlab_config"]["student_template_url"] = gitlab_props["student_template_url"]
+        else:
+            status["missing_items"].append("Student template repository URL")
+            
+        # Check for other GitLab properties
+        if "projects" in gitlab_props:
+            status["gitlab_config"]["projects"] = gitlab_props["projects"]
+            
+    else:
+        status["missing_items"].append("GitLab configuration")
+        
+    # Get course family for additional context
+    if course.course_family_id:
+        family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
+        if family and family.properties and "gitlab" in family.properties:
+            status["course_family_gitlab"] = {
+                "has_config": True,
+                "group_id": family.properties["gitlab"].get("group_id")
+            }
+            
+    # Add recommendations
+    if not status["has_gitlab_config"]:
+        status["recommendations"].append(
+            "The course needs to be created with GitLab integration enabled. "
+            "Please recreate the course or contact an administrator to enable GitLab integration."
+        )
+    elif not status["has_student_template_url"]:
+        status["recommendations"].append(
+            "The course has partial GitLab configuration but is missing the student-template repository. "
+            "The course may need to be recreated or the GitLab projects need to be created manually."
+        )
+        
+    status["can_generate_template"] = status["has_student_template_url"]
+    
+    return status

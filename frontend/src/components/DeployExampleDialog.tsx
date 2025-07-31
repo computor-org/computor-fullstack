@@ -98,12 +98,12 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('');
-  const [examples, setExamples] = useState<ExampleInfo[]>([]);
+  const [examples, setExamples] = useState<ExampleList[]>([]);
   const [filters, setFilters] = useState<{ categories: string[]; languages: string[] }>({
     categories: [],
     languages: [],
   });
-  const [selectedExample, setSelectedExample] = useState<ExampleInfo | null>(null);
+  const [selectedExample, setSelectedExample] = useState<ExampleList | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string>('latest');
   const [preview, setPreview] = useState<DeploymentPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -118,10 +118,10 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
       const params: any = {};
       if (searchQuery) params.search = searchQuery;
       if (selectedCategory) params.category = selectedCategory;
-      if (selectedLanguage) params.language = selectedLanguage;
+      // Language filtering not available
 
       // Fetch examples from the standard examples endpoint
-      const examplesData = await apiClient.get<ExampleInfo[]>('/examples', { params });
+      const examplesData = await apiClient.get<ExampleList[]>('/examples', { params });
 
       setExamples(examplesData || []);
       
@@ -131,12 +131,12 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
       
       examplesData.forEach(example => {
         if (example.category) categories.add(example.category);
-        if (example.language) languages.add(example.language);
+        // Language is not available in ExampleList
       });
       
       setFilters({
         categories: Array.from(categories).sort(),
-        languages: Array.from(languages).sort()
+        languages: [] // Language filtering not available
       });
     } catch (err: any) {
       console.error('Error loading examples:', err);
@@ -147,7 +147,7 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
   };
 
   // Load deployment preview
-  const loadPreview = async (example: ExampleInfo) => {
+  const loadPreview = async (example: ExampleList) => {
     try {
       setLoadingPreview(true);
       setError(null);
@@ -158,8 +158,8 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
         example: {
           id: example.id,
           title: example.title,
-          description: example.subject,
-          category: example.category,
+          description: example.subject || undefined,
+          category: example.category || undefined,
           language: undefined, // Not available in ExampleList
         },
         version: {
@@ -234,10 +234,10 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
     const matchesSearch =
       !searchQuery ||
       example.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (example.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (example.subject || '').toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesCategory = !selectedCategory || example.category === selectedCategory;
-    const matchesLanguage = !selectedLanguage || example.language === selectedLanguage;
+    const matchesLanguage = true; // Language filtering not available
     
     return matchesSearch && matchesCategory && matchesLanguage;
   });
@@ -325,21 +325,7 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
                     </Select>
                   </FormControl>
                   
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Language</InputLabel>
-                    <Select
-                      value={selectedLanguage}
-                      onChange={(e) => setSelectedLanguage(e.target.value)}
-                      label="Language"
-                    >
-                      <MenuItem value="">All Languages</MenuItem>
-                      {filters.languages.map((lang) => (
-                        <MenuItem key={lang} value={lang}>
-                          {lang}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  {/* Language filtering not available in ExampleList */}
                   
                   <IconButton onClick={loadExamples} size="small">
                     <RefreshIcon />
@@ -382,16 +368,8 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
                                 variant="outlined"
                               />
                             )}
-                            {example.language && (
-                              <Chip
-                                icon={<CodeIcon />}
-                                label={example.language}
-                                size="small"
-                                variant="outlined"
-                                color="primary"
-                              />
-                            )}
-                            {example.tags?.slice(0, 2).map((tag) => (
+                            {/* Language not available in ExampleList */}
+                            {example.tags?.slice(0, 2).map((tag: string) => (
                               <Chip
                                 key={tag}
                                 icon={<LabelIcon />}

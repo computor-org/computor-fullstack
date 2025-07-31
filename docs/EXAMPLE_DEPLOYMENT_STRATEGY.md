@@ -33,11 +33,12 @@ The traditional system used three Git repositories per course:
    - Generated from assignments repository
 
 #### New System (With Example Library)
-The Example Library paradigm eliminates the need for the assignments repository:
+The Example Library paradigm eliminates the need for both assignments and reference repositories:
 
 1. **Example Library (MinIO Storage)**
    - Centralized, versioned storage of all examples
    - Examples are first-class entities with metadata
+   - Contains both skeleton code AND full solutions
    - Independent of any specific course
    - Supports versioning and dependency management
 
@@ -45,11 +46,12 @@ The Example Library paradigm eliminates the need for the assignments repository:
    - Generated directly from Example Library selections
    - Contains skeleton code and instructions
    - Students fork this repository
-   - **Key Change**: No intermediate assignments repository needed
+   - **Key Change**: No intermediate repositories needed
 
-3. **Reference Repository** (`{course-path}-reference.git`) [Optional]
-   - Can be generated from Example Library with full solutions
-   - For tutor reference only
+**Note**: The reference repository is also obsolete because:
+- Full solutions are stored in the Example Library
+- Tutors can access examples directly via the UI or API
+- Version control is handled at the example level, not course level
 
 ### Course Content Flow Comparison
 
@@ -84,25 +86,29 @@ graph TD
 
 ## Revised Integration Strategy
 
-### Why Assignments Repository is No Longer Needed
+### Why Assignments and Reference Repositories are No Longer Needed
 
 1. **Examples are First-Class Entities**
    - Stored in MinIO with full versioning
+   - Contains BOTH student templates AND reference solutions
    - Independent of any specific course
    - Can be updated without affecting course repositories
 
 2. **Direct Template Generation**
-   - Student templates can be generated directly from Example Library
+   - Student templates generated directly from Example Library
+   - Reference solutions accessible directly from Example Library
    - No need for intermediate storage in Git
    - CourseContent table maintains the link between course and examples
 
-3. **Lecturer Workflow Simplified**
+3. **Lecturer and Tutor Workflow Simplified**
    - Create/edit examples via VS Code extension or API
    - Select examples for course via UI
    - Student template automatically generated
+   - Tutors access solutions directly from Example Library UI
 
 4. **Version Management**
    - Example versions managed in Example Library
+   - Both templates and solutions versioned together
    - Courses can pin to specific versions or track "latest"
    - No Git history pollution with content updates
 
@@ -119,7 +125,8 @@ graph TD
     G --> H[Commit & Push to GitLab]
     H --> I[Students Fork Template]
     
-    J[Optional: Generate Reference Repo] --> K[Full Solutions for Tutors]
+    J[Tutors Access Examples] --> K[View Solutions in Example Library UI]
+    A --> J
 ```
 
 ### Key Components
@@ -145,7 +152,7 @@ graph TD
 #### 3. Repository Integration Points
 - **CourseContent Model**: Links courses to examples via example_id and example_version
 - **Student Template Repository**: Generated directly from Example Library content
-- **Reference Repository** (optional): Can be generated with full solutions
+- **Example Library Access**: Tutors and lecturers access full solutions directly
 
 ## Detailed Technical Design
 
@@ -493,9 +500,14 @@ student-template/                    # Generated FROM assignments
 
 #### New Structure (Direct from Example Library)
 ```
-Example Library (MinIO)              # Source of truth
+Example Library (MinIO)              # Source of truth for EVERYTHING
 ├── examples/
 │   ├── hello-world-v1.0/
+│   │   ├── meta.yaml               # Defines student/solution files
+│   │   ├── main.py                 # Solution code
+│   │   ├── main_template.py        # Student template
+│   │   ├── test_main.py            # Tests (for grading)
+│   │   └── README.md               # Instructions
 │   ├── variables-v2.1/
 │   └── functions-v1.5/
 
@@ -505,16 +517,19 @@ CourseContent Table                  # Links course to examples
 ├── example_id: uuid
 └── example_version: "v1.0"
 
-student-template/                    # Generated DIRECTLY from Example Library
+student-template/                    # ONLY repository needed
 ├── week1/
 │   ├── hello_world/
-│   │   ├── main.py                  # From Example Library template
+│   │   ├── main.py                  # From main_template.py
 │   │   └── README.md                # From Example Library
 │   └── variables/
-│       └── variables.py             # From Example Library template
+│       └── variables.py             # From template file
 └── week2/
     └── functions/
-        └── functions.py             # From Example Library template
+        └── functions.py             # From template file
+
+NO assignments repository            # Not needed!
+NO reference repository              # Solutions in Example Library!
 ```
 
 ### Example Library Tracking Files
@@ -600,46 +615,53 @@ When a new version of an example is available:
 
 ### Required Changes
 
-1. **Remove Assignments Repository Creation**
-   - Update `GitLabBuilderNew._create_course_projects()` to skip assignments repo
-   - Remove `assignments_url` from course properties
-   - Update any UI that expects assignments repository
+1. **Remove Both Assignments and Reference Repository Creation**
+   - Update `GitLabBuilderNew._create_course_projects()` to only create student-template
+   - Remove `assignments_url` and `reference_url` from course properties
+   - Update any UI that expects these repositories
 
 2. **Update Student Template Generation**
    - Modify workflow to pull directly from Example Library
-   - No longer clone assignments repository
+   - No longer clone any intermediate repositories
    - Use CourseContent records as source of truth
 
 3. **Update Example Selection UI**
    - When selecting an example, directly update CourseContent
-   - No deployment to intermediate repository needed
+   - No deployment to intermediate repositories needed
    - Trigger template regeneration after changes
 
-4. **Simplify Deployment Workflow**
-   - Remove `deploy_examples_to_course` workflow
+4. **Add Solution Access for Tutors**
+   - Create UI for tutors to browse Example Library
+   - Show full solutions for examples used in their courses
+   - Provide download/export functionality if needed
+
+5. **Simplify Deployment Workflow**
+   - Remove `deploy_examples_to_course` workflow entirely
    - Focus on `generate_student_template_with_examples`
    - Update CourseContent records directly via API
 
 ### Benefits of This Approach
 
-1. **Simplified Architecture**
-   - One less repository to manage per course
-   - Cleaner separation of concerns
-   - Reduced storage requirements
+1. **Dramatically Simplified Architecture**
+   - Two fewer repositories per course (assignments and reference removed)
+   - Only one repository needed: student-template
+   - Massive reduction in storage requirements
 
 2. **Better Version Control**
    - Example versions managed in Example Library
-   - Course repositories only contain generated content
-   - No mixing of source and generated files
+   - Solutions and templates versioned together
+   - No redundant copies across multiple repositories
 
-3. **Improved Lecturer Experience**
+3. **Improved Lecturer and Tutor Experience**
    - No need to understand Git for content management
    - Direct example selection from UI
+   - Tutors access solutions without repository navigation
    - Immediate template generation
 
 4. **Easier Maintenance**
    - Single source of truth (Example Library)
-   - Consistent example versions across courses
+   - No synchronization between assignments and reference repos
+   - Consistent example versions across all courses
    - Simplified update process
 
 ### Modified Generation Process
@@ -959,19 +981,19 @@ Response: {
 
 ### Phase 1: Update Infrastructure (Immediate)
 1. **Modify Course Creation**
-   - Stop creating assignments repository in `GitLabBuilderNew`
-   - Update course properties structure
-   - Keep student-template and reference repos
+   - Stop creating both assignments and reference repositories in `GitLabBuilderNew`
+   - Update course properties structure to only include student-template URL
+   - Only create student-template repository
 
 2. **Fix Template Generation**
-   - Update `generate_student_template_with_examples` to not expect assignments repo
+   - Update `generate_student_template_with_examples` to not expect any intermediate repos
    - Pull examples directly from MinIO based on CourseContent records
    - Test with example courses
 
-3. **Update Deployment Workflow**
-   - Repurpose `deploy_examples_to_course` to just update CourseContent records
-   - Remove repository cloning/pushing logic
-   - Focus on linking examples to courses
+3. **Update/Remove Deployment Workflow**
+   - Remove `deploy_examples_to_course` workflow entirely
+   - Create simple API endpoint to update CourseContent with example selections
+   - Trigger template regeneration after CourseContent updates
 
 ### Phase 2: UI Updates (Next Sprint)
 1. **Course Management UI**
@@ -996,6 +1018,11 @@ Response: {
 
 ## Conclusion
 
-By eliminating the assignments repository, we achieve a cleaner, more maintainable architecture that better aligns with the Example Library paradigm. This change simplifies the lecturer workflow, reduces complexity, and provides a more direct path from example creation to student template generation.
+By eliminating both the assignments and reference repositories, we achieve a dramatically cleaner and more maintainable architecture that fully embraces the Example Library paradigm. This change:
 
-The key insight is that with versioned examples in MinIO and CourseContent records linking courses to examples, the intermediate Git repository becomes redundant. This streamlined approach better serves the needs of modern course management while maintaining all the benefits of version control and template generation.
+- Reduces from 3 repositories per course to just 1 (student-template only)
+- Simplifies the lecturer workflow by removing Git complexity
+- Provides tutors direct access to solutions without repository navigation
+- Creates a single source of truth for all course content
+
+The key insight is that with versioned examples in MinIO containing both templates and solutions, and CourseContent records linking courses to examples, ALL intermediate Git repositories become redundant. The Example Library serves as the complete content management system, while Git is relegated to its proper role: version control for student submissions only.

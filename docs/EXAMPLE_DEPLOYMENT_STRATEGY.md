@@ -574,6 +574,31 @@ NO reference repository              # Solutions in Example Library!
 
 ## User Interface Integration
 
+### Two-Step Process: Assignment and Release
+
+The UI implements a clear separation between content planning and deployment:
+
+1. **Step 1: Assign Examples to CourseContent (Database Only)**
+   - In Course Detail Page, add/edit CourseContent
+   - Select examples from Example Library
+   - Assign to specific paths (e.g., `week1.hello_world`)
+   - This ONLY updates database records (CourseContent.example_id)
+   - NO Git operations occur at this stage
+   - Multiple examples can be assigned/updated before release
+
+2. **Step 2: Release Student Template (Git Operations)**
+   - Separate "Generate Student Template" button
+   - Shows summary of pending changes:
+     - New examples to be added
+     - Existing content to be updated
+     - Removed content
+   - Confirmation dialog before proceeding
+   - Triggers Temporal workflow to:
+     - Download examples from MinIO
+     - Process according to meta.yaml
+     - Generate student-template repository
+     - Commit and push changes
+
 ### Course Content Management Enhancement
 
 #### Example Selection Dialog
@@ -585,31 +610,106 @@ NO reference repository              # Solutions in Example Library!
   - Preview example metadata and file structure
   - Conflict detection (if path already exists)
 
-#### Deployment Status Tracking
+#### Assignment Status Tracking
 - **Location**: Course Detail Page content tree
 - **Visual Indicators**:
-  - 🔄 Deploying (during Temporal workflow)
-  - ✅ Deployed (successful deployment)
-  - ❌ Failed (deployment error)
-  - ✏️ Customized (modified after deployment)
-  - 🔄 Update Available (newer example version exists)
+  - 📎 Example Assigned (database only, not in Git yet)
+  - ✅ Released (in student-template repository)
+  - 🔄 Pending Release (assigned but not released)
+  - 🆕 New Version Available (newer example version exists)
+  - ⚠️ Modified (content differs from last release)
 
-#### Batch Deployment Interface
-- **Feature**: Select multiple CourseContent items and deploy examples in bulk
-- **Progress**: Real-time Temporal workflow progress tracking
-- **Error Handling**: Individual failure handling with retry options
+#### Release Button States
+- **"Generate Student Template"** - Active when pending changes exist
+- **"Template Up to Date"** - Disabled when no changes pending
+- **"Release in Progress..."** - During Temporal workflow execution
+
+#### UI Components
+
+```typescript
+// Course Detail Page Actions
+<Stack direction="row" spacing={2}>
+  <Button
+    variant="contained"
+    startIcon={<AddIcon />}
+    onClick={() => setAddContentOpen(true)}
+  >
+    Add Content
+  </Button>
+  
+  <Button
+    variant="contained"
+    color="secondary"
+    startIcon={<PublishIcon />}
+    onClick={() => setReleaseTemplateOpen(true)}
+    disabled={!hasPendingChanges}
+  >
+    Generate Student Template
+  </Button>
+  
+  {pendingChangesCount > 0 && (
+    <Chip
+      label={`${pendingChangesCount} pending changes`}
+      color="warning"
+      size="small"
+    />
+  )}
+</Stack>
+
+// Release Template Dialog
+<ReleaseTemplateDialog
+  open={releaseTemplateOpen}
+  onClose={() => setReleaseTemplateOpen(false)}
+  courseId={course.id}
+  pendingChanges={calculatePendingChanges()}
+  onReleaseStarted={handleReleaseStarted}
+/>
+```
+
+#### Release Dialog Content
+
+```typescript
+interface PendingChange {
+  type: 'new' | 'update' | 'remove';
+  contentPath: string;
+  exampleName?: string;
+  fromVersion?: string;
+  toVersion?: string;
+}
+
+// Dialog shows:
+- Summary: "5 new assignments, 2 updates"
+- Detailed change list with paths and versions
+- Confirmation: "This will regenerate the student template repository"
+- Progress tracking during release
+```
 
 ### Example Update Workflow
 
 When a new version of an example is available:
 
-1. **Notification**: UI shows "Update Available" indicator
-2. **Comparison**: Show diff between current deployed version and new version
-3. **Update Options**:
-   - **Overwrite**: Replace with new version (lose customizations)
-   - **Merge**: Three-way merge (current, deployed original, new version)
-   - **Skip**: Keep current version
-4. **Bulk Updates**: Update multiple examples at once
+1. **Notification**: CourseContent shows "New Version Available" indicator
+2. **Update Assignment**: Click update button to assign new version (database only)
+3. **Review Changes**: Updated content marked as "Pending Release"
+4. **Batch Updates**: Can update multiple examples before releasing
+5. **Release**: Click "Generate Student Template" when ready to deploy all changes
+
+### Benefits of Two-Step Process
+
+1. **Planning Flexibility**
+   - Lecturers can plan course content without immediate Git commits
+   - Review all changes before they go live to students
+   - Easy to revert assignments before release
+
+2. **Atomic Releases**
+   - All changes deployed together
+   - Students see consistent state
+   - Clear versioning of template releases
+
+3. **Reduced Git Noise**
+   - Fewer commits to student-template repository
+   - Meaningful commit messages for releases
+   - No intermediate states
 
 ## Student Template Generation Integration
 
@@ -866,62 +966,115 @@ async def process_example_for_student_template(
 
 ## API Endpoints
 
-### Example Deployment API
+### Two-Step API Design
+
+#### Step 1: Example Assignment (Database Only)
 
 ```python
-# Deploy examples to course
-POST /api/v1/courses/{course_id}/deploy-examples
+# Assign example to CourseContent
+POST /api/v1/course-contents/{content_id}/assign-example
 {
-    "deployments": [
+    "example_id": "uuid",
+    "example_version": "v1.2"  # or "latest"
+}
+Response: {
+    "id": "content-id",
+    "example_id": "uuid",
+    "example_version": "v1.2",
+    "deployment_status": "pending_release"
+}
+
+# Bulk assign examples
+POST /api/v1/courses/{course_id}/assign-examples
+{
+    "assignments": [
         {
             "course_content_id": "uuid",
-            "example_id": "uuid", 
-            "example_version": "v1.2",
-            "target_path": "week1.assignment1"
+            "example_id": "uuid",
+            "example_version": "v1.2"
         }
     ]
+}
+Response: {
+    "assigned": 3,
+    "updated": 2,
+    "failed": 0
+}
+
+#### Step 2: Template Generation (Git Operations)
+
+```python
+# Generate student template from assigned examples
+POST /api/v1/courses/{course_id}/generate-student-template
+{
+    "commit_message": "Release week 1-3 assignments"  # optional
 }
 Response: {
     "workflow_id": "temporal-workflow-id",
     "status": "started",
-    "deployments_requested": 3
+    "contents_to_process": 15
 }
 
-# Check deployment status
-GET /api/v1/courses/{course_id}/deployment-status/{workflow_id}
+# Check template generation status
+GET /api/v1/courses/{course_id}/template-generation-status/{workflow_id}
 Response: {
     "status": "running|completed|failed",
     "progress": {
-        "completed": 2,
-        "total": 3,
-        "current": "Deploying example: functions-intro"
+        "processed": 12,
+        "total": 15,
+        "current": "Processing: week2.functions"
     },
-    "results": [
+    "commit_hash": "abc123..."  # when completed
+}
+
+# Get pending changes (what will be in next release)
+GET /api/v1/courses/{course_id}/pending-changes
+Response: {
+    "total_changes": 5,
+    "changes": [
         {
-            "course_content_id": "uuid",
-            "example_id": "uuid",
-            "status": "deployed",
-            "target_path": "week1.assignment1"
+            "type": "new",
+            "content_id": "uuid",
+            "path": "week1.hello_world",
+            "example_name": "Hello World Basics",
+            "example_version": "v1.0"
+        },
+        {
+            "type": "update",
+            "content_id": "uuid",
+            "path": "week2.functions",
+            "from_version": "v1.0",
+            "to_version": "v1.2"
+        }
+    ],
+    "last_release": {
+        "commit_hash": "def456...",
+        "timestamp": "2025-07-31T10:00:00Z"
+    }
+}
+
+# Clear example assignment
+DELETE /api/v1/course-contents/{content_id}/example
+Response: 204 No Content
+
+# Get course content with example status
+GET /api/v1/courses/{course_id}/contents-with-examples
+Response: {
+    "contents": [
+        {
+            "id": "uuid",
+            "path": "week1.hello_world",
+            "title": "Hello World",
+            "example": {
+                "id": "uuid",
+                "name": "Hello World Basics",
+                "version": "v1.0",
+                "latest_version": "v1.2",
+                "has_update": true,
+                "release_status": "pending"  # pending|released|modified
+            }
         }
     ]
-}
-
-# Update example versions
-PATCH /api/v1/courses/{course_id}/content/{content_id}/example
-{
-    "example_version": "v2.0",
-    "update_strategy": "overwrite|merge|skip"
-}
-
-# Bulk deployment status
-GET /api/v1/courses/{course_id}/examples/deployment-status
-Response: {
-    "total_examples": 12,
-    "deployed": 10,
-    "pending": 1,
-    "failed": 1,
-    "updates_available": 3,
-    "deployments": [...]
 }
 ```
 

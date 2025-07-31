@@ -43,17 +43,8 @@ from .temporal_hierarchy_management import (
     create_course_family_activity,
     create_course_activity
 )
-from .temporal_example_deployment import (
-    DeployExamplesToCourseWorkflow,
-    validate_deployment_request,
-    download_examples_from_library,
-    prepare_assignments_repository,
-    deploy_single_example,
-    resolve_example_dependencies,
-    commit_and_push_changes,
-    update_course_content_deployment_status,
-    cleanup_temp_repository
-)
+# Deprecated: Example deployment workflow no longer needed
+# Examples are now deployed directly from MinIO to student-template
 from .temporal_student_template import (
     GenerateStudentTemplateWorkflow,
     generate_student_template_with_examples
@@ -98,7 +89,7 @@ class TemporalWorker:
             CreateOrganizationWorkflow,
             CreateCourseFamilyWorkflow,
             CreateCourseWorkflow,
-            DeployExamplesToCourseWorkflow,
+            # DeployExamplesToCourseWorkflow,  # Deprecated - use GenerateStudentTemplateWorkflowV2
             GenerateStudentTemplateWorkflow,
             GenerateStudentTemplateWorkflowV2,
         ]
@@ -114,15 +105,7 @@ class TemporalWorker:
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
-            # Removed: Example deployment activities - no longer needed
-            # validate_deployment_request,
-            # download_examples_from_library,
-            # prepare_assignments_repository,
-            # deploy_single_example,
-            # resolve_example_dependencies,
-            # commit_and_push_changes,
-            # update_course_content_deployment_status,
-            # cleanup_temp_repository,
+            # Example deployment activities removed - no longer needed with Example Library paradigm
             generate_student_template_with_examples,  # Legacy version
             generate_student_template_v2,  # New version
         ]

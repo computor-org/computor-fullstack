@@ -987,7 +987,12 @@ class GitLabBuilderNew:
         parent_group: Group,
         deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
-        """Create course projects (assignments, student-template, reference) under a course."""
+        """Create course project (student-template only) under a course.
+        
+        With the Example Library paradigm, assignments and reference repositories
+        are no longer needed. Examples are stored in MinIO and deployed directly
+        to the student-template repository.
+        """
         result = {
             "success": False,
             "created_projects": [],
@@ -995,24 +1000,12 @@ class GitLabBuilderNew:
             "error": None
         }
         
-        # Standard course projects
+        # Only create student-template project
         project_configs = [
-            {
-                "name": "Assignments",
-                "path": "assignments",
-                "description": f"Assignment templates and grading scripts for {course.title}",
-                "visibility": "private"
-            },
             {
                 "name": "Student Template",
                 "path": "student-template",
                 "description": f"Template repository for students in {course.title}",
-                "visibility": "private"
-            },
-            {
-                "name": "Reference",
-                "path": "reference",
-                "description": f"Reference solutions and instructor materials for {course.title}",
                 "visibility": "private"
             }
         ]
@@ -1062,26 +1055,17 @@ class GitLabBuilderNew:
                 course.properties["gitlab"] = {}
             
             course.properties["gitlab"]["projects"] = {
-                "assignments": {
-                    "path": "assignments",
-                    "full_path": f"{parent_group.full_path}/assignments",
-                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/assignments",
-                    "description": "Assignment templates and grading scripts"
-                },
                 "student_template": {
                     "path": "student-template",
                     "full_path": f"{parent_group.full_path}/student-template",
                     "web_url": f"{self.gitlab_url}/{parent_group.full_path}/student-template",
                     "description": "Template repository for students"
                 },
-                "reference": {
-                    "path": "reference",
-                    "full_path": f"{parent_group.full_path}/reference",
-                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/reference",
-                    "description": "Reference solutions and instructor materials"
-                },
                 "created_at": datetime.now().isoformat()
             }
+            
+            # Store the student-template URL at the top level for easy access
+            course.properties["gitlab"]["student_template_url"] = f"{self.gitlab_url}/{parent_group.full_path}/student-template"
             
             # Tell SQLAlchemy that the properties field has been modified
             flag_modified(course, "properties")
@@ -1254,7 +1238,7 @@ class GitLabBuilderNew:
         course: Course,
         deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
-        """Initialize course projects with proper content structure and meta.yaml files."""
+        """Initialize course project (student-template only) with proper content structure."""
         result = {
             "success": False,
             "initialized_projects": [],
@@ -1270,17 +1254,7 @@ class GitLabBuilderNew:
                 result["error"] = "Course has no GitLab projects configured"
                 return result
             
-            # Initialize assignments project
-            if "assignments" in projects:
-                assignments_result = self._initialize_assignments_project(
-                    course, projects["assignments"], deployment
-                )
-                if assignments_result["success"]:
-                    result["initialized_projects"].append("assignments")
-                else:
-                    logger.warning(f"Failed to initialize assignments project: {assignments_result['error']}")
-            
-            # Initialize student-template project
+            # Only initialize student-template project
             if "student_template" in projects:
                 template_result = self._initialize_student_template_project(
                     course, projects["student_template"], deployment
@@ -1290,16 +1264,6 @@ class GitLabBuilderNew:
                 else:
                     logger.warning(f"Failed to initialize student-template project: {template_result['error']}")
             
-            # Initialize reference project
-            if "reference" in projects:
-                reference_result = self._initialize_reference_project(
-                    course, projects["reference"], deployment
-                )
-                if reference_result["success"]:
-                    result["initialized_projects"].append("reference")
-                else:
-                    logger.warning(f"Failed to initialize reference project: {reference_result['error']}")
-            
             result["success"] = len(result["initialized_projects"]) > 0
             
         except Exception as e:
@@ -1307,6 +1271,12 @@ class GitLabBuilderNew:
             result["error"] = str(e)
         
         return result
+    
+    # ===== DEPRECATED METHODS =====
+    # The following methods are no longer needed with the Example Library paradigm.
+    # Assignments and reference repositories are obsolete - examples are stored in MinIO
+    # and deployed directly to student-template repositories.
+    # These methods are kept for reference but should not be used.
     
     def _initialize_assignments_project(
         self,
@@ -1526,3 +1496,5 @@ class GitLabBuilderNew:
             result["error"] = str(e)
         
         return result
+    
+    # END OF DEPRECATED METHODS

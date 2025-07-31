@@ -19,6 +19,21 @@ interface DeploymentStatusChipProps {
   exampleVersion?: string | null;
 }
 
+interface DeploymentStatusResponse {
+  status: 'running' | 'completed' | 'failed';
+  progress?: {
+    completed: number;
+    total: number;
+    current: string;
+  };
+  results?: Array<{
+    course_content_id: string;
+    example_id: string;
+    status: string;
+    target_path: string;
+  }>;
+}
+
 const DeploymentStatusChip: React.FC<DeploymentStatusChipProps> = ({
   courseId,
   deploymentTaskId,
@@ -34,7 +49,7 @@ const DeploymentStatusChip: React.FC<DeploymentStatusChipProps> = ({
       const interval = setInterval(async () => {
         try {
           setChecking(true);
-          const response = await apiClient.get(
+          const response = await apiClient.get<DeploymentStatusResponse>(
             `/api/v1/courses/${courseId}/deployment-status/${deploymentTaskId}`
           );
           

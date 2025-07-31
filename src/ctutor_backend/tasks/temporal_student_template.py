@@ -11,14 +11,12 @@ import json
 from datetime import timedelta
 from typing import Dict, Any, List, Optional
 from pathlib import Path
-import git
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session
 
 from .temporal_base import BaseWorkflow, WorkflowResult
-from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseContent
 from ..model.example import Example
@@ -62,6 +60,9 @@ async def generate_student_template_with_examples(course_id: str) -> Dict[str, A
         temp_dir = tempfile.mkdtemp()
         assignments_path = os.path.join(temp_dir, 'assignments')
         template_path = os.path.join(temp_dir, 'student-template')
+        
+        # Import git inside activity to avoid workflow sandbox restrictions
+        import git
         
         # Clone repositories
         gitlab_token = os.environ.get('GITLAB_TOKEN', '')
@@ -356,9 +357,19 @@ def create_student_meta_yaml(meta_yaml: Dict[str, Any], course_content: CourseCo
 
 
 # Workflow
-@workflow.defn(name="generate_student_template")
+@workflow.defn(name="generate_student_template", sandboxed=False)
 class GenerateStudentTemplateWorkflow(BaseWorkflow):
     """Generate or update student template repository from assignments."""
+    
+    @classmethod
+    def get_name(cls) -> str:
+        """Get the workflow name."""
+        return "generate_student_template"
+    
+    @classmethod
+    def get_task_queue(cls) -> str:
+        """Get the task queue for this workflow."""
+        return "computor-tasks"
     
     @workflow.run
     async def run(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -383,12 +394,3 @@ class GenerateStudentTemplateWorkflow(BaseWorkflow):
         )
         
         return result
-
-
-# Register the workflow
-register_task(
-    'generate_student_template',
-    GenerateStudentTemplateWorkflow,
-    'Generate student template repository with example support',
-    'course_management'
-)

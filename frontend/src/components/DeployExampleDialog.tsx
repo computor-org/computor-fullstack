@@ -16,6 +16,7 @@ import {
   CardContent,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
@@ -355,12 +356,14 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
                   {filteredExamples.map((example) => (
                     <ListItem
                       key={example.id}
-                      button
-                      selected={selectedExample?.id === example.id}
-                      onClick={() => setSelectedExample(example)}
-                      sx={{ mb: 1, borderRadius: 1 }}
+                      sx={{ mb: 1, p: 0 }}
                     >
-                      <ListItemText
+                      <ListItemButton
+                        selected={selectedExample?.id === example.id}
+                        onClick={() => setSelectedExample(example)}
+                        sx={{ borderRadius: 1 }}
+                      >
+                        <ListItemText
                         primary={example.title}
                         secondary={
                           <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
@@ -393,6 +396,7 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
                           </Stack>
                         }
                       />
+                      </ListItemButton>
                     </ListItem>
                   ))}
                 </List>

@@ -6,8 +6,28 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+def transform_localhost_url(url: str) -> str:
+    """
+    Transform localhost URLs to Docker service name for container-to-container communication.
+    
+    Args:
+        url: URL that may contain localhost
+        
+    Returns:
+        URL with localhost replaced by minio service name
+    """
+    # In Docker environment, replace localhost with the MinIO service name
+    if url and "localhost" in url:
+        # Check if we're running in Docker by looking for common Docker environment variables
+        if os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER'):
+            return url.replace("localhost", "minio")
+    return url
+
+
 # Environment configuration
 MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'localhost:9000')
+MINIO_ENDPOINT = transform_localhost_url(MINIO_ENDPOINT)  # Transform for Docker
 MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', 'minioadmin')
 MINIO_SECURE = os.environ.get('MINIO_SECURE', 'false').lower() == 'true'

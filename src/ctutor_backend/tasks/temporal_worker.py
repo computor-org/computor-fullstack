@@ -43,6 +43,21 @@ from .temporal_hierarchy_management import (
     create_course_family_activity,
     create_course_activity
 )
+from .temporal_example_deployment import (
+    DeployExamplesToCourseWorkflow,
+    validate_deployment_request,
+    download_examples_from_library,
+    prepare_assignments_repository,
+    deploy_single_example,
+    resolve_example_dependencies,
+    commit_and_push_changes,
+    update_course_content_deployment_status,
+    cleanup_temp_repository
+)
+from .temporal_student_template import (
+    GenerateStudentTemplateWorkflow,
+    generate_student_template_with_examples
+)
 
 
 class TemporalWorker:
@@ -79,6 +94,8 @@ class TemporalWorker:
             CreateOrganizationWorkflow,
             CreateCourseFamilyWorkflow,
             CreateCourseWorkflow,
+            DeployExamplesToCourseWorkflow,
+            GenerateStudentTemplateWorkflow,
         ]
         
         activities = [
@@ -92,6 +109,15 @@ class TemporalWorker:
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
+            validate_deployment_request,
+            download_examples_from_library,
+            prepare_assignments_repository,
+            deploy_single_example,
+            resolve_example_dependencies,
+            commit_and_push_changes,
+            update_course_content_deployment_status,
+            cleanup_temp_repository,
+            generate_student_template_with_examples,
         ]
         
         # Create a worker for each task queue

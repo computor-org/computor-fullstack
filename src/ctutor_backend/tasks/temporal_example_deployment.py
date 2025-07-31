@@ -4,7 +4,7 @@ Temporal workflows for deploying examples from Example Library to course reposit
 import logging
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import tempfile
@@ -16,10 +16,8 @@ from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session
 from sqlalchemy import update
 from minio import Minio
-import git
 
 from .temporal_base import BaseWorkflow, WorkflowResult
-from .registry import register_task
 from ..database import get_db
 from ..model.course import CourseContent, Course
 from ..model.example import Example, ExampleVersion, ExampleDependency
@@ -241,6 +239,9 @@ async def prepare_assignments_repository(course_id: str) -> Dict[str, Any]:
         temp_dir = tempfile.mkdtemp()
         repo_path = os.path.join(temp_dir, 'assignments')
         
+        # Import git inside activity to avoid workflow sandbox restrictions
+        import git
+        
         # Clone repository
         logger.info(f"Cloning repository from {assignments_url}")
         
@@ -276,6 +277,9 @@ async def deploy_single_example(params: Dict[str, Any]) -> Dict[str, Any]:
     logger.info(f"Deploying example {params['example_id']} to {params['target_path']}")
     
     try:
+        # Import datetime inside activity to avoid workflow sandbox restrictions
+        from datetime import datetime, timezone
+        
         repository_path = params['repository_path']
         target_path = params['target_path']
         example_files = params['example_files']
@@ -440,6 +444,10 @@ async def commit_and_push_changes(params: Dict[str, Any]) -> Dict[str, Any]:
         commit_message = params['commit_message']
         deployments = params['deployments']
         
+        # Import git inside activity to avoid workflow sandbox restrictions
+        import git
+        from datetime import datetime, timezone
+        
         # Open repository
         repo = git.Repo(repository_path)
         
@@ -543,9 +551,19 @@ async def cleanup_temp_repository(temp_dir: str) -> None:
 
 
 # Workflow
-@workflow.defn(name="deploy_examples_to_course")
+@workflow.defn(name="deploy_examples_to_course", sandboxed=False)
 class DeployExamplesToCourseWorkflow(BaseWorkflow):
     """Deploy selected examples from Example Library to course assignments repository."""
+    
+    @classmethod
+    def get_name(cls) -> str:
+        """Get the workflow name."""
+        return "deploy_examples_to_course"
+    
+    @classmethod
+    def get_task_queue(cls) -> str:
+        """Get the task queue for this workflow."""
+        return "computor-tasks"
     
     @workflow.run
     async def run(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -687,12 +705,3 @@ class DeployExamplesToCourseWorkflow(BaseWorkflow):
             "deployment_results": deployment_results,
             "errors": download_result.get('errors', [])
         }
-
-
-# Register the workflow
-register_task(
-    'deploy_examples_to_course',
-    DeployExamplesToCourseWorkflow,
-    'Deploy examples from Example Library to course repository',
-    'course_management'
-)

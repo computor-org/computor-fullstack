@@ -248,7 +248,7 @@ const CourseDetailPage: React.FC = () => {
           />
         )}
         {/* Show deployment status if example is deployed */}
-        {item.example_id && (
+        {item.example_id && course && (
           <DeploymentStatusChip
             courseId={course.id}
             deploymentTaskId={item.deployment_task_id}

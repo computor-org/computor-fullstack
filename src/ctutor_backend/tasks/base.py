@@ -30,7 +30,7 @@ class TaskResult(BaseModel):
     finished_at: Optional[datetime] = None
     progress: Optional[Dict[str, Any]] = None
     
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
 
 
 class BaseTask(ABC):
@@ -144,4 +144,4 @@ class TaskInfo(BaseModel):
     execution_time: Optional[datetime] = None
     history_length: Optional[int] = None
     
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)

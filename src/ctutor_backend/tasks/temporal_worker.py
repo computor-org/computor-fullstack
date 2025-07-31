@@ -58,6 +58,10 @@ from .temporal_student_template import (
     GenerateStudentTemplateWorkflow,
     generate_student_template_with_examples
 )
+from .temporal_student_template_v2 import (
+    GenerateStudentTemplateWorkflowV2,
+    generate_student_template_v2
+)
 
 
 class TemporalWorker:
@@ -96,6 +100,7 @@ class TemporalWorker:
             CreateCourseWorkflow,
             DeployExamplesToCourseWorkflow,
             GenerateStudentTemplateWorkflow,
+            GenerateStudentTemplateWorkflowV2,
         ]
         
         activities = [
@@ -109,15 +114,17 @@ class TemporalWorker:
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
-            validate_deployment_request,
-            download_examples_from_library,
-            prepare_assignments_repository,
-            deploy_single_example,
-            resolve_example_dependencies,
-            commit_and_push_changes,
-            update_course_content_deployment_status,
-            cleanup_temp_repository,
-            generate_student_template_with_examples,
+            # Removed: Example deployment activities - no longer needed
+            # validate_deployment_request,
+            # download_examples_from_library,
+            # prepare_assignments_repository,
+            # deploy_single_example,
+            # resolve_example_dependencies,
+            # commit_and_push_changes,
+            # update_course_content_deployment_status,
+            # cleanup_temp_repository,
+            generate_student_template_with_examples,  # Legacy version
+            generate_student_template_v2,  # New version
         ]
         
         # Create a worker for each task queue

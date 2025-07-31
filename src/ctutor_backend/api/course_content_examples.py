@@ -7,7 +7,7 @@ This implements the two-step process:
 from typing import Annotated, List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -82,7 +82,6 @@ class GenerateTemplateResponse(BaseModel):
 
 # Create router
 course_content_examples_router = APIRouter(
-    prefix="/api/v1",
     tags=["course-content-examples"]
 )
 
@@ -490,6 +489,263 @@ async def generate_student_template(
         status="started",
         contents_to_process=contents_with_examples or 0
     )
+
+
+@course_content_examples_router.get(
+    "/courses/{course_id}/available-examples",
+    response_model=Dict[str, Any]
+)
+async def get_available_examples(
+    course_id: str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+    cache: Annotated[BaseCache, Depends(get_redis_client)] = None,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    language: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+):
+    """
+    Get available examples from the Example Library for a course.
+    
+    Returns examples that can be deployed to course content,
+    with filtering by search query, category, and language.
+    """
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    # Check cache first
+    cache_key = f"course:{course_id}:available-examples:{search}:{category}:{language}:{limit}:{offset}"
+    if cache:
+        cached = await cache.get(cache_key)
+        if cached:
+            return cached
+    
+    # Build query for examples
+    query = db.query(Example).filter(
+        Example.archived_at.is_(None)
+    )
+    
+    # Apply search filter
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.filter(
+            or_(
+                Example.title.ilike(search_pattern),
+                Example.description.ilike(search_pattern),
+                Example.properties['tags'].astext.ilike(search_pattern)
+            )
+        )
+    
+    # Apply category filter
+    if category:
+        query = query.filter(
+            Example.properties['category'].astext == category
+        )
+    
+    # Apply language filter  
+    if language:
+        query = query.filter(
+            Example.properties['language'].astext == language
+        )
+    
+    # Get total count
+    total = query.count()
+    
+    # Apply pagination
+    examples = query.offset(offset).limit(limit).all()
+    
+    # Get unique categories and languages for filters
+    all_examples = db.query(Example).filter(Example.archived_at.is_(None)).all()
+    categories = set()
+    languages = set()
+    
+    for ex in all_examples:
+        if ex.properties:
+            if 'category' in ex.properties:
+                categories.add(ex.properties['category'])
+            if 'language' in ex.properties:
+                languages.add(ex.properties['language'])
+    
+    # Format response
+    example_list = []
+    for example in examples:
+        # Get latest version
+        latest_version = db.query(ExampleVersion).filter(
+            ExampleVersion.example_id == example.id
+        ).order_by(ExampleVersion.version_number.desc()).first()
+        
+        example_data = {
+            "id": str(example.id),
+            "title": example.title,
+            "description": example.description,
+            "repository_id": str(example.example_repository_id),
+            "latest_version": latest_version.version_tag if latest_version else None
+        }
+        
+        # Add properties if they exist
+        if example.properties:
+            if 'category' in example.properties:
+                example_data['category'] = example.properties['category']
+            if 'language' in example.properties:
+                example_data['language'] = example.properties['language']
+            if 'tags' in example.properties:
+                example_data['tags'] = example.properties.get('tags', [])
+        
+        example_list.append(example_data)
+    
+    result = {
+        "examples": example_list,
+        "total": total,
+        "filters": {
+            "categories": sorted(list(categories)),
+            "languages": sorted(list(languages))
+        }
+    }
+    
+    # Cache the result
+    if cache:
+        await cache.set(cache_key, result, ttl=300)  # Cache for 5 minutes
+    
+    return result
+
+
+@course_content_examples_router.get(
+    "/courses/{course_id}/examples/{example_id}/deployment-preview",
+    response_model=Dict[str, Any]
+)
+async def get_deployment_preview(
+    course_id: str,
+    example_id: str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+    version: str = "latest",
+    target_path: str = None
+):
+    """
+    Get a preview of what will happen when deploying an example.
+    
+    Shows files, dependencies, and potential conflicts.
+    """
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    # Get example
+    example = db.query(Example).filter(Example.id == example_id).first()
+    if not example:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Example {example_id} not found"
+        )
+    
+    # Get version
+    if version == "latest":
+        version_obj = db.query(ExampleVersion).filter(
+            ExampleVersion.example_id == example_id
+        ).order_by(ExampleVersion.version_number.desc()).first()
+    else:
+        version_obj = db.query(ExampleVersion).filter(
+            and_(
+                ExampleVersion.example_id == example_id,
+                ExampleVersion.version_tag == version
+            )
+        ).first()
+    
+    if not version_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version {version} not found for example"
+        )
+    
+    # Check for conflicts if target_path provided
+    conflicts = []
+    if target_path:
+        # Check if content already has a different example
+        existing_content = db.query(CourseContent).filter(
+            and_(
+                CourseContent.course_id == course_id,
+                CourseContent.path == target_path
+            )
+        ).first()
+        
+        if existing_content and existing_content.example_id:
+            if str(existing_content.example_id) != example_id:
+                existing_example = db.query(Example).filter(
+                    Example.id == existing_content.example_id
+                ).first()
+                conflicts.append({
+                    "type": "existing_example",
+                    "path": target_path,
+                    "current_example_id": str(existing_content.example_id),
+                    "current_example_title": existing_example.title if existing_example else "Unknown",
+                    "current_example_version": existing_content.example_version
+                })
+    
+    # Get dependencies
+    dependencies = []
+    deps = db.query(ExampleDependency).filter(
+        ExampleDependency.example_id == example_id
+    ).all()
+    
+    for dep in deps:
+        dep_example = db.query(Example).filter(
+            Example.id == dep.dependency_example_id
+        ).first()
+        if dep_example:
+            dependencies.append({
+                "example_id": str(dep.dependency_example_id),
+                "title": dep_example.title,
+                "required": dep.required
+            })
+    
+    # Estimate file structure (in real implementation, would check MinIO)
+    file_structure = {
+        "files": [
+            "meta.yaml",
+            "README.md",
+            # Add more based on example properties
+        ],
+        "size_mb": 0.1  # Placeholder
+    }
+    
+    # Add files based on properties
+    if version_obj.properties:
+        props = version_obj.properties.get('properties', {})
+        if 'studentTemplates' in props:
+            file_structure['files'].extend(props['studentTemplates'])
+        if 'testFiles' in props:
+            file_structure['files'].extend(props['testFiles'])
+        if 'additionalFiles' in props:
+            file_structure['files'].extend(props['additionalFiles'])
+    
+    return {
+        "example": {
+            "id": str(example.id),
+            "title": example.title,
+            "description": example.description,
+            "category": example.properties.get('category') if example.properties else None,
+            "language": example.properties.get('language') if example.properties else None
+        },
+        "version": {
+            "id": str(version_obj.id),
+            "version_tag": version_obj.version_tag,
+            "created_at": version_obj.created_at.isoformat() if version_obj.created_at else None
+        },
+        "dependencies": dependencies,
+        "conflicts": conflicts,
+        "file_structure": file_structure
+    }
 
 
 @course_content_examples_router.get(

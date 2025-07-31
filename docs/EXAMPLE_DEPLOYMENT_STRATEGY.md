@@ -275,9 +275,11 @@ class GenerateStudentTemplateWorkflow:
         )
 ```
 
-### Activity Implementations
+### Simplified Activity Implementations
 
-#### `download_examples_from_library`
+Since we're no longer deploying to intermediate repositories, the activities are much simpler:
+
+#### `download_example_from_minio`
 
 ```python
 @activity.defn
@@ -611,6 +613,48 @@ When a new version of an example is available:
 
 ## Student Template Generation Integration
 
+### The Release Process
+
+The template generation (release) process is straightforward:
+
+1. **Create Temporal Directory**
+   ```
+   /tmp/student-template-generation-{uuid}/
+   ├── week1/
+   │   ├── hello_world/     # CourseContent path: week1.hello_world
+   │   └── variables/       # CourseContent path: week1.variables
+   └── week2/
+       └── functions/       # CourseContent path: week2.functions
+   ```
+
+2. **Download and Process Examples**
+   - Query CourseContent records for the course
+   - For each CourseContent with an example_id:
+     - Download example from MinIO
+     - Process according to meta.yaml
+     - Place in directory matching CourseContent.path (dots → slashes)
+   - Only include student-visible files (templates, README, etc.)
+
+3. **Example Processing Rules**
+   ```yaml
+   # meta.yaml defines what students see
+   properties:
+     studentTemplates:
+       - main_template.py → main.py  # Renamed for students
+       - helper_template.py → helper.py
+     additionalFiles:
+       - README.md
+       - data.json
+     studentSubmissionFiles:
+       - solution.py  # File students must create
+   ```
+
+4. **Generate Repository**
+   - Create/update student-template repository
+   - Copy processed files from temporal directory
+   - Commit and push changes
+   - Clean up temporal directory
+
 ## Implementation Implications
 
 ### Required Changes
@@ -663,6 +707,57 @@ When a new version of an example is available:
    - No synchronization between assignments and reference repos
    - Consistent example versions across all courses
    - Simplified update process
+
+### Concrete Example
+
+Let's trace through a complete example:
+
+1. **CourseContent Record**
+   ```python
+   CourseContent(
+       id="cc-123",
+       course_id="course-456",
+       path="week1.hello_world",
+       example_id="ex-789",
+       example_version="v1.0"
+   )
+   ```
+
+2. **Example in MinIO** (`examples/ex-789/v1.0/`)
+   ```
+   meta.yaml
+   main.py              # Full solution
+   main_template.py     # Student skeleton
+   test_main.py         # Tests for grading
+   README.md            # Instructions
+   ```
+
+3. **meta.yaml Content**
+   ```yaml
+   kind: assignment
+   slug: hello-world
+   properties:
+     studentTemplates:
+       - main_template.py
+     additionalFiles:
+       - README.md
+     studentSubmissionFiles:
+       - main.py
+   ```
+
+4. **Temporal Processing**
+   - Download example to `/tmp/gen-123/`
+   - Read meta.yaml
+   - Copy `main_template.py` → `/tmp/gen-123/week1/hello_world/main.py`
+   - Copy `README.md` → `/tmp/gen-123/week1/hello_world/README.md`
+   - Ignore `test_main.py` (not in student-visible lists)
+
+5. **Result in student-template repo**
+   ```
+   week1/hello_world/
+   ├── main.py      # From main_template.py
+   └── README.md    # From example
+   ```
 
 ### Modified Generation Process
 

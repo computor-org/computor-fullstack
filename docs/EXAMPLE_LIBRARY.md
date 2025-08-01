@@ -46,7 +46,16 @@ Examples can only be created through the upload process, ensuring all examples h
 - Enforces presence of `meta.yaml` file
 - Automatic parsing of metadata during upload
 
-### 2. Automatic Directory Detection & Batch Upload
+### 2. Student Template Directory Structure
+Examples are deployed to student-template repositories using a **flat directory structure** based on example identifiers:
+- **Not hierarchical**: Avoids complex nested paths from CourseContent structure
+- **Example identifier as directory**: Uses `example.identifier` for directory names
+- **Configurable**: Can be overridden via `CourseContentProperties.directory`
+- **Clean structure**: Each assignment is self-contained in its own directory
+
+See [STUDENT_TEMPLATE_DIRECTORY_STRUCTURE.md](./STUDENT_TEMPLATE_DIRECTORY_STRUCTURE.md) for detailed implementation.
+
+### 3. Automatic Directory Detection & Batch Upload
 The upload dialog automatically scans ZIP files for example directories:
 - Detects all directories containing `meta.yaml` files
 - Allows selection of multiple examples from a single ZIP

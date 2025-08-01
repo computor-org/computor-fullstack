@@ -53,7 +53,6 @@ from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.examples import examples_router
-from ctutor_backend.api.course_content_examples import course_content_examples_router
 from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
 
 async def init_execution_backend_api(db: Session):
@@ -284,11 +283,6 @@ app.include_router(
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
 )
 
-app.include_router(
-    course_content_examples_router,
-    tags=["course-content-examples"],
-    dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
-)
 
 @app.head("/", status_code=204)
 def get_status_head():

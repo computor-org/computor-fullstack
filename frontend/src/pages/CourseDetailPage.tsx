@@ -187,7 +187,7 @@ const CourseDetailPage: React.FC = () => {
     if (!course) return;
     
     try {
-      const response = await apiClient.post(`/courses/${course.id}/generate-student-template`, {
+      const response = await apiClient.post(`/system/courses/${course.id}/generate-student-template`, {
         commit_message: `Update student template - ${new Date().toLocaleDateString()}`
       });
       
@@ -210,7 +210,7 @@ const CourseDetailPage: React.FC = () => {
             has_student_template_url: boolean;
             recommendations: string[];
             missing_items: string[];
-          }>(`/courses/${course.id}/gitlab-status`);
+          }>(`/system/courses/${course.id}/gitlab-status`);
           console.log('GitLab status:', status);
           
           let message = `Cannot generate template: ${errorMessage}\n\n`;

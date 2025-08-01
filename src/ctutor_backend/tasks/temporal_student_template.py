@@ -17,6 +17,7 @@ from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session
 
 from .temporal_base import BaseWorkflow, WorkflowResult
+from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseContent
 from ..model.example import Example
@@ -357,6 +358,7 @@ def create_student_meta_yaml(meta_yaml: Dict[str, Any], course_content: CourseCo
 
 
 # Workflow
+@register_task
 @workflow.defn(name="generate_student_template", sandboxed=False)
 class GenerateStudentTemplateWorkflow(BaseWorkflow):
     """Generate or update student template repository from assignments."""

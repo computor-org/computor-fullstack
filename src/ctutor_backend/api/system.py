@@ -1,10 +1,11 @@
 from collections import defaultdict
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
-from typing import Annotated, Optional
-from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile
+from typing import Annotated, Optional, List, Dict, Any
+from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile, HTTPException, status
+from datetime import datetime, timezone
 import logging
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.crud import get_id_db
@@ -24,8 +25,9 @@ from ctutor_backend.interface.student_profile import StudentProfileCreate
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserCreate, UserGet, UserTypeEnum
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
-from ctutor_backend.model.organization import Organization
+from ctutor_backend.model.organization import Organization  
 from ctutor_backend.model.auth import User, StudentProfile
+from ctutor_backend.model.example import Example, ExampleVersion
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from ctutor_backend.tasks import get_task_executor, TaskSubmission
@@ -744,5 +746,433 @@ async def create_course_async(
     except Exception as e:
         logger.error(f"Error submitting course creation task: {e}")
         raise BadRequestException(f"Failed to submit course creation task: {str(e)}")
+
+
+# GitLab Release System Endpoints
+
+class PendingChange(BaseModel):
+    """Represents a pending change for template generation."""
+    type: str = Field(description="new, update, remove")
+    content_id: str
+    path: str
+    title: str
+    example_name: Optional[str] = None
+    example_id: Optional[str] = None
+    from_version: Optional[str] = None
+    to_version: Optional[str] = None
+
+
+class PendingChangesResponse(BaseModel):
+    """Response for pending changes check."""
+    total_changes: int
+    changes: List[PendingChange]
+    last_release: Optional[Dict[str, Any]] = None
+
+
+class GenerateTemplateRequest(BaseModel):
+    """Request to generate student template."""
+    commit_message: Optional[str] = Field(
+        default=None,
+        description="Custom commit message (optional)"
+    )
+
+
+class GenerateTemplateResponse(BaseModel):
+    """Response for template generation request."""
+    workflow_id: str
+    status: str = "started"
+    contents_to_process: int
+
+
+class BulkAssignExamplesRequest(BaseModel):
+    """Request to assign multiple examples to course contents."""
+    assignments: List[Dict[str, str]] = Field(
+        description="List of assignments with course_content_id, example_id, and example_version"
+    )
+
+
+@system_router.get(
+    "/courses/{course_id}/pending-changes",
+    response_model=PendingChangesResponse
+)
+async def get_pending_changes(
+    course_id: str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Get pending changes that will be applied in the next template generation.
+    
+    Compares current assignments with the last release to show what will change.
+    """
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this course"
+        )
+    
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    # Get all course contents
+    contents = db.query(CourseContent).filter(
+        CourseContent.course_id == course_id
+    ).all()
+    
+    changes = []
+    
+    for content in contents:
+        # Determine change type based on deployment status
+        if content.deployment_status == "pending_release":
+            if content.example_id:
+                # Check if it's new or update
+                if content.deployed_at is None:
+                    change_type = "new"
+                else:
+                    change_type = "update"
+                
+                # Get example details
+                example = db.query(Example).filter(
+                    Example.id == content.example_id
+                ).first()
+                
+                change = PendingChange(
+                    type=change_type,
+                    content_id=str(content.id),
+                    path=str(content.path),
+                    title=content.title,
+                    example_name=example.title if example else None,
+                    example_id=str(content.example_id),
+                    to_version=content.example_version
+                )
+                
+                # For updates, try to get the from_version
+                if change_type == "update":
+                    change.from_version = "unknown"  # TODO: Track previous version
+                
+                changes.append(change)
+            else:
+                # Example was removed
+                if content.deployed_at is not None:
+                    changes.append(PendingChange(
+                        type="remove",
+                        content_id=str(content.id),
+                        path=str(content.path),
+                        title=content.title
+                    ))
+    
+    # Get last release info from course properties
+    last_release = None
+    if course.properties and "last_template_release" in course.properties:
+        last_release = course.properties["last_template_release"]
+    
+    return PendingChangesResponse(
+        total_changes=len(changes),
+        changes=changes,
+        last_release=last_release
+    )
+
+
+@system_router.post(
+    "/courses/{course_id}/generate-student-template",
+    response_model=GenerateTemplateResponse
+)
+async def generate_student_template(
+    course_id: str,
+    request: GenerateTemplateRequest,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Generate student template from assigned examples (Git operations).
+    
+    This is step 2 of the two-step process. It triggers a Temporal workflow
+    that will:
+    1. Download examples from MinIO based on CourseContent assignments
+    2. Process them according to meta.yaml rules
+    3. Generate the student-template repository
+    4. Commit and push the changes
+    """
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to generate template for this course"
+        )
+    
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    # Get student-template URL
+    student_template_url = None
+    
+    # First check if course has GitLab properties
+    if course.properties and "gitlab" in course.properties:
+        course_gitlab = course.properties["gitlab"]
+        
+        # Option 1: Direct URL stored (backward compatibility)
+        if "student_template_url" in course_gitlab:
+            student_template_url = course_gitlab["student_template_url"]
+        
+        # Option 2: Construct from course's full_path
+        elif "full_path" in course_gitlab:
+            # Get GitLab URL from organization
+            if not course.course_family_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Course missing course family reference"
+                )
+            
+            family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
+            if not family or not family.organization_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Course family or organization not found"
+                )
+            
+            org = db.query(Organization).filter(Organization.id == family.organization_id).first()
+            if not org or not org.properties or "gitlab" not in org.properties:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Organization missing GitLab configuration"
+                )
+            
+            gitlab_url = org.properties["gitlab"].get("url")
+            if not gitlab_url:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Organization missing GitLab URL"
+                )
+            
+            # Construct URL: {gitlab_url}/{course_full_path}/student-template
+            student_template_url = f"{gitlab_url}/{course_gitlab['full_path']}/student-template"
+    
+    if not student_template_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
+        )
+    
+    # Count contents to process
+    contents_with_examples = db.query(func.count(CourseContent.id)).filter(
+        and_(
+            CourseContent.course_id == course_id,
+            CourseContent.example_id.isnot(None)
+        )
+    ).scalar()
+    
+    # Use Temporal task executor
+    task_executor = get_task_executor()
+    
+    task_submission = TaskSubmission(
+        task_name="generate_student_template_v2",
+        parameters={
+            "course_id": course_id,
+            "student_template_url": student_template_url,
+            "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
+        },
+        queue="computor-tasks"
+    )
+    
+    workflow_id = await task_executor.submit_task(task_submission)
+    
+    # Update all pending_release contents to deploying
+    db.query(CourseContent).filter(
+        and_(
+            CourseContent.course_id == course_id,
+            CourseContent.deployment_status == "pending_release"
+        )
+    ).update({"deployment_status": "deploying"})
+    
+    db.commit()
+    
+    return GenerateTemplateResponse(
+        workflow_id=workflow_id,
+        status="started",
+        contents_to_process=contents_with_examples or 0
+    )
+
+
+@system_router.post(
+    "/courses/{course_id}/assign-examples",
+    response_model=Dict[str, Any]
+)
+async def bulk_assign_examples(
+    course_id: str,
+    request: BulkAssignExamplesRequest,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+):
+    """
+    Assign multiple examples to course contents in bulk (database only).
+    """
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to modify this course"
+        )
+    
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    assigned = 0
+    updated = 0
+    failed = 0
+    
+    for assignment in request.assignments:
+        try:
+            content_id = assignment.get("course_content_id")
+            example_id = assignment.get("example_id")
+            example_version = assignment.get("example_version", "latest")
+            
+            # Get course content
+            content = db.query(CourseContent).filter(
+                and_(
+                    CourseContent.id == content_id,
+                    CourseContent.course_id == course_id
+                )
+            ).first()
+            
+            if not content:
+                failed += 1
+                continue
+            
+            # Check if already has an example
+            is_update = content.example_id is not None
+            
+            # Assign example
+            content.example_id = example_id if example_id else None
+            content.example_version = example_version
+            content.deployment_status = "pending_release"
+            
+            if is_update:
+                updated += 1
+            else:
+                assigned += 1
+                
+        except Exception:
+            failed += 1
+            continue
+    
+    db.commit()
+    
+    # Clear cache
+    if cache:
+        await cache.delete(f"course:{course_id}:contents")
+    
+    return {
+        "assigned": assigned,
+        "updated": updated,
+        "failed": failed
+    }
+
+
+@system_router.get(
+    "/courses/{course_id}/gitlab-status",
+    response_model=Dict[str, Any]
+)
+async def get_course_gitlab_status(
+    course_id: str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Check GitLab configuration status for a course.
+    
+    Returns information about GitLab integration and what's missing.
+    """
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this course"
+        )
+    
+    # Get course
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Course {course_id} not found"
+        )
+    
+    # Check GitLab configuration
+    status = {
+        "course_id": course_id,
+        "has_gitlab_config": False,
+        "has_group_id": False,
+        "has_student_template_url": False,
+        "gitlab_config": {},
+        "missing_items": [],
+        "recommendations": []
+    }
+    
+    if course.properties and "gitlab" in course.properties:
+        status["has_gitlab_config"] = True
+        gitlab_props = course.properties["gitlab"]
+        
+        # Check for group ID
+        if "group_id" in gitlab_props:
+            status["has_group_id"] = True
+            status["gitlab_config"]["group_id"] = gitlab_props["group_id"]
+        else:
+            status["missing_items"].append("GitLab group ID")
+            
+        # Check for student template URL
+        if "student_template_url" in gitlab_props:
+            status["has_student_template_url"] = True
+            status["gitlab_config"]["student_template_url"] = gitlab_props["student_template_url"]
+        else:
+            status["missing_items"].append("Student template repository URL")
+            
+        # Check for other GitLab properties
+        if "projects" in gitlab_props:
+            status["gitlab_config"]["projects"] = gitlab_props["projects"]
+            
+    else:
+        status["missing_items"].append("GitLab configuration")
+        
+    # Get course family for additional context
+    if course.course_family_id:
+        family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
+        if family and family.properties and "gitlab" in family.properties:
+            status["course_family_gitlab"] = {
+                "has_config": True,
+                "group_id": family.properties["gitlab"].get("group_id")
+            }
+            
+    # Add recommendations
+    if not status["has_gitlab_config"]:
+        status["recommendations"].append(
+            "The course needs to be created with GitLab integration enabled. "
+            "Please recreate the course or contact an administrator to enable GitLab integration."
+        )
+    elif not status["has_student_template_url"]:
+        status["recommendations"].append(
+            "The course has partial GitLab configuration but is missing the student-template repository. "
+            "The course may need to be recreated or the GitLab projects need to be created manually."
+        )
+        
+    status["can_generate_template"] = status["has_student_template_url"]
+    
+    return status
 
 

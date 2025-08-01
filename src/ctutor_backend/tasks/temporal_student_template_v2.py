@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .temporal_hierarchy_management import transform_localhost_url
+from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseContent
 from ..model.example import Example, ExampleVersion
@@ -389,6 +390,7 @@ async def process_example_for_student_template_v2(
 
 
 # Workflow
+@register_task
 @workflow.defn(name="generate_student_template_v2", sandboxed=False)
 class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
     """Generate student template repository directly from Example Library."""

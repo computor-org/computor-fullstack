@@ -163,13 +163,12 @@ services:
     labels:
       - traefik.enable=false
 
-  # Temporal Worker
+  # Temporal Worker (Development with Hot Reload)
   temporal-worker:
     build:
       context: ./
-      dockerfile: ./docker/api/Dockerfile
+      dockerfile: ./docker/temporal-worker-dev/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker","--queues","computor-tasks"]
     deploy:
       replicas: ${TEMPORAL_WORKER_REPLICAS:-1}
     environment:
@@ -186,7 +185,9 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DEBUG_MODE=${DEBUG_MODE}
       - TOKEN_SECRET=${TOKEN_SECRET}
+      - PYTHONPATH=/home/worker/src
     volumes:
+      - ./src:/home/worker/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal

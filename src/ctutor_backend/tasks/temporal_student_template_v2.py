@@ -21,7 +21,8 @@ from .temporal_hierarchy_management import transform_localhost_url
 from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseContent
-from ..model.example import Example, ExampleVersion
+from ..model.example import Example, ExampleVersion, ExampleRepository
+from ..model.organization import Organization
 from ..services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,22 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         if not course:
             raise ValueError(f"Course {course_id} not found")
         
+        # Get organization directly using the foreign key relationship
+        organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
+        if not organization:
+            raise ValueError(f"Organization not found for course {course_id}. Organization ID: {course.organization_id}")
+        
+        # Get GitLab token from organization properties
+        gitlab_token = None
+        if organization.properties and 'gitlab' in organization.properties:
+            gitlab_config = organization.properties.get('gitlab', {})
+            gitlab_token = gitlab_config.get('access_token')
+        
+        if not gitlab_token:
+            logger.warning(f"No GitLab token found in organization {organization.title} properties")
+        else:
+            logger.info(f"Using GitLab token from organization {organization.title}")
+        
         # Use the URL passed from the API
         # Transform localhost to Docker host IP if running in container
         student_template_url = transform_localhost_url(student_template_url)
@@ -65,7 +82,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         from datetime import datetime, timezone
         
         # Clone or create student template repository
-        gitlab_token = os.environ.get('GITLAB_TOKEN', '')
+        # gitlab_token retrieved from organization properties above
         
         try:
             if gitlab_token and 'http' in student_template_url:
@@ -82,6 +99,9 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             os.makedirs(template_repo_path, exist_ok=True)
             template_repo = git.Repo.init(template_repo_path)
             
+            # Set default branch to main
+            template_repo.git.checkout('-b', 'main')
+            
             # Add remote
             if 'http' in student_template_url:
                 template_repo.create_remote('origin', student_template_url)
@@ -95,6 +115,9 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         
         logger.info(f"Found {len(course_contents)} course contents with examples")
         
+        if len(course_contents) == 0:
+            logger.warning(f"No course contents with examples found for course {course_id}. This will result in an empty student template.")
+        
         # Initialize storage service
         storage_service = StorageService()
         
@@ -105,6 +128,20 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         for content in course_contents:
             try:
                 logger.info(f"Processing {content.path} with example {content.example_id}")
+                
+                # Get example and repository details
+                example = db.query(Example).filter(Example.id == content.example_id).first()
+                if not example:
+                    logger.error(f"Example {content.example_id} not found")
+                    errors.append(f"Example not found for {content.path}")
+                    continue
+                
+                # Get the repository to determine bucket name
+                repository = example.repository
+                if not repository:
+                    logger.error(f"Repository not found for example {content.example_id}")
+                    errors.append(f"Repository not found for {content.path}")
+                    continue
                 
                 # Get example version details
                 version = db.query(ExampleVersion).filter(
@@ -123,14 +160,12 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     errors.append(f"No version found for {content.path}")
                     continue
                 
-                # Download example from MinIO
+                # Download example from MinIO using repository's bucket
                 storage_path = version.storage_path
-                logger.info(f"Downloading from storage path: {storage_path}")
+                bucket_name = repository.source_url  # Use repository's source_url as bucket name
+                prefix = storage_path.strip('/')
                 
-                # Parse bucket and prefix from storage path
-                parts = storage_path.strip('/').split('/', 1)
-                bucket_name = parts[0] if parts else 'computor-storage'
-                prefix = parts[1] if len(parts) > 1 else ''
+                logger.info(f"Downloading from bucket: {bucket_name}, path: {storage_path}")
                 
                 # Download all files for this example
                 example_files = {}
@@ -157,7 +192,9 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                         logger.error(f"Failed to download {obj.object_name}: {e}")
                 
                 # Process example for student template
-                target_path = Path(template_staging_path) / str(content.path).replace('.', '/')
+                # Convert content.path (Ltree) to string first
+                content_path_str = str(content.path)
+                target_path = Path(template_staging_path) / content_path_str.replace('.', '/')
                 result = await process_example_for_student_template_v2(
                     example_files, target_path, content, version
                 )
@@ -218,21 +255,37 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             template_repo.index.commit(commit_message)
             
             # Push to remote
+            push_successful = False
             try:
                 origin = template_repo.remote('origin')
-                origin.push()
+                
+                # Get current branch name
+                current_branch = template_repo.active_branch.name
+                logger.info(f"Current branch: {current_branch}")
+                logger.info(f"Remote URL: {origin.url}")
+                
+                # Push with upstream tracking
+                origin.push(refspec=f"{current_branch}:main", set_upstream=True)
                 logger.info("Successfully pushed changes to remote")
+                push_successful = True
             except Exception as e:
                 logger.error(f"Failed to push to remote: {e}")
-                # Try to push with authentication
+                # Try alternative push methods
                 if gitlab_token and 'http' in student_template_url:
                     try:
                         push_url = auth_url if 'auth_url' in locals() else student_template_url
-                        template_repo.git.push(push_url, 'HEAD:main')
+                        current_branch = template_repo.active_branch.name
+                        logger.info(f"Trying alternative push to: {push_url}")
+                        template_repo.git.push(push_url, f"{current_branch}:main", '--set-upstream')
                         logger.info("Successfully pushed with authentication")
-                    except:
-                        logger.error("Failed to push even with authentication")
-                        raise
+                        push_successful = True
+                    except Exception as e2:
+                        logger.error(f"Failed to push even with authentication: {e2}")
+                        # Don't raise - let it continue but mark the failure
+                        
+            if not push_successful:
+                errors.append("Failed to push changes to GitLab repository")
+                logger.error("All push attempts failed - changes committed locally but not pushed to remote")
             
             commit_hash = template_repo.head.commit.hexsha
         else:

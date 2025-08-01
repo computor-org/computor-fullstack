@@ -59,7 +59,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         gitlab_token = None
         if organization.properties and 'gitlab' in organization.properties:
             gitlab_config = organization.properties.get('gitlab', {})
-            gitlab_token = gitlab_config.get('access_token')
+            gitlab_token = gitlab_config.get('token')  # Use 'token' field as defined in GitLabConfig
         
         if not gitlab_token:
             logger.warning(f"No GitLab token found in organization {organization.title} properties")

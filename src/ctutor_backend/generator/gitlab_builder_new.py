@@ -21,11 +21,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.attributes import flag_modified
 
+from ctutor_backend.api.exceptions import NotImplementedException
 from ctutor_backend.services.git_service import GitService
-from ctutor_backend.interface.codeability_meta import (
-    CodeAbilityCourseMeta,
-    CodeAbilityExampleMeta
-)
 
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
@@ -1285,82 +1282,8 @@ class GitLabBuilderNew:
         deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
         """Initialize assignments project with proper structure and meta.yaml."""
-        result = {"success": False, "error": None}
-        
-        try:
-            # For now, we'll create the structure locally and then describe what would be pushed
-            # In a full implementation, this would clone the repository, make changes, and push
-            
-            # Create temporary structure to show what would be created
-            with tempfile.TemporaryDirectory() as temp_dir:
-                repo_path = os.path.join(temp_dir, "assignments")
-                os.makedirs(repo_path, exist_ok=True)
-                
-                # Create course-level meta.yaml (matching gitlab_builder.py format)
-                course_meta = CodeAbilityCourseMeta(
-                    title=deployment.course.name,
-                    description=course.description or "",
-                    version="0.1"
-                )
-                
-                meta_path = os.path.join(repo_path, "meta.yaml")
-                # Exclude contentTypes and executionBackends as requested
-                meta_content = course_meta.model_dump(exclude_none=True, exclude={'contentTypes', 'executionBackends'})
-                with open(meta_path, 'w') as f:
-                    yaml.dump(meta_content, f, default_flow_style=False)
-                
-                # Create example structure
-                examples_dir = os.path.join(repo_path, "examples")
-                os.makedirs(examples_dir, exist_ok=True)
-                
-                # Create a sample assignment
-                sample_dir = os.path.join(examples_dir, "01-hello-world")
-                os.makedirs(sample_dir, exist_ok=True)
-                
-                # Create example meta.yaml
-                example_meta = CodeAbilityExampleMeta(
-                    title="Hello World",
-                    description="A simple hello world assignment to get started"
-                )
-                
-                example_meta_path = os.path.join(sample_dir, "meta.yaml")
-                with open(example_meta_path, 'w') as f:
-                    yaml.dump(example_meta.model_dump(exclude_none=True), f, default_flow_style=False)
-                
-                # Create sample README
-                readme_path = os.path.join(sample_dir, "README.md")
-                with open(readme_path, 'w') as f:
-                    f.write(f"# Hello World Assignment\n\n")
-                    f.write(f"Welcome to the first assignment in {course.title}!\n\n")
-                    f.write(f"## Instructions\n\n")
-                    f.write(f"1. Implement a simple 'Hello, World!' program\n")
-                    f.write(f"2. Follow the coding standards outlined in the course\n")
-                    f.write(f"3. Submit your solution through the course platform\n")
-                
-                # Create project README
-                project_readme = os.path.join(repo_path, "README.md")
-                if not os.path.exists(project_readme):
-                    with open(project_readme, 'w') as f:
-                        f.write(f"# {course.title} - Assignments\n\n")
-                        f.write(f"This repository contains assignment templates and grading scripts for {course.title}.\n\n")
-                        f.write(f"## Structure\n\n")
-                        f.write(f"- `examples/`: Assignment templates and examples\n")
-                        f.write(f"- `meta.yaml`: Course metadata for CodeAbility platform\n")
-                        f.write(f"- Each assignment is in its own directory under `examples/`\n")
-                
-                # Note: In full implementation, would commit and push:
-                # - git add .
-                # - git commit -m "Initialize assignments project with course structure and sample assignment"
-                # - git push origin main
-                
-                result["success"] = True
-                logger.info(f"Initialized assignments project for course {course.path}")
-                
-        except Exception as e:
-            logger.error(f"Failed to initialize assignments project: {e}")
-            result["error"] = str(e)
-        
-        return result
+
+        raise NotImplementedException()
     
     def _initialize_student_template_project(
         self,

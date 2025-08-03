@@ -9,62 +9,11 @@ Examples are course-agnostic and can be assigned to multiple courses through
 the CourseContent model which links examples to specific course contexts.
 """
 
-from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_yaml import to_yaml_str
 
 
-# Language is now a string type to support any language
-# class LanguageEnum(str, Enum):
-#     """Supported languages for course content."""
-#     de = "de"
-#     en = "en"
-
-
-# MetaTypeEnum removed - kind field is obsolete since we only handle assignments
-
-
-class QualificationEnum(str, Enum):
-    """Test qualification types."""
-    verifyEqual = "verifyEqual"
-    matches = "matches"
-    contains = "contains"
-    startsWith = "startsWith"
-    endsWith = "endsWith"
-    count = "count"
-    regexp = "regexp"
-
-
-class TypeEnum(str, Enum):
-    """Test types for assignments."""
-    variable = "variable"
-    graphics = "graphics"
-    structural = "structural"
-    linting = "linting"
-    exist = "exist"
-    error = "error"
-    warning = "warning"
-    help = "help"
-    stdout = "stdout"
-
-
-class StatusEnum(str, Enum):
-    """Execution status for assignments."""
-    scheduled = "SCHEDULED"
-    completed = "COMPLETED"
-    timedout = "TIMEDOUT"
-    crashed = "CRASHED"
-    cancelled = "CANCELLED"
-    skipped = "SKIPPED"
-    failed = "FAILED"
-
-
-class ResultEnum(str, Enum):
-    """Test result types."""
-    passed = "PASSED"
-    failed = "FAILED"
-    skipped = "SKIPPED"
 
 
 # Version regex pattern

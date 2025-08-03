@@ -29,7 +29,6 @@ from . import temporal_system
 from . import temporal_student_testing
 
 # Import Temporal student template tasks to auto-register
-from . import temporal_student_template
 from . import temporal_student_template_v2
 
 __all__ = [

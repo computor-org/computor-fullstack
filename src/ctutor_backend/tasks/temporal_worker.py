@@ -43,12 +43,6 @@ from .temporal_hierarchy_management import (
     create_course_family_activity,
     create_course_activity
 )
-# Deprecated: Example deployment workflow no longer needed
-# Examples are now deployed directly from MinIO to student-template
-from .temporal_student_template import (
-    GenerateStudentTemplateWorkflow,
-    generate_student_template_with_examples
-)
 from .temporal_student_template_v2 import (
     GenerateStudentTemplateWorkflowV2,
     generate_student_template_v2
@@ -89,8 +83,7 @@ class TemporalWorker:
             CreateOrganizationWorkflow,
             CreateCourseFamilyWorkflow,
             CreateCourseWorkflow,
-            # DeployExamplesToCourseWorkflow,  # Deprecated - use GenerateStudentTemplateWorkflowV2
-            GenerateStudentTemplateWorkflow,
+            # DeployExamplesToCourseWorkflow,  # Deprecated - removed
             GenerateStudentTemplateWorkflowV2,
         ]
         
@@ -105,8 +98,6 @@ class TemporalWorker:
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
-            # Example deployment activities removed - no longer needed with Example Library paradigm
-            generate_student_template_with_examples,  # Legacy version
             generate_student_template_v2,  # New version
         ]
         

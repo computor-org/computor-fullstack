@@ -28,6 +28,97 @@ from ..services.storage_service import StorageService
 logger = logging.getLogger(__name__)
 
 
+async def download_example_files(repository: ExampleRepository, version: ExampleVersion) -> Dict[str, bytes]:
+    """
+    Download example files from repository based on its source type.
+    
+    Args:
+        repository: ExampleRepository with source type information
+        version: ExampleVersion with storage path information
+        
+    Returns:
+        Dictionary mapping file paths to their content
+        
+    Raises:
+        NotImplementedError: For unsupported repository types
+        ValueError: For invalid source types
+    """
+    if repository.source_type == 'git':
+        return await download_example_from_git(repository, version)
+    elif repository.source_type in ['minio', 's3']:
+        return await download_example_from_object_storage(repository, version)
+    else:
+        raise ValueError(f"Unsupported source type: {repository.source_type}")
+
+
+async def download_example_from_git(repository: ExampleRepository, version: ExampleVersion) -> Dict[str, bytes]:
+    """
+    Download example files from a Git repository.
+    
+    Args:
+        repository: ExampleRepository with source_type='git'
+        version: ExampleVersion with storage path information
+        
+    Returns:
+        Dictionary mapping file paths to their content
+        
+    Raises:
+        NotImplementedError: Git repositories are not yet supported
+    """
+    logger.error(f"Git source type not implemented for repository {repository.name}")
+    raise NotImplementedError(f"Git source type is not yet implemented for repository '{repository.name}'")
+
+
+async def download_example_from_object_storage(
+    repository: ExampleRepository, 
+    version: ExampleVersion
+) -> Dict[str, bytes]:
+    """
+    Download example files from MinIO/S3 object storage.
+    
+    Args:
+        repository: ExampleRepository with source_type in ['minio', 's3']
+        version: ExampleVersion with storage path information
+        
+    Returns:
+        Dictionary mapping file paths to their content
+    """
+    # Initialize storage service
+    storage_service = StorageService()
+    
+    storage_path = version.storage_path
+    bucket_name = repository.source_url  # Use repository's source_url as bucket name
+    prefix = storage_path.strip('/')
+    
+    logger.info(f"Downloading from {repository.source_type} bucket: {bucket_name}, path: {storage_path}")
+    
+    # Download all files for this example
+    example_files = {}
+    objects = await storage_service.list_objects(
+        prefix=prefix,
+        bucket_name=bucket_name
+    )
+    
+    for obj in objects:
+        try:
+            # Download file content
+            file_data = await storage_service.download_file(
+                object_key=obj.object_name,
+                bucket_name=bucket_name
+            )
+            
+            # Get relative path within example
+            relative_path = obj.object_name
+            if prefix:
+                relative_path = obj.object_name.replace(prefix, '').lstrip('/')
+            
+            example_files[relative_path] = file_data
+        except Exception as e:
+            logger.error(f"Failed to download {obj.object_name}: {e}")
+    
+    return example_files
+
+
 @activity.defn(name="generate_student_template_v2")
 async def generate_student_template_v2(course_id: str, student_template_url: str) -> Dict[str, Any]:
     """
@@ -118,9 +209,6 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         if len(course_contents) == 0:
             logger.warning(f"No course contents with examples found for course {course_id}. This will result in an empty student template.")
         
-        # Initialize storage service
-        storage_service = StorageService()
-        
         # Process each CourseContent with an example
         processed_count = 0
         errors = []
@@ -134,13 +222,6 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 if not example:
                     logger.error(f"Example {content.example_id} not found")
                     errors.append(f"Example not found for {content.path}")
-                    continue
-                
-                # Get the repository to determine bucket name
-                repository = example.repository
-                if not repository:
-                    logger.error(f"Repository not found for example {content.example_id}")
-                    errors.append(f"Repository not found for {content.path}")
                     continue
                 
                 # Get example version details
@@ -159,42 +240,33 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     logger.error(f"No version found for example {content.example_id}")
                     errors.append(f"No version found for {content.path}")
                     continue
+
+                # Get the repository to determine bucket name
+                repository = example.repository
+                if not repository:
+                    logger.error(f"Repository not found for example {content.example_id}")
+                    errors.append(f"Repository not found for {content.path}")
+                    continue
                 
-                # Download example from MinIO using repository's bucket
-                storage_path = version.storage_path
-                bucket_name = repository.source_url  # Use repository's source_url as bucket name
-                prefix = storage_path.strip('/')
-                
-                logger.info(f"Downloading from bucket: {bucket_name}, path: {storage_path}")
-                
-                # Download all files for this example
-                example_files = {}
-                objects = await storage_service.list_objects(
-                    prefix=prefix,
-                    bucket_name=bucket_name
-                )
-                
-                for obj in objects:
-                    try:
-                        # Download file content
-                        file_data = await storage_service.download_file(
-                            object_key=obj.object_name,
-                            bucket_name=bucket_name
-                        )
-                        
-                        # Get relative path within example
-                        relative_path = obj.object_name
-                        if prefix:
-                            relative_path = obj.object_name.replace(prefix, '').lstrip('/')
-                        
-                        example_files[relative_path] = file_data
-                    except Exception as e:
-                        logger.error(f"Failed to download {obj.object_name}: {e}")
+                # Download example files based on repository source type
+                try:
+                    example_files = await download_example_files(repository, version)
+                except NotImplementedError as e:
+                    logger.error(f"Not implemented: {e}")
+                    errors.append(str(e))
+                    continue
+                except ValueError as e:
+                    logger.error(f"Invalid source type: {e}")
+                    errors.append(f"Invalid source type for {content.path}: {str(e)}")
+                    continue
+                except Exception as e:
+                    logger.error(f"Failed to download example files: {e}")
+                    errors.append(f"Failed to download files for {content.path}: {str(e)}")
+                    continue
                 
                 # Process example for student template
-                # Convert content.path (Ltree) to string first
-                content_path_str = str(content.path)
-                target_path = Path(template_staging_path) / content_path_str.replace('.', '/')
+                content_path_str = content.example.identifier # str(content.path)
+                target_path = Path(template_staging_path) / content_path_str
                 result = await process_example_for_student_template_v2(
                     example_files, target_path, content, version
                 )
@@ -405,30 +477,30 @@ async def process_example_for_student_template_v2(
                     
                     submission_path.write_text(content)
             
-            # Create student-specific meta.yaml (without test references)
-            student_meta = {
-                'kind': meta_yaml.get('kind', 'assignment'),
-                'slug': meta_yaml.get('slug', str(course_content.path).split('.')[-1]),
-                'name': meta_yaml.get('name', course_content.title),
-                'deployedFrom': {
-                    'exampleId': str(course_content.example_id),
-                    'version': version.version_tag
-                }
-            }
+            # # Create student-specific meta.yaml (without test references)
+            # student_meta = {
+            #     'kind': meta_yaml.get('kind', 'assignment'),
+            #     'slug': meta_yaml.get('slug', str(course_content.path).split('.')[-1]),
+            #     'name': meta_yaml.get('name', course_content.title),
+            #     'deployedFrom': {
+            #         'exampleId': str(course_content.example_id),
+            #         'version': version.version_tag
+            #     }
+            # }
             
-            # Only include safe properties for students
-            if 'properties' in meta_yaml:
-                student_props = {}
-                for key in ['studentSubmissionFiles', 'additionalFiles', 'maxGroupSize', 'maxTestRuns', 'maxSubmissions']:
-                    if key in properties:
-                        student_props[key] = properties[key]
+            # # Only include safe properties for students
+            # if 'properties' in meta_yaml:
+            #     student_props = {}
+            #     for key in ['studentSubmissionFiles', 'additionalFiles', 'maxGroupSize', 'maxTestRuns', 'maxSubmissions']:
+            #         if key in properties:
+            #             student_props[key] = properties[key]
                 
-                if student_props:
-                    student_meta['properties'] = student_props
+            #     if student_props:
+            #         student_meta['properties'] = student_props
             
-            meta_output_path = target_path / 'meta.yaml'
-            with open(meta_output_path, 'w') as f:
-                yaml.dump(student_meta, f, default_flow_style=False, sort_keys=False)
+            # meta_output_path = target_path / 'meta.yaml'
+            # with open(meta_output_path, 'w') as f:
+            #     yaml.dump(student_meta, f, default_flow_style=False, sort_keys=False)
         
         # Copy README if exists
         if 'README.md' in example_files:

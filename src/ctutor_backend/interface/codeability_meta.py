@@ -1,14 +1,12 @@
 """
-CodeAbility Meta Models for Assignment Repository Structure
+CodeAbility Meta Models for Assignment/Example Metadata
 
-This module defines the Pydantic models for meta.yaml files at different levels 
-of the assignments repository hierarchy:
+This module defines the Pydantic models for meta.yaml files in example directories.
+Each example contains a single meta.yaml file describing the assignment properties,
+files, execution backend, and other metadata.
 
-1. Root Level (Course): CodeAbilityCourseMeta - defines the overall course
-2. Unit Level: CodeAbilityUnitMeta - defines units or content kinds with ascends
-3. Assignment Level: CodeAbilityExampleMeta - defines individual assignments/examples
-
-Each level has its own meta.yaml file with specific fields appropriate for that level.
+Examples are course-agnostic and can be assigned to multiple courses through
+the CourseContent model which links examples to specific course contexts.
 """
 
 from enum import Enum
@@ -17,17 +15,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_yaml import to_yaml_str
 
 
-class LanguageEnum(str, Enum):
-    """Supported languages for course content."""
-    de = "de"
-    en = "en"
+# Language is now a string type to support any language
+# class LanguageEnum(str, Enum):
+#     """Supported languages for course content."""
+#     de = "de"
+#     en = "en"
 
 
-class MetaTypeEnum(str, Enum):
-    """Types of meta.yaml files in the hierarchy."""
-    Course = "course"
-    Unit = "unit"
-    Assignment = "assignment"
+# MetaTypeEnum removed - kind field is obsolete since we only handle assignments
 
 
 class QualificationEnum(str, Enum):
@@ -111,17 +106,11 @@ class CodeAbilityPerson(CodeAbilityBase):
 class CourseExecutionBackendConfig(CodeAbilityBase):
     """Configuration for course execution backend."""
     slug: str = Field(description="Unique identifier for the execution backend")
+    version: str = Field(description="Version of the execution backend (e.g., 'r2024b', 'v1.0')")
     settings: Optional[dict] = Field(None, description="Backend-specific settings")
 
 
-class TypeConfig(CodeAbilityBase):
-    """Configuration for content types."""
-    kind: str = Field(description="Type of content (e.g., 'assignment', 'unit')")
-    slug: str = Field(description="Unique identifier for the content type")
-    title: str = Field(description="Human-readable title")
-    color: Optional[str] = Field(None, description="Color for UI representation")
-    description: Optional[str] = Field(None, description="Description of the content type")
-    properties: dict = Field(default_factory=dict, description="Additional properties")
+# TypeConfig removed - content types are managed at CourseContent level, not in examples
 
 
 class CodeAbilityMetaProperties(CodeAbilityBase):
@@ -142,27 +131,19 @@ class CodeAbilityMetaProperties(CodeAbilityBase):
         default_factory=list,
         description="Template files for student projects"
     )
+    testDependencies: Optional[List[str]] = Field(
+        default_factory=list,
+        description="List of example identifiers that this example depends on (e.g., functions called from other examples)"
+    )
     executionBackend: Optional[CourseExecutionBackendConfig] = Field(
         None,
         description="Execution backend configuration for this assignment"
     )
-    maxTestRuns: Optional[int] = Field(
-        None,
-        ge=0,
-        description="Maximum number of test runs allowed"
-    )
-    maxSubmissions: Optional[int] = Field(
-        None,
-        ge=0,
-        description="Maximum number of submissions allowed"
-    )
-    maxGroupSize: Optional[int] = Field(
-        None,
-        ge=1,
-        description="Maximum group size for collaborative assignments"
-    )
+    # Course-dependent fields removed - these belong to course configuration, not example metadata
+    # maxTestRuns, maxSubmissions, maxGroupSize are course/term specific and should be
+    # configured at the CourseContent or Course level, not in the example meta.yaml
 
-    @field_validator('maxTestRuns', 'maxSubmissions', 'maxGroupSize', 'executionBackend', mode='before')
+    @field_validator('executionBackend', mode='before')
     @classmethod
     def empty_list_to_none(cls, value):
         """Convert empty lists to None."""
@@ -171,16 +152,16 @@ class CodeAbilityMetaProperties(CodeAbilityBase):
         return value
 
 
-class CodeAbilityBaseMeta(CodeAbilityBase):
-    """Base meta information common to all levels."""
+class CodeAbilityMeta(CodeAbilityBase):
+    """Meta information for assignments/examples."""
     version: Optional[str] = Field(
         "1.0",
         pattern=VERSION_REGEX,
         description="Version of the meta format"
     )
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Assignment,
-        description="Type of content (course, unit, assignment)"
+    slug: Optional[str] = Field(
+        None,
+        description="Unique identifier for the assignment"
     )
     title: Optional[str] = Field(
         None,
@@ -191,9 +172,9 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         None,
         description="Detailed description of the content"
     )
-    language: Optional[LanguageEnum] = Field(
-        LanguageEnum.en,
-        description="Primary language of the content"
+    language: Optional[str] = Field(
+        "en",
+        description="Primary language of the content (e.g., 'en', 'de', 'fr', etc.)"
     )
     license: Optional[str] = Field(
         "Not specified",
@@ -220,6 +201,10 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         default_factory=list,
         description="Keywords for categorization"
     )
+    properties: Optional[CodeAbilityMetaProperties] = Field(
+        default_factory=CodeAbilityMetaProperties,
+        description="Assignment-specific properties"
+    )
 
     @field_validator('description', mode='before')
     @classmethod
@@ -230,71 +215,3 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         return value
 
 
-class CodeAbilityExampleMeta(CodeAbilityBaseMeta):
-    """
-    Meta information for assignment/release level directories.
-    
-    This is used for individual assignments, examples, or exercises.
-    Contains the most detailed information including submission requirements,
-    test configuration, and execution settings.
-    """
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Assignment,
-        description="Must be 'assignment' for release-level meta"
-    )
-    properties: Optional[CodeAbilityMetaProperties] = Field(
-        default_factory=CodeAbilityMetaProperties,
-        description="Assignment-specific properties"
-    )
-
-
-class CodeAbilityUnitMeta(CodeAbilityBaseMeta):
-    """
-    Meta information for unit/content kind directories.
-    
-    This is used for organizational units like chapters, modules, or thematic groups.
-    Contains information about the unit structure and content organization.
-    """
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Unit,
-        description="Must be 'unit' for unit-level meta"
-    )
-    type: str = Field(
-        description="Content type slug (e.g., 'chapter', 'module', 'week')"
-    )
-
-
-class CodeAbilityCourseMeta(CodeAbilityBaseMeta):
-    """
-    Meta information for course root level.
-    
-    This is used at the root of the assignments repository to define
-    the overall course structure, content types, and execution backends.
-    """
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Course,
-        description="Must be 'course' for course-level meta"
-    )
-    contentTypes: Optional[List[TypeConfig]] = Field(
-        default_factory=list,
-        description="Available content types for this course"
-    )
-    executionBackends: Optional[List[CourseExecutionBackendConfig]] = Field(
-        default_factory=list,
-        description="Available execution backends for this course"
-    )
-
-
-# Legacy compatibility - keep the old CodeAbilityMeta for backward compatibility
-class CodeAbilityMeta(CodeAbilityExampleMeta):
-    """
-    Legacy meta model for backward compatibility.
-    
-    This extends CodeAbilityExampleMeta with additional fields that were
-    used in the original implementation.
-    """
-    type: str = Field(description="Content type (legacy field)")
-    testDependencies: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Test dependencies (legacy field)"
-    )

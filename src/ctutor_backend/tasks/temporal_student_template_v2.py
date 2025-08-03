@@ -265,7 +265,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     continue
                 
                 # Process example for student template
-                content_path_str = content.example.identifier # str(content.path)
+                content_path_str = str(content.example.identifier) # str(content.path)
                 target_path = Path(template_staging_path) / content_path_str
                 result = await process_example_for_student_template_v2(
                     example_files, target_path, content, version

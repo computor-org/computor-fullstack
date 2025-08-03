@@ -437,19 +437,20 @@ async def process_example_for_student_template_v2(
             properties = meta_yaml.get('properties', {})
             
             # Process student template files
+            # These are the actual template files/directories to copy to the student repo
             student_templates = properties.get('studentTemplates', [])
-            for template_file in student_templates:
-                if template_file in example_files:
-                    # Handle file renaming (e.g., main_template.py → main.py)
-                    output_name = template_file
-                    if template_file.endswith('_template.py'):
-                        output_name = template_file.replace('_template.py', '.py')
-                    elif template_file.endswith('_template'):
-                        output_name = template_file.replace('_template', '')
+            for template_path in student_templates:
+                if template_path in example_files:
+                    # Remove 'studentTemplates/' prefix if present for output path
+                    output_path = template_path
+                    if output_path.startswith('studentTemplates/'):
+                        output_path = output_path.replace('studentTemplates/', '', 1)
                     
-                    file_path = target_path / output_name
+                    file_path = target_path / output_path
                     file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_bytes(example_files[template_file])
+                    file_path.write_bytes(example_files[template_path])
+                else:
+                    logger.warning(f"Student template file not found: {template_path}")
             
             # Copy additional files
             additional_files = properties.get('additionalFiles', [])
@@ -460,47 +461,28 @@ async def process_example_for_student_template_v2(
                     file_path.write_bytes(example_files[file_name])
             
             # Create placeholder files for student submissions
+            # Only create empty files for submission files that aren't already provided via studentTemplates
             submission_files = properties.get('studentSubmissionFiles', [])
+            student_templates = properties.get('studentTemplates', [])
+            
+            # Extract just the filename from studentTemplates paths for comparison
+            template_filenames = set()
+            for template_path in student_templates:
+                # Get the base filename, handling paths like 'studentTemplates/check_password.py'
+                if '/' in template_path:
+                    template_filenames.add(template_path.split('/')[-1])
+                else:
+                    template_filenames.add(template_path)
+            
             for submission_file in submission_files:
-                submission_path = target_path / submission_file
-                if not submission_path.exists():
-                    submission_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Create with appropriate template based on extension
-                    extension = submission_path.suffix.lower()
-                    if extension == '.py':
-                        content = f'"""\n{course_content.title}\n\nYour solution goes here.\n"""\n\n# TODO: Implement your solution\n'
-                    elif extension in ['.java', '.cpp', '.c']:
-                        content = f'/*\n * {course_content.title}\n * \n * Your solution goes here.\n */\n\n// TODO: Implement your solution\n'
-                    else:
-                        content = f'# {course_content.title}\n# Your solution goes here\n'
-                    
-                    submission_path.write_text(content)
-            
-            # # Create student-specific meta.yaml (without test references)
-            # student_meta = {
-            #     'kind': meta_yaml.get('kind', 'assignment'),
-            #     'slug': meta_yaml.get('slug', str(course_content.path).split('.')[-1]),
-            #     'name': meta_yaml.get('name', course_content.title),
-            #     'deployedFrom': {
-            #         'exampleId': str(course_content.example_id),
-            #         'version': version.version_tag
-            #     }
-            # }
-            
-            # # Only include safe properties for students
-            # if 'properties' in meta_yaml:
-            #     student_props = {}
-            #     for key in ['studentSubmissionFiles', 'additionalFiles', 'maxGroupSize', 'maxTestRuns', 'maxSubmissions']:
-            #         if key in properties:
-            #             student_props[key] = properties[key]
-                
-            #     if student_props:
-            #         student_meta['properties'] = student_props
-            
-            # meta_output_path = target_path / 'meta.yaml'
-            # with open(meta_output_path, 'w') as f:
-            #     yaml.dump(student_meta, f, default_flow_style=False, sort_keys=False)
+                # Check if this submission file is already provided via studentTemplates
+                if submission_file not in template_filenames:
+                    submission_path = target_path / submission_file
+                    if not submission_path.exists():
+                        submission_path.parent.mkdir(parents=True, exist_ok=True)
+                        # Create empty placeholder file
+                        submission_path.write_text('')
+                        logger.info(f"Created empty placeholder for: {submission_file}")
         
         # Copy README if exists
         if 'README.md' in example_files:

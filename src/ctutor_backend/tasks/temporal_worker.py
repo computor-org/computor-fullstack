@@ -42,7 +42,8 @@ from .temporal_hierarchy_management import (
     DeployComputorHierarchyWorkflow,
     create_organization_activity,
     create_course_family_activity,
-    create_course_activity
+    create_course_activity,
+    create_course_content_types_activity
 )
 from .temporal_student_template_v2 import (
     GenerateStudentTemplateWorkflowV2,
@@ -100,6 +101,7 @@ class TemporalWorker:
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
+            create_course_content_types_activity,
             generate_student_template_v2,  # New version
         ]
         

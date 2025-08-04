@@ -87,6 +87,16 @@ class ExecutionBackendConfig(BaseDeployment):
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Backend-specific settings")
 
 
+class CourseContentTypeConfig(BaseDeployment):
+    """Course content type configuration for deployment."""
+    slug: str = Field(description="Unique identifier for the content type")
+    title: Optional[str] = Field(None, description="Display title for the content type")
+    description: Optional[str] = Field(None, description="Description of the content type")
+    color: Optional[str] = Field("green", description="Display color (hex, rgb, hsl, or named color)")
+    properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional properties")
+    course_content_kind_id: str = Field(description="ID of the course content kind (e.g., 'assignment', 'unit')")
+
+
 class CourseProjects(BaseDeployment):
     """Configuration for course-related GitLab projects."""
     tests: Optional[str] = Field("tests", description="Path for tests project")
@@ -123,6 +133,10 @@ class CourseConfig(BaseDeployment):
     execution_backends: Optional[List[ExecutionBackendConfig]] = Field(
         default_factory=list, 
         description="Available execution backends for this course"
+    )
+    content_types: Optional[List[CourseContentTypeConfig]] = Field(
+        default_factory=list,
+        description="Course content types to be created (assignments, units, etc.)"
     )
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course-specific settings")
 
@@ -250,6 +264,29 @@ EXAMPLE_DEPLOYMENT = ComputorDeploymentConfig(
                                     type="python",
                                     version="3.11",
                                     settings={"timeout": 30}
+                                )
+                            ],
+                            content_types=[
+                                CourseContentTypeConfig(
+                                    slug="homework",
+                                    title="Homework Assignment",
+                                    description="Weekly homework assignments",
+                                    color="blue",
+                                    course_content_kind_id="assignment"
+                                ),
+                                CourseContentTypeConfig(
+                                    slug="exam",
+                                    title="Exam",
+                                    description="Course examinations",
+                                    color="red",
+                                    course_content_kind_id="assignment"
+                                ),
+                                CourseContentTypeConfig(
+                                    slug="lecture",
+                                    title="Lecture Material",
+                                    description="Lecture notes and materials",
+                                    color="green",
+                                    course_content_kind_id="unit"
                                 )
                             ]
                         )

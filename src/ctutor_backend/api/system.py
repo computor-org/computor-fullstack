@@ -19,7 +19,6 @@ from ctutor_backend.interface.courses import CourseInterface, CourseUpdate
 from ctutor_backend.interface.deployments import ComputorDeploymentConfig, CourseConfig, CourseFamilyConfig, GitLabConfig, OrganizationConfig
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.permissions import Principal
-from ctutor_backend.interface.course_content_types import CourseContentTypeCreate
 from ctutor_backend.interface.student_profile import StudentProfileCreate
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserCreate, UserGet, UserTypeEnum
@@ -33,7 +32,7 @@ from ctutor_backend.interface.system import (
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
 from ctutor_backend.model.organization import Organization  
 from ctutor_backend.model.auth import User, StudentProfile
-from ctutor_backend.model.example import Example, ExampleVersion
+from ctutor_backend.model.example import Example
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from ctutor_backend.tasks import get_task_executor, TaskSubmission

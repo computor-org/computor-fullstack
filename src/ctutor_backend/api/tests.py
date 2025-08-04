@@ -29,7 +29,7 @@ from ctutor_backend.model.course import Course, CourseContent, CourseContentType
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
-from sqlalchemy_utils import Ltree
+from ..types import Ltree
 from ctutor_backend.settings import settings
 #from ctutor_backend.helpers import get_prefect_client
 

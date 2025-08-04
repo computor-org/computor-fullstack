@@ -4,7 +4,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy_utils import LtreeType
+from ..types import LtreeType
 
 from .base import Base
 

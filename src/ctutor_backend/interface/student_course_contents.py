@@ -9,7 +9,7 @@ from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQu
 from ctutor_backend.interface.results import ResultStatus
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
-from sqlalchemy_utils import Ltree
+from ..types import Ltree
 
 class SubmissionGroupStudentList(BaseModel):
     id: Optional[str] = None

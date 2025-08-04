@@ -27,7 +27,7 @@ from model.organization import Organization
 from model.course import Course, CourseFamily, CourseGroup, CourseMember, CourseRole, CourseExecutionBackend, CourseContent, CourseContentType, CourseContentKind
 from model.execution import ExecutionBackend
 from model.role import Role, UserRole
-from sqlalchemy_utils import Ltree
+from ..types import Ltree
 from sqlalchemy.orm import Session
 import requests
 import time

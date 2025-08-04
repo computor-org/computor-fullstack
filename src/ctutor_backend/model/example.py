@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
-from sqlalchemy_utils.types.ltree import LtreeType
+from ..types import LtreeType
 
 from .base import Base
 

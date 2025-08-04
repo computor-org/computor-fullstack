@@ -5,7 +5,7 @@ from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQu
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.organizations import OrganizationGet
 from ctutor_backend.model.course import CourseFamily
-from sqlalchemy_utils import Ltree
+from ..types import Ltree
 
 class CourseFamilyProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None

@@ -8,7 +8,7 @@ from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQu
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseContentKind, CourseContentType, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
 from ctutor_backend.model.auth import User
-from sqlalchemy_utils import Ltree
+from ..types import Ltree
 
 
 # Deployment History Models

@@ -12,13 +12,14 @@ from pathlib import Path
 
 from ..interface.deployments_refactored import (
     ComputorDeploymentConfig,
-    OrganizationConfig,
-    CourseFamilyConfig,
-    CourseConfig,
+    HierarchicalOrganizationConfig,
+    HierarchicalCourseFamilyConfig,
+    HierarchicalCourseConfig,
     GitLabConfig,
     ExecutionBackendConfig,
     CourseProjects,
-    EXAMPLE_DEPLOYMENT
+    EXAMPLE_DEPLOYMENT,
+    EXAMPLE_MULTI_DEPLOYMENT
 )
 from .auth import authenticate
 from .config import CLIAuthConfig
@@ -55,74 +56,28 @@ def init(output: str, format: str):
     if format == 'minimal':
         # Minimal configuration with only required fields
         config = ComputorDeploymentConfig(
-            organization=OrganizationConfig(
-                name="My Organization",
-                path="my-org"
-            ),
-            course_family=CourseFamilyConfig(
-                name="My Courses",
-                path="my-courses"
-            ),
-            course=CourseConfig(
-                name="My First Course",
-                path="course-2025"
-            )
+            organizations=[
+                HierarchicalOrganizationConfig(
+                    name="My Organization",
+                    path="my-org",
+                    course_families=[
+                        HierarchicalCourseFamilyConfig(
+                            name="My Courses",
+                            path="my-courses",
+                            courses=[
+                                HierarchicalCourseConfig(
+                                    name="My First Course",
+                                    path="course-2025"
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
         )
     elif format == 'full':
-        # Full configuration with all optional fields
-        config = ComputorDeploymentConfig(
-            organization=OrganizationConfig(
-                name="Computer Science Department",
-                path="cs-dept",
-                description="Department of Computer Science",
-                gitlab=GitLabConfig(
-                    url="${GITLAB_URL:-http://localhost:8084}",
-                    token="${GITLAB_TOKEN}",
-                    parent=0
-                ),
-                settings={
-                    "department": "Computer Science",
-                    "university": "Technical University"
-                }
-            ),
-            course_family=CourseFamilyConfig(
-                name="Programming Courses",
-                path="programming",
-                description="Core programming courses",
-                settings={
-                    "level": "undergraduate",
-                    "credits": 6
-                }
-            ),
-            course=CourseConfig(
-                name="Introduction to Python",
-                path="python-2025s",
-                description="Learn Python from basics to advanced",
-                projects=CourseProjects(
-                    tests="tests",
-                    student_template="student-template",
-                    reference="reference",
-                    examples="examples",
-                    documents="docs"
-                ),
-                execution_backends=[
-                    ExecutionBackendConfig(
-                        slug="python-3.11",
-                        type="python",
-                        version="3.11",
-                        settings={"timeout": 30}
-                    )
-                ],
-                settings={
-                    "instructor": "Dr. Smith",
-                    "start_date": "2025-03-01",
-                    "end_date": "2025-06-30"
-                }
-            ),
-            settings={
-                "deployment_notes": "Production deployment"
-            }
-        )
+        # Use the multi-organization example
+        config = EXAMPLE_MULTI_DEPLOYMENT
     else:  # tutorial
         # Use the example from deployments_refactored.py
         config = EXAMPLE_DEPLOYMENT
@@ -191,19 +146,31 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         
         if dry_run:
             click.echo("\n--- Deployment Plan (Dry Run) ---")
-            click.echo(f"Organization: {config.organization.name} ({config.organization.path})")
-            click.echo(f"Course Family: {config.course_family.name} ({config.course_family.path})")
-            click.echo(f"Course: {config.course.name} ({config.course.path})")
             
-            if config.organization.gitlab:
-                click.echo(f"\nGitLab Integration:")
-                click.echo(f"  URL: {config.organization.gitlab.url}")
-                click.echo(f"  Parent: {config.organization.gitlab.parent or 'root'}")
+            # Show entity counts
+            counts = config.count_entities()
+            click.echo(f"Total: {counts['organizations']} organizations, {counts['course_families']} course families, {counts['courses']} courses")
             
-            if config.course.execution_backends:
-                click.echo(f"\nExecution Backends:")
-                for backend in config.course.execution_backends:
-                    click.echo(f"  - {backend.type} ({backend.slug})")
+            # Show hierarchical structure
+            for org_idx, org in enumerate(config.organizations):
+                click.echo(f"\nOrganization {org_idx + 1}: {org.name} ({org.path})")
+                if org.gitlab:
+                    click.echo(f"  GitLab: {org.gitlab.url} (parent: {org.gitlab.parent or 'root'})")
+                
+                for family_idx, family in enumerate(org.course_families):
+                    click.echo(f"  Course Family {family_idx + 1}: {family.name} ({family.path})")
+                    
+                    for course_idx, course in enumerate(family.courses):
+                        click.echo(f"    Course {course_idx + 1}: {course.name} ({course.path})")
+                        if course.execution_backends:
+                            click.echo(f"      Backends: {', '.join(b.type + '-' + b.version for b in course.execution_backends)}")
+            
+            # Show all paths that will be created
+            paths = config.get_deployment_paths()
+            if paths:
+                click.echo(f"\nPaths to be created:")
+                for path in paths:
+                    click.echo(f"  - {path}")
             
             click.echo("\n✅ Dry run completed. No changes made.")
             return
@@ -288,18 +255,35 @@ def validate(config_file: str):
         config = ComputorDeploymentConfig(**yaml_data)
         
         click.echo("✅ Configuration is valid!")
+        
+        # Show entity counts
+        counts = config.count_entities()
         click.echo(f"\nSummary:")
-        click.echo(f"  Organization: {config.organization.name}")
-        click.echo(f"  Course Family: {config.course_family.name}")
-        click.echo(f"  Course: {config.course.name}")
-        click.echo(f"  Full Path: {config.get_full_course_path()}")
+        click.echo(f"  Organizations: {counts['organizations']}")
+        click.echo(f"  Course Families: {counts['course_families']}")
+        click.echo(f"  Courses: {counts['courses']}")
+        
+        # Show paths
+        paths = config.get_deployment_paths()
+        if paths:
+            click.echo(f"\nPaths:")
+            for path in paths:
+                click.echo(f"  - {path}")
         
         # Check for potential issues
         warnings = []
-        if not config.organization.gitlab:
-            warnings.append("No GitLab configuration specified")
-        if not config.course.execution_backends:
-            warnings.append("No execution backends configured")
+        gitlab_configured = any(org.gitlab for org in config.organizations)
+        execution_backends_configured = any(
+            course.execution_backends 
+            for org in config.organizations 
+            for family in org.course_families 
+            for course in family.courses
+        )
+        
+        if not gitlab_configured:
+            warnings.append("No GitLab configuration specified for any organization")
+        if not execution_backends_configured:
+            warnings.append("No execution backends configured for any course")
         
         if warnings:
             click.echo(f"\n⚠️  Warnings:")
@@ -320,9 +304,9 @@ def list_examples():
     click.echo("Available deployment configuration examples:\n")
     
     examples = {
-        "minimal": "Bare minimum configuration with only required fields",
-        "tutorial": "Tutorial configuration with common settings (default)",
-        "full": "Complete configuration showing all available options"
+        "minimal": "Single organization with one course family and one course",
+        "tutorial": "Simple single organization deployment (default)",
+        "full": "Multi-organization deployment with multiple course families and courses"
     }
     
     for name, description in examples.items():

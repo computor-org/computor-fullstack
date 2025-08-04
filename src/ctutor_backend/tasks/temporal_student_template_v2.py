@@ -320,6 +320,38 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             f.write(f"- **Course**: {course.title}\n\n")
             f.write(f"## Contents\n\n")
             f.write(f"This repository contains {processed_count} assignments organized by topic.\n\n")
+            
+            # Generate tree structure table for CourseContents with examples
+            if course_contents:
+                f.write(f"## Assignment Structure\n\n")
+                f.write(f"| Course Tree | Example Directory | Example Title |\n")
+                f.write(f"|------------------|-------------------|---------------|\n")
+                
+                # Sort course contents by path for better tree visualization
+                sorted_contents = sorted(course_contents, key=lambda x: str(x.path))
+                
+                for content in sorted_contents:
+                    if content.example_id and hasattr(content, 'example') and content.example:
+                        # Create tree structure visualization from ltree path
+                        path_parts = str(content.path).split('.')
+                        
+                        # Create indented tree structure
+                        if len(path_parts) == 1:
+                            tree_structure = path_parts[0]
+                        else:
+                            # Show hierarchy with indentation
+                            tree_structure = path_parts[0]
+                            for i in range(1, len(path_parts)):
+                                tree_structure += " → " + path_parts[i]
+                        
+                        # Get example directory (identifier) and title
+                        example_dir = str(content.example.identifier)
+                        example_title = content.example.title
+                        example_version = content.example_version if content.example_version else "latest"
+                        
+                        f.write(f"| {tree_structure} | [`{example_dir}`](./{example_dir}) | {example_title} (v{example_version}) |\n")
+                
+                f.write(f"\n")
             f.write(f"## Getting Started\n\n")
             f.write(f"1. Fork this repository to your personal account\n")
             f.write(f"2. Clone your fork to your local machine\n")

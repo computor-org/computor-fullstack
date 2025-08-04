@@ -16,7 +16,7 @@ from uuid import uuid4
 from gitlab.exceptions import GitlabCreateError, GitlabGetError
 from sqlalchemy.exc import IntegrityError
 
-from ctutor_backend.generator.gitlab_builder import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilder
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,
@@ -28,7 +28,7 @@ from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.course import CourseFamily, Course
 
 
-class TestGitLabBuilderNew:
+class TestGitLabBuilder:
     """Test suite for new GitLab builder."""
     
     @pytest.fixture
@@ -111,7 +111,7 @@ class TestGitLabBuilderNew:
         mock_repo_class.return_value = mock_repo_instance
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -158,7 +158,7 @@ class TestGitLabBuilderNew:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -200,7 +200,7 @@ class TestGitLabBuilderNew:
         mock_repo_class.return_value = mock_repo_instance
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -242,7 +242,7 @@ class TestGitLabBuilderNew:
         mock_repo_class.return_value = mock_repo_instance
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -296,7 +296,7 @@ class TestGitLabBuilderNew:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -352,7 +352,7 @@ class TestGitLabBuilderNew:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -369,7 +369,7 @@ class TestGitLabBuilderNew:
         """Test enhanced GitLab config creation."""
         with patch('ctutor_backend.generator.gitlab_builder.Gitlab'):
             with patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository'):
-                builder = GitLabBuilderNew(
+                builder = GitLabBuilder(
                     db_session=mock_db_session,
                     gitlab_url="http://localhost:8084",
                     gitlab_token="test-token"
@@ -391,7 +391,7 @@ class TestGitLabBuilderNew:
         """Test proper logging throughout operations."""
         with patch('ctutor_backend.generator.gitlab_builder.Gitlab'):
             with patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository'):
-                builder = GitLabBuilderNew(
+                builder = GitLabBuilder(
                     db_session=mock_db_session,
                     gitlab_url="http://localhost:8084",
                     gitlab_token="test-token"

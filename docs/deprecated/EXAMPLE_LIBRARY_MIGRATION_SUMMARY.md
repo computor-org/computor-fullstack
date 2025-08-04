@@ -63,7 +63,7 @@ POST   /api/v1/courses/{course_id}/deploy-examples (old workflow)
 
 ### 5. GitLab Builder Changes
 
-`GitLabBuilderNew` now only creates:
+`GitLabBuilder` now only creates:
 - Course group
 - Students subgroup
 - `student-template` repository
@@ -116,7 +116,7 @@ For existing courses:
 - MinIO Docker networking fixes
 - New API endpoints implementation
 - GenerateStudentTemplateWorkflowV2 workflow
-- GitLabBuilderNew modifications
+- GitLabBuilder modifications
 - Documentation updates
 - Deprecated file cleanup
 

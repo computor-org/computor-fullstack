@@ -60,7 +60,7 @@ class EnhancedGitLabConfig(GitLabConfig):
     last_synced_at: Optional[datetime] = None
 
 
-class GitLabBuilderNew:
+class GitLabBuilder:
     """
     New GitLab builder with integrated database operations.
     

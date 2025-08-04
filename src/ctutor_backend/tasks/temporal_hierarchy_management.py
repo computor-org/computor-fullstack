@@ -27,9 +27,9 @@ async def create_organization_activity(
     gitlab_token: str,
     user_id: str
 ) -> Dict[str, Any]:
-    """Activity to create an organization using GitLabBuilderNew."""
-    # Import GitLabBuilderNew inside activity to avoid workflow sandbox restrictions
-    from ..generator.gitlab_builder import GitLabBuilderNew
+    """Activity to create an organization using GitLabBuilder."""
+    # Import GitLabBuilder inside activity to avoid workflow sandbox restrictions
+    from ..generator.gitlab_builder import GitLabBuilder
     
     logger.info(f"Starting organization creation activity for: {org_config.get('name')}")
     logger.info(f"GitLab URL: {gitlab_url}")
@@ -81,7 +81,7 @@ async def create_organization_activity(
         db = next(db_gen)
         try:
             logger.info("Database session created successfully")
-            builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
+            builder = GitLabBuilder(db, gitlab_url, gitlab_token)
             logger.info("GitLab builder created successfully")
             
             logger.info("Calling _create_organization method")
@@ -136,9 +136,9 @@ async def create_course_family_activity(
     organization_id: str,
     user_id: str
 ) -> Dict[str, Any]:
-    """Activity to create a course family using GitLabBuilderNew."""
-    # Import GitLabBuilderNew inside activity to avoid workflow sandbox restrictions
-    from ..generator.gitlab_builder import GitLabBuilderNew
+    """Activity to create a course family using GitLabBuilder."""
+    # Import GitLabBuilder inside activity to avoid workflow sandbox restrictions
+    from ..generator.gitlab_builder import GitLabBuilder
     
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
     logger.info(f"Organization ID: {organization_id}")
@@ -219,7 +219,7 @@ async def create_course_family_activity(
             )
             
             # Create the builder and course family
-            builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
+            builder = GitLabBuilder(db, gitlab_url, gitlab_token)
             result = builder._create_course_family(deployment_config, org, user_id)
             
             if result["success"]:
@@ -270,9 +270,9 @@ async def create_course_activity(
     course_family_id: str,
     user_id: str
 ) -> Dict[str, Any]:
-    """Activity to create a course using GitLabBuilderNew."""
-    # Import GitLabBuilderNew inside activity to avoid workflow sandbox restrictions
-    from ..generator.gitlab_builder import GitLabBuilderNew
+    """Activity to create a course using GitLabBuilder."""
+    # Import GitLabBuilder inside activity to avoid workflow sandbox restrictions
+    from ..generator.gitlab_builder import GitLabBuilder
     
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
     logger.info(f"Course Family ID: {course_family_id}")
@@ -349,7 +349,7 @@ async def create_course_activity(
             )
             
             # Create the builder and course
-            builder = GitLabBuilderNew(db, gitlab_url, gitlab_token)
+            builder = GitLabBuilder(db, gitlab_url, gitlab_token)
             result = builder._create_course(deployment_config, org, family, user_id)
             
             if result["success"]:

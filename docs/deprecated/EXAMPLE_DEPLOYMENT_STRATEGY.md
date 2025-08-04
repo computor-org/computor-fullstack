@@ -760,7 +760,7 @@ The template generation (release) process is straightforward:
 ### Required Changes
 
 1. **Remove Both Assignments and Reference Repository Creation**
-   - Update `GitLabBuilderNew._create_course_projects()` to only create student-template
+   - Update `GitLabBuilder._create_course_projects()` to only create student-template
    - Remove `assignments_url` and `reference_url` from course properties
    - Update any UI that expects these repositories
 
@@ -1229,7 +1229,7 @@ Response: {
 
 ### Phase 1: Update Infrastructure (Immediate)
 1. **Modify Course Creation**
-   - Stop creating both assignments and reference repositories in `GitLabBuilderNew`
+   - Stop creating both assignments and reference repositories in `GitLabBuilder`
    - Update course properties structure to only include student-template URL
    - Only create student-template repository
 

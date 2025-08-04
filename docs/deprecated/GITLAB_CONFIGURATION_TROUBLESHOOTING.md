@@ -68,7 +68,7 @@ course.properties = {
 If the course exists but GitLab projects weren't created, you can trigger the creation:
 
 1. Ensure the course family has GitLab configuration
-2. Use the GitLabBuilderNew to create projects for the course
+2. Use the GitLabBuilder to create projects for the course
 3. Update the course properties with the created project information
 
 ## Prevention

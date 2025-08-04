@@ -292,20 +292,20 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 logger.error(f"Failed to process content {content.path}: {e}")
                 errors.append(f"Failed to process {content.path}: {str(e)}")
         
-        # Clean existing content in repo (except .git)
-        for item in Path(template_repo_path).iterdir():
-            if item.name != '.git':
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
+        # Update repository content (preserve existing directories, only update assigned examples)
+        # Only remove/update files that are being actively managed, preserve everything else
         
-        # Copy staged content to repository
+        # Copy/update only the staged content to repository
         for item in Path(template_staging_path).iterdir():
             target = Path(template_repo_path) / item.name
+            
             if item.is_dir():
+                # If directory exists, remove it first, then replace with new content
+                if target.exists():
+                    shutil.rmtree(target)
                 shutil.copytree(item, target)
             else:
+                # For files, just copy/overwrite
                 shutil.copy2(item, target)
         
         # Create root README

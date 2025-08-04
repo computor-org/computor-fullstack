@@ -14,23 +14,9 @@ from ..interface.deployments import ComputorDeploymentConfig, OrganizationConfig
 from ..database import get_db
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
+from ..utils.docker_utils import transform_localhost_url
 
 logger = logging.getLogger(__name__)
-
-
-def transform_localhost_url(url: str) -> str:
-    """
-    Transform localhost URLs to Docker host IP for container-to-host communication.
-    
-    Args:
-        url: URL that may contain localhost
-        
-    Returns:
-        URL with localhost replaced by Docker host IP (172.17.0.1)
-    """
-    if url and "localhost" in url:
-        return url.replace("localhost", "172.17.0.1")
-    return url
 
 
 # Activities

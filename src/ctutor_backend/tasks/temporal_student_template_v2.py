@@ -141,10 +141,13 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         if not course:
             raise ValueError(f"Course {course_id} not found")
         
-        # Get organization directly using the foreign key relationship
-        organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
-        if not organization:
-            raise ValueError(f"Organization not found for course {course_id}. Organization ID: {course.organization_id}")
+        course_family = course.course_family
+        organization = course.organization
+        
+        # # Get organization directly using the foreign key relationship
+        # organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
+        # if not organization:
+        #     raise ValueError(f"Organization not found for course {course_id}. Organization ID: {course.organization_id}")
         
         # Get GitLab token from organization properties
         gitlab_token = None
@@ -304,7 +307,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             f.write(f"This repository contains templates for your assignments.\n\n")
             f.write(f"## Course Information\n\n")
             f.write(f"- **Organization**: {str(course.path).split('.')[0]}\n")
-            f.write(f"- **Course Family**: {str(course.path).split('.')[1] if len(str(course.path).split('.')) > 1 else 'N/A'}\n")
+            f.write(f"- **Course Family**: {str(course_family.path).split('.')[1] if len(str(course_family.path).split('.')) > 1 else 'N/A'}\n")
             f.write(f"- **Course**: {course.title}\n\n")
             f.write(f"## Contents\n\n")
             f.write(f"This repository contains {processed_count} assignments organized by topic.\n\n")
@@ -425,69 +428,102 @@ async def process_example_for_student_template_v2(
             except Exception as e:
                 logger.error(f"Failed to parse meta.yaml: {e}")
         
-        if not meta_yaml:
-            # If no meta.yaml, include all files except tests
-            for filename, content in example_files.items():
-                if not filename.startswith('test_') and not filename.endswith('_test.py'):
-                    file_path = target_path / filename
+        # Process content directory files
+        for filename, content in example_files.items():
+            if filename.startswith('content/'):
+                # Handle index*.md files specially - rename to README*.md
+                if filename.startswith('content/index'):
+                    # Handle index.md -> README.md
+                    if filename == 'content/index.md':
+                        readme_path = target_path / 'README.md'
+                        readme_path.write_bytes(content)
+                    # Handle index_<lang>.md -> README_<lang>.md
+                    elif filename.startswith('content/index_') and filename.endswith('.md'):
+                        # Extract language suffix
+                        lang_suffix = filename[len('content/index'):-3]  # Gets '_de' from 'content/index_de.md'
+                        readme_filename = f'README{lang_suffix}.md'
+                        readme_path = target_path / readme_filename
+                        readme_path.write_bytes(content)
+                # Copy all other content files (mediaFiles, etc.) preserving structure
+                else:
+                    # Remove 'content/' prefix and copy to assignment root
+                    relative_path = filename.replace('content/', '', 1)
+                    file_path = target_path / relative_path
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_bytes(content)
-        else:
-            # Process according to meta.yaml rules
+        
+        if meta_yaml:
             properties = meta_yaml.get('properties', {})
             
-            # Process student template files
-            # These are the actual template files/directories to copy to the student repo
-            student_templates = properties.get('studentTemplates', [])
-            for template_path in student_templates:
-                if template_path in example_files:
-                    # Remove 'studentTemplates/' prefix if present for output path
-                    output_path = template_path
-                    if output_path.startswith('studentTemplates/'):
-                        output_path = output_path.replace('studentTemplates/', '', 1)
-                    
-                    file_path = target_path / output_path
-                    file_path.parent.mkdir(parents=True, exist_ok=True)
-                    file_path.write_bytes(example_files[template_path])
-                else:
-                    logger.warning(f"Student template file not found: {template_path}")
-            
-            # Copy additional files
+            # 3. Process additionalFiles - copy to assignment root
             additional_files = properties.get('additionalFiles', [])
             for file_name in additional_files:
                 if file_name in example_files:
-                    file_path = target_path / file_name
+                    # Copy to root of assignment directory
+                    file_path = target_path / Path(file_name).name  # Use only filename, not path
                     file_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.write_bytes(example_files[file_name])
             
-            # Create placeholder files for student submissions
-            # Only create empty files for submission files that aren't already provided via studentTemplates
+            # 4. Process studentSubmissionFiles - ensure all required files exist
+            # Use content from studentTemplates when available, otherwise create empty
             submission_files = properties.get('studentSubmissionFiles', [])
             student_templates = properties.get('studentTemplates', [])
             
-            # Extract just the filename from studentTemplates paths for comparison
-            template_filenames = set()
+            # Build a map of template filenames to their content
+            template_content_map = {}
             for template_path in student_templates:
-                # Get the base filename, handling paths like 'studentTemplates/check_password.py'
-                if '/' in template_path:
-                    template_filenames.add(template_path.split('/')[-1])
+                # Try to find the template file in example_files
+                file_content = None
+                actual_path = None
+                
+                if template_path in example_files:
+                    file_content = example_files[template_path]
+                    actual_path = template_path
                 else:
-                    template_filenames.add(template_path)
+                    # Try to find by filename
+                    filename = Path(template_path).name
+                    for file_path, content in example_files.items():
+                        if Path(file_path).name == filename:
+                            # Prefer paths containing 'studentTemplate'
+                            if 'studentTemplate' in file_path:
+                                file_content = content
+                                actual_path = file_path
+                                break
+                            elif file_content is None:
+                                file_content = content
+                                actual_path = file_path
+                
+                if file_content is not None:
+                    # Store the content mapped to just the filename
+                    filename = Path(template_path).name
+                    template_content_map[filename] = file_content
+                    logger.info(f"Found template content for: {filename} from {actual_path}")
+                else:
+                    logger.warning(f"Student template file not found: {template_path}")
             
+            # Now create all studentSubmissionFiles
             for submission_file in submission_files:
-                # Check if this submission file is already provided via studentTemplates
-                if submission_file not in template_filenames:
-                    submission_path = target_path / submission_file
-                    if not submission_path.exists():
-                        submission_path.parent.mkdir(parents=True, exist_ok=True)
-                        # Create empty placeholder file
-                        submission_path.write_text('')
-                        logger.info(f"Created empty placeholder for: {submission_file}")
-        
-        # Copy README if exists
-        if 'README.md' in example_files:
-            readme_path = target_path / 'README.md'
-            readme_path.write_bytes(example_files['README.md'])
+                submission_path = target_path / submission_file
+                submission_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Check if we have template content for this file
+                if submission_file in template_content_map:
+                    # Use template content
+                    submission_path.write_bytes(template_content_map[submission_file])
+                    logger.info(f"Created {submission_file} from template")
+                else:
+                    # Create empty file
+                    submission_path.write_text('')
+                    logger.info(f"Created empty file: {submission_file}")
+        else:
+            # No meta.yaml - fallback processing
+            logger.warning(f"No meta.yaml found for {course_content.path}, using fallback processing")
+            for filename, content in example_files.items():
+                # Skip test files and meta files
+                if not filename.startswith('test') and not filename.endswith('_test.py') and filename != 'meta.yaml':
+                    file_path = target_path / filename
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(content)
         
         return {"success": True}
         

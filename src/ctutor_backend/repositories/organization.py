@@ -8,7 +8,7 @@ client composite functions.
 
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from ..types import Ltree
+from ..custom_types import Ltree
 
 from .base import BaseRepository
 from ..model.organization import Organization

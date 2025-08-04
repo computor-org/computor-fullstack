@@ -26,7 +26,7 @@ from ctutor_backend.interface.deployments import (
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.course import CourseFamily, Course
 from ctutor_backend.services.git_service import GitService
-from ..types import Ltree
+from ..custom_types import Ltree
 
 
 def test_course_family_refresh_fix():

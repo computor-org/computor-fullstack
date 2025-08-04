@@ -44,7 +44,7 @@ from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.course import CourseFamily, Course
 from ctutor_backend.repositories.organization import OrganizationRepository
 from ctutor_backend.services.git_service import GitService
-from ..types import Ltree
+from ..custom_types import Ltree
 
 
 logger = logging.getLogger(__name__)

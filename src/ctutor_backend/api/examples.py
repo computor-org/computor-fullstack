@@ -9,7 +9,7 @@ import yaml
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
-from ..types import Ltree
+from ..custom_types import Ltree
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func

@@ -11,7 +11,7 @@ from ctutor_backend.interface.filter import apply_filters
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.base import EntityInterface, ListQuery
 from sqlalchemy.inspection import inspect
-from ..types import Ltree, LtreeType
+from ..custom_types import Ltree, LtreeType
 from sqlalchemy.exc import StatementError
 
 async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_type: Any, response_type: BaseModel, post_create: Any = None):

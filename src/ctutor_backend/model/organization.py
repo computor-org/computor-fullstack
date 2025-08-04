@@ -4,7 +4,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
-from ..types import LtreeType
+try:
+    from ..custom_types import LtreeType
+except ImportError:
+    # Fallback for Alembic context
+    from ctutor_backend.custom_types import LtreeType
 
 from .base import Base
 

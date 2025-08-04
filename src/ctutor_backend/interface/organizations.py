@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.model.organization import Organization
-from ..types import Ltree
+from ..custom_types import Ltree
 import re
 
 class OrganizationType(str,Enum):

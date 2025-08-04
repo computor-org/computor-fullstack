@@ -8,7 +8,7 @@ from datetime import datetime
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from ..types import Ltree
+from ..custom_types import Ltree
 
 from .base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency

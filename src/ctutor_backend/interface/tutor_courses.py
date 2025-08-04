@@ -2,7 +2,7 @@ from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
-from ..types import Ltree
+from ..custom_types import Ltree
 
 from ctutor_backend.model.course import Course
 

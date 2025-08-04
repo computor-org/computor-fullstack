@@ -234,7 +234,7 @@ class GitLabBuilderNew:
                         if not is_valid:
                             # Need to recreate GitLab group
                             logger.warning(f"GitLab group for organization {existing_org.path} no longer exists")
-                            gitlab_group, gitlab_config = self._create_gitlab_group(
+                            gitlab_group, _ = self._create_gitlab_group(
                                 deployment.organization.name,
                                 deployment.organization.path,
                                 deployment.organization.gitlab.parent,
@@ -242,6 +242,9 @@ class GitLabBuilderNew:
                             )
                             result["gitlab_group"] = gitlab_group
                             result["gitlab_created"] = True
+                            
+                            # Create organization-specific config with encrypted token
+                            gitlab_config = self._create_organization_gitlab_config(gitlab_group)
                             
                             # Update organization properties
                             self._update_organization_gitlab_properties(
@@ -253,7 +256,7 @@ class GitLabBuilderNew:
                             result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
                     else:
                         # No group_id stored, create GitLab group
-                        gitlab_group, gitlab_config = self._create_gitlab_group(
+                        gitlab_group, _ = self._create_gitlab_group(
                             deployment.organization.name,
                             deployment.organization.path,
                             deployment.organization.gitlab.parent,
@@ -261,6 +264,9 @@ class GitLabBuilderNew:
                         )
                         result["gitlab_group"] = gitlab_group
                         result["gitlab_created"] = True
+                        
+                        # Create organization-specific config with encrypted token
+                        gitlab_config = self._create_organization_gitlab_config(gitlab_group)
                         
                         # Update organization properties
                         self._update_organization_gitlab_properties(
@@ -270,7 +276,7 @@ class GitLabBuilderNew:
                         )
                 else:
                     # No GitLab properties, create GitLab group
-                    gitlab_group, gitlab_config = self._create_gitlab_group(
+                    gitlab_group, _ = self._create_gitlab_group(
                         deployment.organization.name,
                         deployment.organization.path,
                         deployment.organization.gitlab.parent,
@@ -278,6 +284,9 @@ class GitLabBuilderNew:
                     )
                     result["gitlab_group"] = gitlab_group
                     result["gitlab_created"] = True
+                    
+                    # Create organization-specific config with encrypted token
+                    gitlab_config = self._create_organization_gitlab_config(gitlab_group)
                     
                     # Update organization properties
                     self._update_organization_gitlab_properties(
@@ -292,7 +301,7 @@ class GitLabBuilderNew:
             # Create new organization
             # First create GitLab group
             logger.info(f"Creating new organization GitLab group with parent: {deployment.organization.gitlab.parent}")
-            gitlab_group, gitlab_config = self._create_gitlab_group(
+            gitlab_group, _ = self._create_gitlab_group(
                 deployment.organization.name,
                 deployment.organization.path,
                 deployment.organization.gitlab.parent,
@@ -300,6 +309,9 @@ class GitLabBuilderNew:
             )
             result["gitlab_group"] = gitlab_group
             result["gitlab_created"] = True
+            
+            # Create organization-specific config with encrypted token
+            gitlab_config = self._create_organization_gitlab_config(gitlab_group)
             
             # Create organization in database
             logger.info(f"Creating organization with gitlab_config: {gitlab_config}")
@@ -391,7 +403,7 @@ class GitLabBuilderNew:
                         )
                         if not is_valid:
                             # Recreate GitLab group
-                            gitlab_group, gitlab_config = self._create_gitlab_group(
+                            gitlab_group, _ = self._create_gitlab_group(
                                 deployment.courseFamily.name,
                                 deployment.courseFamily.path,
                                 parent_group_id,
@@ -400,6 +412,9 @@ class GitLabBuilderNew:
                             )
                             result["gitlab_group"] = gitlab_group
                             result["gitlab_created"] = True
+                            
+                            # Create child-specific config WITHOUT token
+                            gitlab_config = self._create_child_gitlab_config(gitlab_group)
                             
                             # Update properties
                             self._update_course_family_gitlab_properties(
@@ -411,7 +426,7 @@ class GitLabBuilderNew:
                             result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
                     else:
                         # Create GitLab group
-                        gitlab_group, gitlab_config = self._create_gitlab_group(
+                        gitlab_group, _ = self._create_gitlab_group(
                             deployment.courseFamily.name,
                             deployment.courseFamily.path,
                             parent_group_id,
@@ -421,6 +436,9 @@ class GitLabBuilderNew:
                         result["gitlab_group"] = gitlab_group
                         result["gitlab_created"] = True
                         
+                        # Create child-specific config WITHOUT token
+                        gitlab_config = self._create_child_gitlab_config(gitlab_group)
+                        
                         # Update properties
                         self._update_course_family_gitlab_properties(
                             existing_family,
@@ -429,7 +447,7 @@ class GitLabBuilderNew:
                         )
                 else:
                     # Create GitLab group
-                    gitlab_group, gitlab_config = self._create_gitlab_group(
+                    gitlab_group, _ = self._create_gitlab_group(
                         deployment.courseFamily.name,
                         deployment.courseFamily.path,
                         parent_group_id,
@@ -438,6 +456,9 @@ class GitLabBuilderNew:
                     )
                     result["gitlab_group"] = gitlab_group
                     result["gitlab_created"] = True
+                    
+                    # Create child-specific config WITHOUT token
+                    gitlab_config = self._create_child_gitlab_config(gitlab_group)
                     
                     # Update properties
                     self._update_course_family_gitlab_properties(
@@ -465,7 +486,7 @@ class GitLabBuilderNew:
                 return result
             
             # Create GitLab group
-            gitlab_group, gitlab_config = self._create_gitlab_group(
+            gitlab_group, _ = self._create_gitlab_group(
                 deployment.courseFamily.name,
                 deployment.courseFamily.path,
                 parent_group_id,
@@ -474,6 +495,9 @@ class GitLabBuilderNew:
             )
             result["gitlab_group"] = gitlab_group
             result["gitlab_created"] = True
+            
+            # Create child-specific config WITHOUT token
+            gitlab_config = self._create_child_gitlab_config(gitlab_group)
             
             # Create course family in database
             family_data = CourseFamilyCreate(
@@ -567,7 +591,7 @@ class GitLabBuilderNew:
                         )
                         if not is_valid:
                             # Recreate GitLab group
-                            gitlab_group, gitlab_config = self._create_gitlab_group(
+                            gitlab_group, _ = self._create_gitlab_group(
                                 deployment.course.name,
                                 deployment.course.path,
                                 parent_group_id,
@@ -576,6 +600,9 @@ class GitLabBuilderNew:
                             )
                             result["gitlab_group"] = gitlab_group
                             result["gitlab_created"] = True
+                            
+                            # Create child-specific config WITHOUT token
+                            gitlab_config = self._create_child_gitlab_config(gitlab_group)
                             
                             # Update properties
                             self._update_course_gitlab_properties(
@@ -587,7 +614,7 @@ class GitLabBuilderNew:
                             result["gitlab_group"] = self.gitlab.groups.get(gitlab_config["group_id"])
                     else:
                         # Create GitLab group
-                        gitlab_group, gitlab_config = self._create_gitlab_group(
+                        gitlab_group, _ = self._create_gitlab_group(
                             deployment.course.name,
                             deployment.course.path,
                             parent_group_id,
@@ -597,6 +624,9 @@ class GitLabBuilderNew:
                         result["gitlab_group"] = gitlab_group
                         result["gitlab_created"] = True
                         
+                        # Create child-specific config WITHOUT token
+                        gitlab_config = self._create_child_gitlab_config(gitlab_group)
+                        
                         # Update properties
                         self._update_course_gitlab_properties(
                             existing_course,
@@ -605,7 +635,7 @@ class GitLabBuilderNew:
                         )
                 else:
                     # Create GitLab group
-                    gitlab_group, gitlab_config = self._create_gitlab_group(
+                    gitlab_group, _ = self._create_gitlab_group(
                         deployment.course.name,
                         deployment.course.path,
                         parent_group_id,
@@ -614,6 +644,9 @@ class GitLabBuilderNew:
                     )
                     result["gitlab_group"] = gitlab_group
                     result["gitlab_created"] = True
+                    
+                    # Create child-specific config WITHOUT token
+                    gitlab_config = self._create_child_gitlab_config(gitlab_group)
                     
                     # Update properties
                     self._update_course_gitlab_properties(
@@ -666,7 +699,7 @@ class GitLabBuilderNew:
                 return result
             
             # Create GitLab group
-            gitlab_group, gitlab_config = self._create_gitlab_group(
+            gitlab_group, _ = self._create_gitlab_group(
                 deployment.course.name,
                 deployment.course.path,
                 parent_group_id,
@@ -675,6 +708,9 @@ class GitLabBuilderNew:
             )
             result["gitlab_group"] = gitlab_group
             result["gitlab_created"] = True
+            
+            # Create child-specific config WITHOUT token
+            gitlab_config = self._create_child_gitlab_config(gitlab_group)
             
             # Create course in database
             course_data = CourseCreate(
@@ -782,9 +818,8 @@ class GitLabBuilderNew:
                     group.description = description
                     group.save()
                 
-                # Return group with enhanced config
-                enhanced_config = self._create_enhanced_config(group)
-                return group, enhanced_config
+                # Return group with basic metadata (config will be created by caller)
+                return group, {}
                 
         except Exception as e:
             logger.warning(f"Error searching for group: {e}")
@@ -804,9 +839,8 @@ class GitLabBuilderNew:
             group = self.gitlab.groups.create(payload)
             logger.info(f"Created new GitLab group: {group.full_path}")
             
-            # Return group with enhanced config
-            enhanced_config = self._create_enhanced_config(group)
-            return group, enhanced_config
+            # Return group with basic metadata (config will be created by caller)
+            return group, {}
             
         except GitlabCreateError as e:
             # Check if it's a duplicate error
@@ -817,18 +851,36 @@ class GitLabBuilderNew:
                 if existing_groups:
                     group = self.gitlab.groups.get(existing_groups[0].id)
                     logger.info(f"Found existing GitLab group after create error: {group.full_path}")
-                    enhanced_config = self._create_enhanced_config(group)
-                    return group, enhanced_config
+                    return group, {}
             raise
     
-    def _create_enhanced_config(self, group: Group) -> Dict[str, Any]:
-        """Create enhanced GitLab configuration from group."""
+    def _create_organization_gitlab_config(self, group: Group) -> Dict[str, Any]:
+        """Create GitLab configuration for organization WITH encrypted token."""
+        from ..interface.tokens import encrypt_api_key
+        
         config = {
             "url": self.gitlab_url,
-            "token": self.gitlab_token,
+            "token": encrypt_api_key(self.gitlab_token),  # Only organizations get tokens
             "group_id": int(group.id) if group.id is not None else None,
             "full_path": group.full_path,
-            "parent": int(group.parent_id) if group.parent_id is not None else None,  # Use 'parent' for compatibility
+            "parent": int(group.parent_id) if group.parent_id is not None else None,
+            "parent_id": int(group.parent_id) if group.parent_id is not None else None,
+            "namespace_id": group.namespace.get('id') if hasattr(group, 'namespace') else None,
+            "namespace_path": group.namespace.get('path') if hasattr(group, 'namespace') else None,
+            "web_url": f"{self.gitlab_url}/groups/{group.full_path}",
+            "visibility": group.visibility,
+            "last_synced_at": datetime.now(timezone.utc).isoformat()
+        }
+        return config
+    
+    def _create_child_gitlab_config(self, group: Group) -> Dict[str, Any]:
+        """Create GitLab configuration for course families and courses WITHOUT token."""
+        config = {
+            "url": self.gitlab_url,
+            # NO TOKEN - course families and courses get token from parent organization
+            "group_id": int(group.id) if group.id is not None else None,
+            "full_path": group.full_path,
+            "parent": int(group.parent_id) if group.parent_id is not None else None,
             "parent_id": int(group.parent_id) if group.parent_id is not None else None,
             "namespace_id": group.namespace.get('id') if hasattr(group, 'namespace') else None,
             "namespace_path": group.namespace.get('path') if hasattr(group, 'namespace') else None,

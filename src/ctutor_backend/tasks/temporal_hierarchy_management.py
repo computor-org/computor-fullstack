@@ -155,12 +155,30 @@ async def create_course_family_activity(
                 raise ValueError(f"Organization {organization_id} not found")
             
             # Extract GitLab config from organization
+            logger.info(f"🔍 DEBUG: Organization properties: {org.properties}")
             org_gitlab = org.properties.get("gitlab", {}) if org.properties else {}
-            gitlab_url = org_gitlab.get("url")
-            gitlab_token = org_gitlab.get("token")
+            logger.info(f"🔍 DEBUG: GitLab config: {org_gitlab}")
             
-            if not gitlab_url or not gitlab_token:
+            gitlab_url = org_gitlab.get("url")
+            encrypted_token = org_gitlab.get("token")
+            
+            logger.info(f"🔍 DEBUG: GitLab URL: {gitlab_url}")
+            logger.info(f"🔍 DEBUG: Has encrypted token: {bool(encrypted_token)}")
+            
+            if not gitlab_url or not encrypted_token:
+                logger.error(f"❌ Organization {org.title} is missing GitLab configuration:")
+                logger.error(f"   - Has properties: {bool(org.properties)}")
+                logger.error(f"   - Has gitlab config: {'gitlab' in (org.properties or {})}")
+                logger.error(f"   - Has URL: {bool(gitlab_url)}")
+                logger.error(f"   - Has token: {bool(encrypted_token)}")
                 raise ValueError("Organization missing GitLab configuration")
+            
+            # Decrypt the GitLab token
+            from ..interface.tokens import decrypt_api_key
+            try:
+                gitlab_token = decrypt_api_key(encrypted_token)
+            except Exception as e:
+                raise ValueError(f"Failed to decrypt GitLab token: {str(e)}")
                 
             # Transform localhost URLs for Docker environment
             gitlab_url = transform_localhost_url(gitlab_url)
@@ -280,10 +298,17 @@ async def create_course_activity(
             family_gitlab = family.properties.get("gitlab", {}) if family.properties else {}
             
             gitlab_url = org_gitlab.get("url")
-            gitlab_token = org_gitlab.get("token")
+            encrypted_token = org_gitlab.get("token")
             
-            if not gitlab_url or not gitlab_token:
+            if not gitlab_url or not encrypted_token:
                 raise ValueError("Organization missing GitLab configuration")
+            
+            # Decrypt the GitLab token
+            from ..interface.tokens import decrypt_api_key
+            try:
+                gitlab_token = decrypt_api_key(encrypted_token)
+            except Exception as e:
+                raise ValueError(f"Failed to decrypt GitLab token: {str(e)}")
                 
             # Transform localhost URLs for Docker environment
             gitlab_url = transform_localhost_url(gitlab_url)
@@ -832,6 +857,7 @@ class DeployComputorHierarchyWorkflow(BaseWorkflow):
                 workflow.logger.info(f"Processing organization {org_idx + 1}/{total_orgs}: {org_config['name']}")
                 
                 # Prepare GitLab configuration for this organization
+                # NOTE: This reads from deployment YAML, not database - token is not encrypted yet
                 gitlab_config = org_config.get("gitlab", {})
                 gitlab_url = gitlab_config.get("url", "")
                 gitlab_token = gitlab_config.get("token", "")

@@ -153,12 +153,20 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         gitlab_token = None
         if organization.properties and 'gitlab' in organization.properties:
             gitlab_config = organization.properties.get('gitlab', {})
-            gitlab_token = gitlab_config.get('token')  # Use 'token' field as defined in GitLabConfig
+            encrypted_token = gitlab_config.get('token')  # Use 'token' field as defined in GitLabConfig
+            
+            if encrypted_token:
+                # Decrypt the GitLab token
+                from ..interface.tokens import decrypt_api_key
+                try:
+                    gitlab_token = decrypt_api_key(encrypted_token)
+                    logger.info(f"Using decrypted GitLab token from organization {organization.title}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt GitLab token for organization {organization.title}: {str(e)}")
+                    gitlab_token = None
         
         if not gitlab_token:
             logger.warning(f"No GitLab token found in organization {organization.title} properties")
-        else:
-            logger.info(f"Using GitLab token from organization {organization.title}")
         
         # Use the URL passed from the API
         # Transform localhost to Docker host IP if running in container

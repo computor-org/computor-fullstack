@@ -23,6 +23,7 @@ from ..database import get_db
 from ..model.course import Course, CourseContent
 from ..model.example import Example, ExampleVersion, ExampleRepository
 from ..model.organization import Organization
+from ..model.example_deployment import ExampleDeployment
 from ..services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
@@ -217,6 +218,16 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         
         logger.info(f"Found {len(course_contents)} course contents with examples")
         
+        # Also get orphaned deployments (where CourseContent was deleted)
+        orphaned_deployments = db.query(ExampleDeployment).filter(
+            ExampleDeployment.course_id == course_id,
+            ExampleDeployment.course_content_id.is_(None),
+            ExampleDeployment.status == 'active'
+        ).all()
+        
+        if orphaned_deployments:
+            logger.info(f"Found {len(orphaned_deployments)} orphaned deployments to preserve")
+        
         if len(course_contents) == 0:
             logger.warning(f"No course contents with examples found for course {course_id}. This will result in an empty student template.")
         
@@ -284,6 +295,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 
                 if result['success']:
                     processed_count += 1
+                    # Track this successful processing for ExampleDeployment creation later
+                    # Store version info for this content
+                    if not hasattr(content, '_deployment_version'):
+                        content._deployment_version = version
                 else:
                     errors.append(f"Failed to process {content.path}: {result.get('error')}")
                 
@@ -386,11 +401,57 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             'error_count': len(errors)
         }
         
-        # Update CourseContent deployment status
+        # Create or update ExampleDeployment records
+        deployment_timestamp = datetime.now(timezone.utc)
+        
         for content in course_contents:
             if not any(str(content.path) in error for error in errors):
-                content.deployment_status = 'released'
-                content.deployed_at = datetime.now(timezone.utc)
+                # Update CourseContent status
+                content.deployment_status = 'deployed'
+                content.deployed_at = deployment_timestamp
+                
+                # Check for existing deployment at this path
+                existing_deployment = db.query(ExampleDeployment).filter(
+                    ExampleDeployment.course_id == course_id,
+                    ExampleDeployment.deployment_path == content.path,
+                    ExampleDeployment.status == 'active'
+                ).first()
+                
+                if existing_deployment:
+                    # Mark existing as replaced if it's a different version
+                    if hasattr(content, '_deployment_version'):
+                        if existing_deployment.example_version_id != content._deployment_version.id:
+                            existing_deployment.status = 'replaced'
+                            existing_deployment.removed_at = deployment_timestamp
+                            existing_deployment.removal_reason = 'replaced_by_new_version'
+                            
+                            # Create new deployment record
+                            new_deployment = ExampleDeployment(
+                                example_id=content.example_id,
+                                example_version_id=content._deployment_version.id,
+                                course_id=course_id,
+                                course_content_id=content.id,
+                                deployment_path=content.path,
+                                deployed_at=deployment_timestamp,
+                                status='active',
+                                commit_hash=commit_hash
+                            )
+                            db.add(new_deployment)
+                        # else: same version, no need to update
+                else:
+                    # Create new deployment record
+                    if hasattr(content, '_deployment_version'):
+                        new_deployment = ExampleDeployment(
+                            example_id=content.example_id,
+                            example_version_id=content._deployment_version.id,
+                            course_id=course_id,
+                            course_content_id=content.id,
+                            deployment_path=content.path,
+                            deployed_at=deployment_timestamp,
+                            status='active',
+                            commit_hash=commit_hash
+                        )
+                        db.add(new_deployment)
         
         db.commit()
         

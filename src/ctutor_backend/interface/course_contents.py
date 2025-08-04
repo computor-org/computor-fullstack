@@ -1,6 +1,6 @@
 from datetime import datetime
-from pydantic import BaseModel, field_validator, ConfigDict
-from typing import Optional
+from pydantic import BaseModel, field_validator, ConfigDict, Field
+from typing import Optional, List, Literal
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
@@ -11,8 +11,93 @@ from ctutor_backend.model.auth import User
 from sqlalchemy_utils import Ltree
 
 
+# Deployment History Models
+class DeploymentHistoryAction(BaseModel):
+    """Single deployment history action entry."""
+    action: Literal["deployed", "unassigned", "reassigned", "archived", "updated", "failed"] = Field(
+        description="Type of deployment action"
+    )
+    timestamp: datetime = Field(
+        description="When the action occurred"
+    )
+    example_id: Optional[str] = Field(
+        default=None,
+        description="Example ID involved in the action"
+    )
+    example_version: Optional[str] = Field(
+        default=None,
+        description="Example version at time of action"
+    )
+    previous_example_id: Optional[str] = Field(
+        default=None,
+        description="Previous example ID (for reassignment)"
+    )
+    previous_example_version: Optional[str] = Field(
+        default=None,
+        description="Previous example version (for reassignment)"
+    )
+    reason: Optional[str] = Field(
+        default=None,
+        description="Reason for the action (optional)"
+    )
+    performed_by: Optional[str] = Field(
+        default=None,
+        description="User ID who performed the action"
+    )
+    workflow_id: Optional[str] = Field(
+        default=None,
+        description="Temporal workflow ID if applicable"
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="Error message if action failed"
+    )
+    
+    model_config = ConfigDict(use_enum_values=True)
+
+
+class DeploymentHistory(BaseModel):
+    """Complete deployment history for a CourseContent."""
+    actions: List[DeploymentHistoryAction] = Field(
+        default_factory=list,
+        description="List of deployment actions in chronological order"
+    )
+    last_successful_deployment: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of last successful deployment"
+    )
+    last_successful_example_id: Optional[str] = Field(
+        default=None,
+        description="Example ID of last successful deployment"
+    )
+    last_successful_example_version: Optional[str] = Field(
+        default=None,
+        description="Example version of last successful deployment"
+    )
+    
+    def add_action(self, action: DeploymentHistoryAction) -> None:
+        """Add a new action to the history."""
+        self.actions.append(action)
+        
+        # Update last successful deployment if applicable
+        if action.action == "deployed" and not action.error_message:
+            self.last_successful_deployment = action.timestamp
+            self.last_successful_example_id = action.example_id
+            self.last_successful_example_version = action.example_version
+    
+    def get_latest_action(self) -> Optional[DeploymentHistoryAction]:
+        """Get the most recent action."""
+        return self.actions[-1] if self.actions else None
+    
+    model_config = ConfigDict(use_enum_values=True)
+
+
 class CourseContentProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None
+    deployment_history: Optional[DeploymentHistory] = Field(
+        default=None,
+        description="Complete deployment history for this content"
+    )
     
     model_config = ConfigDict(
         extra='allow',
@@ -20,6 +105,10 @@ class CourseContentProperties(BaseModel):
 
 class CourseContentPropertiesGet(BaseModel):
     gitlab: Optional[GitLabConfigGet] = None
+    deployment_history: Optional[DeploymentHistory] = Field(
+        default=None,
+        description="Complete deployment history for this content"
+    )
 
     model_config = ConfigDict(
         extra='allow',
@@ -32,12 +121,15 @@ class CourseContentCreate(BaseModel):
     course_id: str
     course_content_type_id: str
     properties: Optional[CourseContentProperties] = None
-    version_identifier: str
+    version_identifier: Optional[str] = None  # Made optional - will be deprecated
     position: float = 0
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    # Example assignment fields
+    example_id: Optional[str] = None
+    example_version: Optional[str] = None
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -51,7 +143,7 @@ class CourseContentGet(BaseEntityGet):
     course_content_type_id: str
     course_content_kind_id: str
     properties: Optional[CourseContentPropertiesGet] = None
-    version_identifier: str
+    version_identifier: Optional[str] = None  # Made optional - will be deprecated
     position: float
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
@@ -64,6 +156,8 @@ class CourseContentGet(BaseEntityGet):
     deployment_status: Optional[str] = None
     deployment_task_id: Optional[str] = None
     deployed_at: Optional[datetime] = None
+    is_customized: Optional[bool] = None
+    last_customized_at: Optional[datetime] = None
 
     course_content_type: Optional[CourseContentTypeGet] = None
 
@@ -81,7 +175,7 @@ class CourseContentList(BaseModel):
     course_id: str
     course_content_type_id: str
     course_content_kind_id: str
-    version_identifier: str
+    version_identifier: Optional[str] = None  # Made optional - will be deprecated
     position: float
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
@@ -94,6 +188,8 @@ class CourseContentList(BaseModel):
     deployment_status: Optional[str] = None
     deployment_task_id: Optional[str] = None
     deployed_at: Optional[datetime] = None
+    is_customized: Optional[bool] = None
+    last_customized_at: Optional[datetime] = None
     
     course_content_type: Optional[CourseContentTypeGet] = None
     

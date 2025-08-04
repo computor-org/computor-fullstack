@@ -20,10 +20,11 @@ from .result import Result
 from .role import Role, RoleClaim, UserRole
 from .group import Group, GroupClaim, UserGroup
 from .message import Message, MessageRead
-from .example import Example, ExampleRepository
+from .example import Example, ExampleRepository, ExampleVersion, ExampleDependency
+from .example_deployment import ExampleDeployment
 
 # Import all models to ensure relationships are properly set up
-from . import auth, organization, role, group, execution, course, result, message, example
+from . import auth, organization, role, group, execution, course, result, message, example, example_deployment
 
 __all__ = [
     'Base',
@@ -66,5 +67,8 @@ __all__ = [
     'MessageRead',
     # Example models
     'ExampleRepository',
-    'Example'
+    'Example',
+    'ExampleVersion',
+    'ExampleDependency',
+    'ExampleDeployment'
 ]

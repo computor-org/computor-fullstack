@@ -145,6 +145,9 @@ class Example(Base):
     # Dependency relationships
     dependencies = relationship("ExampleDependency", foreign_keys="ExampleDependency.example_id", back_populates="example")
     
+    # Deployment tracking
+    deployments = relationship("ExampleDeployment", back_populates="example")
+    
     # Constraints
     __table_args__ = (
         # Unique constraint: one example per directory per repository
@@ -227,6 +230,9 @@ class ExampleVersion(Base):
     # Relationships
     example = relationship("Example", back_populates="versions")
     created_by_user = relationship("User", foreign_keys=[created_by])
+    
+    # Deployment tracking
+    deployments = relationship("ExampleDeployment", back_populates="example_version")
     
     # Constraints
     __table_args__ = (

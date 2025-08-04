@@ -101,6 +101,7 @@ class Course(Base):
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
     course_submission_groups = relationship("CourseSubmissionGroup", back_populates="course", uselist=True)
     messages = relationship("Message", back_populates="course", uselist=True)
+    example_deployments = relationship("ExampleDeployment", back_populates="course", uselist=True)
 
 
 class CourseContentType(Base):
@@ -201,7 +202,7 @@ class CourseContent(Base):
     path = Column(LtreeType, nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    version_identifier = Column(String(2048), nullable=False)
+    version_identifier = Column(String(2048), nullable=True)  # Made nullable - deprecated field
     position = Column(Float(53), nullable=False)
     max_group_size = Column(Integer, nullable=False)
     max_test_runs = Column(Integer)
@@ -233,6 +234,9 @@ class CourseContent(Base):
     
     # Example relationships
     example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
+    
+    # Deployment tracking
+    example_deployments = relationship('ExampleDeployment', back_populates='course_content')
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(

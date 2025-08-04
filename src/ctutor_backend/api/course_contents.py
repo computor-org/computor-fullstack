@@ -17,6 +17,7 @@ from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseContent, Course
 from ctutor_backend.model.example import Example, ExampleVersion, ExampleDependency
+from ctutor_backend.model.example_deployment import ExampleDeployment
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 
@@ -155,6 +156,18 @@ async def assign_example_to_content(
             )
         version_tag = request.example_version
     
+    # Check for existing deployment at this path (if re-assigning)
+    existing_deployment = db.query(ExampleDeployment).filter(
+        ExampleDeployment.course_content_id == content.id,
+        ExampleDeployment.status == 'active'
+    ).first()
+    
+    if existing_deployment:
+        # Mark existing deployment as removed (will be replaced on next student-template generation)
+        existing_deployment.status = 'removed'
+        existing_deployment.removed_at = func.now()
+        existing_deployment.removal_reason = 'example_reassigned'
+    
     # Update course content
     content.example_id = request.example_id
     content.example_version = version_tag
@@ -211,10 +224,22 @@ async def remove_example_assignment(
             detail="Not authorized to modify this course content"
         )
     
+    # Find active deployment for this content
+    deployment = db.query(ExampleDeployment).filter(
+        ExampleDeployment.course_content_id == content.id,
+        ExampleDeployment.status == 'active'
+    ).first()
+    
+    if deployment:
+        # Mark deployment as removed but preserve the directory in student-template
+        deployment.status = 'removed'
+        deployment.removed_at = func.now()
+        deployment.removal_reason = 'example_unassigned'
+    
     # Clear example assignment
     content.example_id = None
     content.example_version = None
-    content.deployment_status = "pending_release"
+    content.deployment_status = "unassigned"
     
     db.commit()
     

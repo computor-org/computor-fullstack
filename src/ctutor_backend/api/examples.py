@@ -8,9 +8,11 @@ import logging
 import yaml
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime, timezone
 from sqlalchemy_utils import Ltree
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, or_
 
 from ..database import get_db
 from ..interface.permissions import Principal
@@ -26,6 +28,16 @@ from ..interface.example import (
     ExampleDownloadResponse,
 )
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
+from ..model.example_deployment import ExampleDeployment
+from ..model.course import Course, CourseContent
+from ..interface.example_deployment import (
+    ExampleDeploymentCreate,
+    ExampleDeploymentUpdate,
+    ExampleDeploymentGet,
+    ExampleDeploymentList,
+    CourseDeploymentState,
+    DeploymentStatusUpdate
+)
 from ..api.auth import get_current_permissions
 from ..api.exceptions import (
     NotFoundException,
@@ -541,5 +553,153 @@ async def download_example(
         meta_yaml=version.meta_yaml,
         test_yaml=version.test_yaml,
     )
+
+
+# ==============================================================================
+# Example Deployment Viewing Endpoints (Read-Only)
+# ==============================================================================
+
+@examples_router.get("/deployments/course/{course_id}", response_model=CourseDeploymentState)
+async def get_course_deployment_state(
+    course_id: str,
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions)
+) -> CourseDeploymentState:
+    """Get complete deployment state for a course."""
+    
+    # Check permissions
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise NotFoundException("Course not found")
+    
+    # TODO: Add proper permission check
+    # if not check_course_permissions(permissions, Course, "read", db).filter(Course.id == course_id).first():
+    #     raise ForbiddenException()
+    
+    # Get all deployments for the course
+    active_deployments = db.query(ExampleDeployment).options(
+        joinedload(ExampleDeployment.example),
+        joinedload(ExampleDeployment.example_version)
+    ).filter(
+        ExampleDeployment.course_id == course_id,
+        ExampleDeployment.status == 'active'
+    ).all()
+    
+    removed_deployments = db.query(ExampleDeployment).options(
+        joinedload(ExampleDeployment.example),
+        joinedload(ExampleDeployment.example_version)
+    ).filter(
+        ExampleDeployment.course_id == course_id,
+        ExampleDeployment.status.in_(['removed', 'replaced'])
+    ).all()
+    
+    # Convert to DTOs with nested data
+    active_dtos = []
+    for dep in active_deployments:
+        dto = ExampleDeploymentGet.model_validate(dep)
+        if dep.example:
+            dto.example_title = dep.example.title
+        if dep.example_version:
+            dto.example_version_tag = dep.example_version.version_tag
+        active_dtos.append(dto)
+    
+    removed_dtos = []
+    for dep in removed_deployments:
+        dto = ExampleDeploymentGet.model_validate(dep)
+        if dep.example:
+            dto.example_title = dep.example.title
+        if dep.example_version:
+            dto.example_version_tag = dep.example_version.version_tag
+        removed_dtos.append(dto)
+    
+    # Get repository URL from course properties
+    repository_url = ""
+    last_commit = None
+    if course.properties and 'gitlab' in course.properties:
+        gitlab_config = course.properties['gitlab']
+        if 'student_template_url' in gitlab_config:
+            repository_url = gitlab_config['student_template_url']
+    
+    if course.properties and 'last_template_release' in course.properties:
+        last_commit = course.properties['last_template_release'].get('commit_hash')
+    
+    return CourseDeploymentState(
+        course_id=str(course.id),
+        repository_url=repository_url,
+        last_commit=last_commit,
+        active_deployments=active_dtos,
+        removed_deployments=removed_dtos
+    )
+
+
+@examples_router.get("/deployments/{deployment_id}", response_model=ExampleDeploymentGet)
+async def get_deployment(
+    deployment_id: str,
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions)
+) -> ExampleDeploymentGet:
+    """Get a specific deployment record."""
+    
+    deployment = db.query(ExampleDeployment).options(
+        joinedload(ExampleDeployment.example),
+        joinedload(ExampleDeployment.example_version),
+        joinedload(ExampleDeployment.course)
+    ).filter(ExampleDeployment.id == deployment_id).first()
+    
+    if not deployment:
+        raise NotFoundException("Deployment not found")
+    
+    # TODO: Add permission check
+    
+    dto = ExampleDeploymentGet.model_validate(deployment)
+    if deployment.example:
+        dto.example_title = deployment.example.title
+    if deployment.example_version:
+        dto.example_version_tag = deployment.example_version.version_tag
+    if deployment.course:
+        dto.course_path = str(deployment.course.path)
+    
+    return dto
+
+
+
+
+@examples_router.get("/deployments/orphaned/{course_id}", response_model=List[ExampleDeploymentGet])
+async def get_orphaned_deployments(
+    course_id: str,
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions)
+) -> List[ExampleDeploymentGet]:
+    """Get deployments where CourseContent was deleted (orphaned)."""
+    
+    # Check course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise NotFoundException("Course not found")
+    
+    # TODO: Add permission check
+    
+    # Find deployments with no CourseContent
+    orphaned = db.query(ExampleDeployment).options(
+        joinedload(ExampleDeployment.example),
+        joinedload(ExampleDeployment.example_version)
+    ).filter(
+        ExampleDeployment.course_id == course_id,
+        ExampleDeployment.course_content_id.is_(None),
+        ExampleDeployment.status == 'active'
+    ).all()
+    
+    result = []
+    for dep in orphaned:
+        dto = ExampleDeploymentGet.model_validate(dep)
+        if dep.example:
+            dto.example_title = dep.example.title
+        if dep.example_version:
+            dto.example_version_tag = dep.example_version.version_tag
+        result.append(dto)
+    
+    return result
+
+
 
 

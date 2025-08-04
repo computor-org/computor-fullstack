@@ -657,3 +657,208 @@ class CreateCourseWorkflow(BaseWorkflow):
                 error=str(e),
                 metadata={"workflow_type": "create_course"}
             )
+
+
+@register_task
+@workflow.defn(name="deploy_computor_hierarchy", sandboxed=False)
+class DeployComputorHierarchyWorkflow(BaseWorkflow):
+    """
+    Orchestrator workflow that chains existing workflows to deploy a complete
+    organization -> course family -> course hierarchy from a deployment configuration.
+    
+    This workflow reuses the CreateOrganizationWorkflow, CreateCourseFamilyWorkflow,
+    and CreateCourseWorkflow to create the full hierarchy from a YAML configuration.
+    """
+    
+    @classmethod
+    def get_name(cls) -> str:
+        return "deploy_computor_hierarchy"
+    
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return "computor-tasks"
+    
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        return timedelta(minutes=30)
+    
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        """
+        Execute the deployment orchestration.
+        
+        Args:
+            parameters: Dictionary containing:
+                - deployment_config: Complete deployment configuration with:
+                    - organization: Organization configuration
+                    - course_family: Course family configuration  
+                    - course: Course configuration
+                    - deploy_examples: Whether to deploy examples (optional)
+                    - settings: Global settings (optional)
+                - user_id: ID of the user initiating the deployment
+            
+        Returns:
+            WorkflowResult with deployment status and created entity IDs
+        """
+        # Validate required parameters
+        if not parameters.get('deployment_config') or not parameters.get('user_id'):
+            error_msg = "Missing required parameters: deployment_config and user_id"
+            workflow.logger.error(error_msg)
+            return WorkflowResult(
+                status="failed",
+                result=None,
+                error=error_msg,
+                metadata={"workflow_type": "deploy_computor_hierarchy"}
+            )
+        
+        deployment_config = parameters['deployment_config']
+        user_id = parameters['user_id']
+        
+        try:
+            workflow.logger.info("Starting deployment orchestration")
+            
+            # Track created entities
+            created_entities = {
+                "organization": None,
+                "course_family": None,
+                "course": None
+            }
+            
+            # Prepare GitLab configuration
+            gitlab_config = deployment_config["organization"].get("gitlab", {})
+            gitlab_url = gitlab_config.get("url", "")
+            gitlab_token = gitlab_config.get("token", "")
+            
+            # Handle environment variable substitution for token
+            if gitlab_token.startswith("${") and gitlab_token.endswith("}"):
+                import os
+                env_var = gitlab_token[2:-1]
+                gitlab_token = os.environ.get(env_var, "")
+            
+            # Step 1: Create Organization using existing workflow
+            workflow.logger.info("Triggering organization creation workflow...")
+            org_params = {
+                "org_config": deployment_config["organization"],
+                "gitlab_url": gitlab_url,
+                "gitlab_token": gitlab_token,
+                "user_id": user_id
+            }
+            
+            org_workflow_handle = await workflow.start_child_workflow(
+                CreateOrganizationWorkflow.run,
+                args=[org_params],
+                id=f"create-org-{workflow.info().workflow_id}",
+                task_queue="computor-tasks",
+                execution_timeout=timedelta(minutes=10)
+            )
+            
+            org_result = await org_workflow_handle
+            
+            if org_result.status != "completed":
+                raise Exception(f"Organization creation failed: {org_result.error}")
+            
+            created_entities["organization"] = org_result.result
+            org_id = org_result.result.get("organization_id")
+            workflow.logger.info(f"Organization created with ID: {org_id}")
+            
+            # Step 2: Create Course Family using existing workflow
+            workflow.logger.info("Triggering course family creation workflow...")
+            family_params = {
+                "family_config": deployment_config["course_family"],
+                "organization_id": str(org_id),
+                "user_id": user_id
+            }
+            
+            family_workflow_handle = await workflow.start_child_workflow(
+                CreateCourseFamilyWorkflow.run,
+                args=[family_params],
+                id=f"create-family-{workflow.info().workflow_id}",
+                task_queue="computor-tasks",
+                execution_timeout=timedelta(minutes=10)
+            )
+            
+            family_result = await family_workflow_handle
+            
+            if family_result.status != "completed":
+                raise Exception(f"Course family creation failed: {family_result.error}")
+            
+            created_entities["course_family"] = family_result.result
+            family_id = family_result.result.get("course_family_id")
+            workflow.logger.info(f"Course family created with ID: {family_id}")
+            
+            # Step 3: Create Course using existing workflow
+            workflow.logger.info("Triggering course creation workflow...")
+            course_params = {
+                "course_config": deployment_config["course"],
+                "course_family_id": str(family_id),
+                "user_id": user_id
+            }
+            
+            course_workflow_handle = await workflow.start_child_workflow(
+                CreateCourseWorkflow.run,
+                args=[course_params],
+                id=f"create-course-{workflow.info().workflow_id}",
+                task_queue="computor-tasks",
+                execution_timeout=timedelta(minutes=10)
+            )
+            
+            course_result = await course_workflow_handle
+            
+            if course_result.status != "completed":
+                raise Exception(f"Course creation failed: {course_result.error}")
+            
+            created_entities["course"] = course_result.result
+            course_id = course_result.result.get("course_id")
+            workflow.logger.info(f"Course created with ID: {course_id}")
+            
+            # Step 4: Deploy examples if configured
+            if deployment_config.get("deploy_examples", False):
+                workflow.logger.info("Example deployment requested - would trigger temporal_examples workflow")
+                # TODO: Trigger temporal_examples workflow when ready
+                # example_workflow_handle = await workflow.start_child_workflow(
+                #     "deploy_examples",
+                #     args=[{"course_id": course_id, "config": deployment_config}],
+                #     id=f"deploy-examples-{workflow.info().workflow_id}",
+                #     task_queue="computor-tasks",
+                #     execution_timeout=timedelta(minutes=30)
+                # )
+                # await example_workflow_handle
+            
+            # Build full path
+            full_path = (
+                f"{deployment_config['organization']['path']}/"
+                f"{deployment_config['course_family']['path']}/"
+                f"{deployment_config['course']['path']}"
+            )
+            
+            # Build success result
+            result_data = {
+                "deployment_status": "success",
+                "created_entities": created_entities,
+                "full_path": full_path,
+                "organization_id": str(org_id),
+                "course_family_id": str(family_id),
+                "course_id": str(course_id)
+            }
+            
+            workflow.logger.info(f"Deployment orchestration completed successfully. Full path: {full_path}")
+            return WorkflowResult(
+                status="completed",
+                result=result_data,
+                metadata={
+                    "workflow_type": "deploy_computor_hierarchy",
+                    "full_path": full_path
+                }
+            )
+            
+        except Exception as e:
+            workflow.logger.error(f"Deployment orchestration failed: {str(e)}")
+            return WorkflowResult(
+                status="failed",
+                result={
+                    "created_entities": created_entities,
+                    "partial_deployment": any(created_entities.values())
+                },
+                error=str(e),
+                metadata={"workflow_type": "deploy_computor_hierarchy"}
+            )

@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilderNew
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,

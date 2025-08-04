@@ -129,7 +129,7 @@ For existing courses:
 
 - **New API**: `src/ctutor_backend/api/course_content_examples.py`
 - **New Workflow**: `src/ctutor_backend/tasks/temporal_student_template_v2.py`
-- **Modified Builder**: `src/ctutor_backend/generator/gitlab_builder_new.py`
+- **Modified Builder**: `src/ctutor_backend/generator/gitlab_builder.py`
 - **Frontend Guide**: `docs/FRONTEND_EXAMPLE_ASSIGNMENT.md`
 
 ## Testing

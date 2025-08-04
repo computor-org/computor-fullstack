@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 env_file = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_file)
 
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilderNew
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,

@@ -29,7 +29,7 @@ async def create_organization_activity(
 ) -> Dict[str, Any]:
     """Activity to create an organization using GitLabBuilderNew."""
     # Import GitLabBuilderNew inside activity to avoid workflow sandbox restrictions
-    from ..generator.gitlab_builder_new import GitLabBuilderNew
+    from ..generator.gitlab_builder import GitLabBuilderNew
     
     logger.info(f"Starting organization creation activity for: {org_config.get('name')}")
     logger.info(f"GitLab URL: {gitlab_url}")
@@ -138,7 +138,7 @@ async def create_course_family_activity(
 ) -> Dict[str, Any]:
     """Activity to create a course family using GitLabBuilderNew."""
     # Import GitLabBuilderNew inside activity to avoid workflow sandbox restrictions
-    from ..generator.gitlab_builder_new import GitLabBuilderNew
+    from ..generator.gitlab_builder import GitLabBuilderNew
     
     logger.info(f"Starting course family creation activity for: {family_config.get('name')}")
     logger.info(f"Organization ID: {organization_id}")
@@ -272,7 +272,7 @@ async def create_course_activity(
 ) -> Dict[str, Any]:
     """Activity to create a course using GitLabBuilderNew."""
     # Import GitLabBuilderNew inside activity to avoid workflow sandbox restrictions
-    from ..generator.gitlab_builder_new import GitLabBuilderNew
+    from ..generator.gitlab_builder import GitLabBuilderNew
     
     logger.info(f"Starting course creation activity for: {course_config.get('name')}")
     logger.info(f"Course Family ID: {course_family_id}")

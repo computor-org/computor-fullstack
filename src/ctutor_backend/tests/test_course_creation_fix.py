@@ -15,7 +15,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilderNew
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy_utils import Ltree
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
 
 from ..database import get_db
 from ..interface.permissions import Principal
@@ -417,15 +417,34 @@ async def upload_example(
         example.tags = tags
         example.updated_by = permissions.user_id
     
-    # Get next version number
-    last_version = db.query(ExampleVersion).filter(
-        ExampleVersion.example_id == example.id
-    ).order_by(ExampleVersion.version_number.desc()).first()
+    # Check if this version already exists
+    existing_version = db.query(ExampleVersion).filter(
+        ExampleVersion.example_id == example.id,
+        ExampleVersion.version_tag == request.version_tag
+    ).first()
     
-    next_version_number = (last_version.version_number + 1) if last_version else 1
+    # Check if meta.yaml indicates this should update an existing version
+    should_update = meta_data.get('update_existing', False) or meta_data.get('overwrite', False)
     
-    # Prepare storage path
-    storage_path = f"examples/{repository.id}/{example.directory}/v{next_version_number}"
+    if existing_version and not should_update:
+        raise BadRequestException(
+            f"Version '{request.version_tag}' already exists for this example. "
+            f"To update it, add 'update_existing: true' to meta.yaml or use a different version tag."
+        )
+    
+    # Determine version number and storage path
+    if existing_version:
+        # Updating existing version
+        version_number = existing_version.version_number
+        storage_path = existing_version.storage_path
+    else:
+        # Creating new version
+        last_version = db.query(ExampleVersion).filter(
+            ExampleVersion.example_id == example.id
+        ).order_by(ExampleVersion.version_number.desc()).first()
+        
+        version_number = (last_version.version_number + 1) if last_version else 1
+        storage_path = f"examples/{repository.id}/{example.directory}/v{version_number}"
     
     # Upload files to MinIO
     bucket_name = repository.source_url.split('/')[0]  # First part is bucket
@@ -450,18 +469,26 @@ async def upload_example(
             content_type=content_type,
         )
     
-    # Create version record
-    version = ExampleVersion(
-        example_id=example.id,
-        version_tag=request.version_tag,
-        version_number=next_version_number,
-        storage_path=storage_path,
-        meta_yaml=meta_content,
-        test_yaml=test_yaml_content,
-        created_by=permissions.user_id,
-    )
+    # Create or update version record
+    if existing_version:
+        # Update existing version
+        existing_version.meta_yaml = meta_content
+        existing_version.test_yaml = test_yaml_content
+        existing_version.updated_at = func.now()
+        version = existing_version
+    else:
+        # Create new version
+        version = ExampleVersion(
+            example_id=example.id,
+            version_tag=request.version_tag,
+            version_number=version_number,
+            storage_path=storage_path,
+            meta_yaml=meta_content,
+            test_yaml=test_yaml_content,
+            created_by=permissions.user_id,
+        )
+        db.add(version)
     
-    db.add(version)
     db.commit()
     db.refresh(version)
     

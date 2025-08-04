@@ -101,7 +101,6 @@ class Course(Base):
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
     course_submission_groups = relationship("CourseSubmissionGroup", back_populates="course", uselist=True)
     messages = relationship("Message", back_populates="course", uselist=True)
-    example_deployments = relationship("ExampleDeployment", back_populates="course", uselist=True)
 
 
 class CourseContentType(Base):
@@ -213,14 +212,10 @@ class CourseContent(Base):
     example_id = Column(UUID, ForeignKey('example.id'), nullable=True)
     example_version = Column(String(64), nullable=True)
     
-    # Deployment tracking
+    # Deployment tracking (basic status only)
     deployed_at = Column(DateTime(True), nullable=True)
     deployment_status = Column(String(32), server_default=text("'pending'"))  # pending, deploying, deployed, failed
-    deployment_task_id = Column(String(128), nullable=True)  # Temporal workflow ID
     
-    # Customization tracking
-    is_customized = Column(Boolean, server_default=text("false"))  # True if modified after deployment
-    last_customized_at = Column(DateTime(True), nullable=True)
 
     # Relationships
     course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")
@@ -236,7 +231,6 @@ class CourseContent(Base):
     example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
     
     # Deployment tracking
-    example_deployments = relationship('ExampleDeployment', back_populates='course_content')
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(

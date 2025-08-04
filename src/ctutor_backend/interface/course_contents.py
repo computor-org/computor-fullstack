@@ -130,6 +130,8 @@ class CourseContentCreate(BaseModel):
     # Example assignment fields
     example_id: Optional[str] = None
     example_version: Optional[str] = None
+    deployment_status: Optional[str] = None
+    deployed_at: Optional[datetime] = None
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -150,14 +152,11 @@ class CourseContentGet(BaseEntityGet):
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
     
-    # Example deployment fields
+    # Example assignment fields
     example_id: Optional[str] = None
     example_version: Optional[str] = None
     deployment_status: Optional[str] = None
-    deployment_task_id: Optional[str] = None
     deployed_at: Optional[datetime] = None
-    is_customized: Optional[bool] = None
-    last_customized_at: Optional[datetime] = None
 
     course_content_type: Optional[CourseContentTypeGet] = None
 
@@ -182,14 +181,11 @@ class CourseContentList(BaseModel):
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
     
-    # Example deployment fields
+    # Example assignment fields
     example_id: Optional[str] = None
     example_version: Optional[str] = None
     deployment_status: Optional[str] = None
-    deployment_task_id: Optional[str] = None
     deployed_at: Optional[datetime] = None
-    is_customized: Optional[bool] = None
-    last_customized_at: Optional[datetime] = None
     
     course_content_type: Optional[CourseContentTypeGet] = None
     

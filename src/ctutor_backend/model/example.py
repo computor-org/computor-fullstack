@@ -146,7 +146,6 @@ class Example(Base):
     dependencies = relationship("ExampleDependency", foreign_keys="ExampleDependency.example_id", back_populates="example")
     
     # Deployment tracking
-    deployments = relationship("ExampleDeployment", back_populates="example")
     
     # Constraints
     __table_args__ = (
@@ -232,7 +231,6 @@ class ExampleVersion(Base):
     created_by_user = relationship("User", foreign_keys=[created_by])
     
     # Deployment tracking
-    deployments = relationship("ExampleDeployment", back_populates="example_version")
     
     # Constraints
     __table_args__ = (

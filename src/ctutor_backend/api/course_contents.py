@@ -6,7 +6,7 @@ from typing import Annotated, Optional, List, Dict, Any
 from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, or_
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
@@ -17,7 +17,6 @@ from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseContent, Course
 from ctutor_backend.model.example import Example, ExampleVersion, ExampleDependency
-from ctutor_backend.model.example_deployment import ExampleDeployment
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 
@@ -67,6 +66,11 @@ async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Prin
 
 course_content_router.on_created.append(event_wrapper)
 course_content_router.on_updated.append(event_wrapper)
+
+
+# Note: We don't need to track CourseContent deletion in ExampleDeployment
+# The deployment tracks what's actually in the student-template repository,
+# not what CourseContent intends to deploy
 
 
 # DTOs for Example Assignment
@@ -156,17 +160,8 @@ async def assign_example_to_content(
             )
         version_tag = request.example_version
     
-    # Check for existing deployment at this path (if re-assigning)
-    existing_deployment = db.query(ExampleDeployment).filter(
-        ExampleDeployment.course_content_id == content.id,
-        ExampleDeployment.status == 'active'
-    ).first()
-    
-    if existing_deployment:
-        # Mark existing deployment as removed (will be replaced on next student-template generation)
-        existing_deployment.status = 'removed'
-        existing_deployment.removed_at = func.now()
-        existing_deployment.removal_reason = 'example_reassigned'
+    # Note: ExampleDeployment tracking happens during student-template generation,
+    # not during assignment. This just updates the CourseContent's intent.
     
     # Update course content
     content.example_id = request.example_id
@@ -224,17 +219,8 @@ async def remove_example_assignment(
             detail="Not authorized to modify this course content"
         )
     
-    # Find active deployment for this content
-    deployment = db.query(ExampleDeployment).filter(
-        ExampleDeployment.course_content_id == content.id,
-        ExampleDeployment.status == 'active'
-    ).first()
-    
-    if deployment:
-        # Mark deployment as removed but preserve the directory in student-template
-        deployment.status = 'removed'
-        deployment.removed_at = func.now()
-        deployment.removal_reason = 'example_unassigned'
+    # Note: ExampleDeployment removal happens during next student-template generation,
+    # not during unassignment. This just updates the CourseContent's intent.
     
     # Clear example assignment
     content.example_id = None

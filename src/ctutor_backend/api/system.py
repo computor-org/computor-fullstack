@@ -1129,11 +1129,14 @@ async def create_hierarchy(
     
     workflow_id = await task_executor.submit_task(task_submission)
     
+    # Get first organization name for message
+    org_name = config.organizations[0].name if config.organizations else "Unknown Organization"
+    
     return {
         "workflow_id": workflow_id,
         "status": "started",
         "deployment_path": config.get_full_course_path(),
-        "message": f"Deployment started for {config.organization.name}"
+        "message": f"Deployment started for {org_name}"
     }
 
 

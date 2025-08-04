@@ -234,27 +234,35 @@ async def validate_deployment_config(
             "errors": [],
             "warnings": [],
             "info": {
-                "organization": config.organization.name,
-                "course_family": config.course_family.name,
-                "course": config.course.name,
+                "organizations_count": len(config.organizations),
+                "total_courses": sum(
+                    len(family.courses) 
+                    for org in config.organizations 
+                    for family in org.course_families
+                ),
+                "entity_counts": config.count_entities(),
+                "deployment_paths": config.get_deployment_paths(),
                 "full_path": config.get_full_course_path()
             }
         }
         
         # Check for potential issues
-        if not config.organization.gitlab and not config.organization.github:
-            validation_result["warnings"].append(
-                "No repository configuration (GitLab/GitHub) specified"
-            )
-        
-        if config.course.max_submissions and config.course.max_submissions < 1:
-            validation_result["errors"].append("max_submissions must be at least 1")
+        if not config.organizations:
+            validation_result["errors"].append("At least one organization must be configured")
             validation_result["valid"] = False
         
-        if not config.course.execution_backends:
-            validation_result["warnings"].append(
-                "No execution backends configured for the course"
-            )
+        for org in config.organizations:
+            if not org.gitlab and not org.github:
+                validation_result["warnings"].append(
+                    f"No repository configuration (GitLab/GitHub) specified for organization '{org.name}'"
+                )
+            
+            for family in org.course_families:
+                for course in family.courses:
+                    if not course.execution_backends:
+                        validation_result["warnings"].append(
+                            f"No execution backends configured for course '{course.name}' in '{org.name}/{family.name}'"
+                        )
         
         return validation_result
         

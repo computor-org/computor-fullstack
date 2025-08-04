@@ -127,15 +127,39 @@ class CourseConfig(BaseDeployment):
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course-specific settings")
 
 
+# Hierarchical configuration classes for nested structure
+
+class HierarchicalCourseConfig(CourseConfig):
+    """Course configuration for hierarchical deployment."""
+    pass  # Inherits all fields from CourseConfig
+
+
+class HierarchicalCourseFamilyConfig(CourseFamilyConfig):
+    """Course family configuration with nested courses."""
+    courses: List[HierarchicalCourseConfig] = Field(
+        default_factory=list,
+        description="List of courses in this course family"
+    )
+
+
+class HierarchicalOrganizationConfig(OrganizationConfig):
+    """Organization configuration with nested course families."""
+    course_families: List[HierarchicalCourseFamilyConfig] = Field(
+        default_factory=list,
+        description="List of course families in this organization"
+    )
+
+
 class ComputorDeploymentConfig(BaseDeployment):
     """
-    Complete deployment configuration for creating an organization -> course family -> course hierarchy.
+    Hierarchical deployment configuration for creating organization -> course family -> course structures.
     
-    This configuration can be used to deploy a complete course structure through Temporal workflows.
+    Supports deploying multiple organizations, each with multiple course families and courses.
     """
-    organization: OrganizationConfig = Field(description="Organization configuration")
-    course_family: CourseFamilyConfig = Field(description="Course family configuration")  # Renamed from courseFamily
-    course: CourseConfig = Field(description="Course configuration")
+    # Hierarchical structure - list of organizations with nested course families and courses
+    organizations: List[HierarchicalOrganizationConfig] = Field(
+        description="List of organizations with nested course families and courses"
+    )
     
     # Global deployment settings
     settings: Optional[Dict[str, Any]] = Field(
@@ -143,58 +167,189 @@ class ComputorDeploymentConfig(BaseDeployment):
         description="Global deployment settings"
     )
     
-    # Deployment metadata
-    version: Optional[str] = Field("1.0", description="Deployment configuration version")
+    def validate_structure(self) -> bool:
+        """Validate the deployment configuration structure."""
+        return len(self.organizations) > 0
     
-    def validate_paths(self) -> bool:
-        """Validate that paths form a proper hierarchy."""
-        # Paths should be hierarchical: org/family/course
-        expected_family_path = f"{self.organization.path}/{self.course_family.path}"
-        expected_course_path = f"{expected_family_path}/{self.course.path}"
-        
-        # This is a soft validation - paths can be customized
-        return True
+    def count_entities(self) -> Dict[str, int]:
+        """Count the total number of entities to be created."""
+        org_count = len(self.organizations)
+        family_count = sum(len(org.course_families) for org in self.organizations)
+        course_count = sum(
+            len(family.courses) 
+            for org in self.organizations 
+            for family in org.course_families
+        )
+        return {
+            "organizations": org_count, 
+            "course_families": family_count, 
+            "courses": course_count
+        }
+    
+    def get_deployment_paths(self) -> List[str]:
+        """Get all the hierarchical paths that will be created."""
+        paths = []
+        for org in self.organizations:
+            for family in org.course_families:
+                for course in family.courses:
+                    paths.append(f"{org.path}/{family.path}/{course.path}")
+        return paths
     
     def get_full_course_path(self) -> str:
-        """Get the full hierarchical path for the course."""
-        return f"{self.organization.path}/{self.course_family.path}/{self.course.path}"
+        """Get the full course path for the primary deployment."""
+        if not self.organizations:
+            return ""
+        
+        # Return the first organization/course family/course path
+        org = self.organizations[0]
+        if not org.course_families:
+            return org.path
+        
+        family = org.course_families[0]
+        if not family.courses:
+            return f"{org.path}/{family.path}"
+        
+        course = family.courses[0]
+        return f"{org.path}/{family.path}/{course.path}"
 
 
-# Example deployment configuration
+# Example deployment configurations
+
+# Simple single organization deployment
 EXAMPLE_DEPLOYMENT = ComputorDeploymentConfig(
-    organization=OrganizationConfig(
-        name="Computer Science Department",
-        path="cs-dept",
-        description="Department of Computer Science",
-        gitlab=GitLabConfig(
-            url="https://gitlab.example.com",
-            token="<token>",
-            parent=0  # Root level group
+    organizations=[
+        HierarchicalOrganizationConfig(
+            name="Computer Science Department",
+            path="cs-dept",
+            description="Department of Computer Science",
+            gitlab=GitLabConfig(
+                url="https://gitlab.example.com",
+                token="<token>",
+                parent=0
+            ),
+            course_families=[
+                HierarchicalCourseFamilyConfig(
+                    name="Programming Fundamentals",
+                    path="programming",
+                    description="Core programming courses",
+                    courses=[
+                        HierarchicalCourseConfig(
+                            name="Python Programming",
+                            path="python-2025s",
+                            description="Introduction to Python programming",
+                            projects=CourseProjects(
+                                tests="tests",
+                                student_template="student-template",
+                                reference="reference",
+                                examples="examples",
+                                documents="docs"
+                            ),
+                            execution_backends=[
+                                ExecutionBackendConfig(
+                                    slug="python-3.11",
+                                    type="python",
+                                    version="3.11",
+                                    settings={"timeout": 30}
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
         )
-    ),
-    course_family=CourseFamilyConfig(
-        name="Programming Fundamentals",
-        path="prog-fundamentals",
-        description="Introductory programming courses"
-    ),
-    course=CourseConfig(
-        name="Python Programming",
-        path="python-2025s",
-        description="Introduction to Python programming",
-        projects=CourseProjects(
-            tests="tests",
-            student_template="student-template",
-            reference="reference",
-            examples="examples",
-            documents="docs"
+    ]
+)
+
+# Multi-organization deployment example
+EXAMPLE_MULTI_DEPLOYMENT = ComputorDeploymentConfig(
+    organizations=[
+        HierarchicalOrganizationConfig(
+            name="Technical University",
+            path="tech-uni",
+            description="Technical University Computer Science",
+            gitlab=GitLabConfig(
+                url="https://gitlab.example.com",
+                token="<token>",
+                parent=0
+            ),
+            course_families=[
+                HierarchicalCourseFamilyConfig(
+                    name="Programming Fundamentals",
+                    path="programming",
+                    description="Core programming courses",
+                    courses=[
+                        HierarchicalCourseConfig(
+                            name="Python Programming",
+                            path="python-2025s",
+                            description="Introduction to Python programming",
+                            execution_backends=[
+                                ExecutionBackendConfig(
+                                    slug="python-3.11",
+                                    type="python",
+                                    version="3.11",
+                                    settings={"timeout": 30}
+                                )
+                            ]
+                        ),
+                        HierarchicalCourseConfig(
+                            name="Java Programming",
+                            path="java-2025s",
+                            description="Introduction to Java programming",
+                            execution_backends=[
+                                ExecutionBackendConfig(
+                                    slug="java-17",
+                                    type="java",
+                                    version="17",
+                                    settings={"timeout": 45}
+                                )
+                            ]
+                        )
+                    ]
+                ),
+                HierarchicalCourseFamilyConfig(
+                    name="Data Science",
+                    path="data-science",
+                    description="Data analysis and machine learning",
+                    courses=[
+                        HierarchicalCourseConfig(
+                            name="Statistics with R",
+                            path="stats-r-2025s",
+                            description="Statistical analysis using R",
+                            execution_backends=[
+                                ExecutionBackendConfig(
+                                    slug="r-4.3",
+                                    type="r",
+                                    version="4.3",
+                                    settings={"timeout": 60}
+                                )
+                            ]
+                        )
+                    ]
+                )
+            ]
         ),
-        execution_backends=[
-            ExecutionBackendConfig(
-                slug="python-3.11",
-                type="python",
-                version="3.11",
-                settings={"timeout": 30}
-            )
-        ]
-    )
+        HierarchicalOrganizationConfig(
+            name="Business School",
+            path="business",
+            description="Business School IT Department",
+            course_families=[
+                HierarchicalCourseFamilyConfig(
+                    name="Business Analytics",
+                    path="analytics",
+                    description="Data analysis for business",
+                    courses=[
+                        HierarchicalCourseConfig(
+                            name="Excel Analytics",
+                            path="excel-2025s",
+                            description="Advanced Excel for business analysis"
+                        )
+                    ]
+                )
+            ]
+        )
+    ],
+    settings={
+        "deployment_notes": "Multi-university deployment example",
+        "created_by": "system_admin"
+    }
 )

@@ -126,11 +126,6 @@ class CourseConfig(BaseDeployment):
         description="Available execution backends for this course"
     )
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course-specific settings")
-    
-    # Course-specific limits (moved from example meta)
-    max_test_runs: Optional[int] = Field(None, description="Maximum test runs per student")
-    max_submissions: Optional[int] = Field(None, description="Maximum submissions allowed")
-    max_group_size: Optional[int] = Field(None, description="Maximum group size for assignments")
 
 
 class ComputorDeploymentConfig(BaseDeployment):
@@ -151,14 +146,6 @@ class ComputorDeploymentConfig(BaseDeployment):
     
     # Deployment metadata
     version: Optional[str] = Field("1.0", description="Deployment configuration version")
-    deploy_examples: Optional[bool] = Field(
-        False, 
-        description="Whether to deploy example content during creation"
-    )
-    create_student_groups: Optional[bool] = Field(
-        True, 
-        description="Whether to create student groups during deployment"
-    )
     
     def validate_paths(self) -> bool:
         """Validate that paths form a proper hierarchy."""
@@ -210,11 +197,6 @@ EXAMPLE_DEPLOYMENT = ComputorDeploymentConfig(
                 version="3.11",
                 settings={"timeout": 30}
             )
-        ],
-        max_submissions=10,
-        max_test_runs=50,
-        max_group_size=2
-    ),
-    deploy_examples=True,
-    create_student_groups=True
+        ]
+    )
 )

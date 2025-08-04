@@ -1,6 +1,5 @@
 from collections import defaultdict
 from uuid import UUID
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from typing import Annotated, Optional, List, Dict, Any
@@ -24,6 +23,13 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeCreat
 from ctutor_backend.interface.student_profile import StudentProfileCreate
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserCreate, UserGet, UserTypeEnum
+from ctutor_backend.interface.system import (
+    StudentCreate, ReleaseStudentsCreate, TUGStudentExport, ReleaseCourseCreate,
+    ReleaseCourseContentCreate, StatusQuery, CourseReleaseUpdate, GitLabCredentials,
+    OrganizationTaskRequest, CourseFamilyTaskRequest, CourseTaskRequest, TaskResponse,
+    PendingChange, PendingChangesResponse, GenerateTemplateRequest, GenerateTemplateResponse,
+    BulkAssignExamplesRequest
+)
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
 from ctutor_backend.model.organization import Organization  
 from ctutor_backend.model.auth import User, StudentProfile
@@ -82,17 +88,6 @@ def get_computor_deployment_from_course_id_db(course_id: UUID | str, db: Session
         raise NotImplementedError()
 
     return deployment
-
-class StudentCreate(BaseModel):
-    user_id: Optional[UUID | str] = None
-    user: Optional[UserGet] = None
-    course_group_id: Optional[UUID | str] = None
-    course_group_title: Optional[str] = None
-    role: Optional[str] = None
-
-class ReleaseStudentsCreate(BaseModel):
-   students: list[StudentCreate] = []
-   course_id: UUID | str
 
 @system_router.post("/release/students", response_model=dict)
 async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
@@ -153,14 +148,6 @@ async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[
     
     return {"task_id": task_id}
   
-class TUGStudentExport(BaseModel):
-   course_group_title: str
-   family_name: str
-   given_name: str
-   matriculation_number: str
-   created_at: str
-   email: str
-
 @system_router.post("/release/students/export", response_model=list[TUGStudentExport])
 async def create_student_from_export(permissions: Annotated[Principal, Depends(get_current_permissions)], course_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
 
@@ -351,12 +338,6 @@ async def create_course_client(course_id: str | None, deployment: ComputorDeploy
     
     return {"task_id": task_id}
 
-class ReleaseCourseCreate(BaseModel):
-    course_id: Optional[str] = None
-    gitlab_url: Optional[str] = None
-    descendants: Optional[bool] = False
-    deployment: Optional[ComputorDeploymentConfig] = None
-
 @system_router.post("/release/courses", response_model=dict)
 async def release_course(payload: ReleaseCourseCreate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
     if payload.course_id != None:
@@ -376,14 +357,6 @@ async def release_course(payload: ReleaseCourseCreate, permissions: Annotated[Pr
 
     return await create_course_client(course_id,get_computor_deployment_from_course_id_db(course_id, db),None,None,payload.descendants)
 
-class ReleaseCourseContentCreate(BaseModel):
-    release_dir: Optional[str] = None
-    course_id: Optional[str] = None
-    gitlab_url: Optional[str] = None
-    ascendants: bool = False
-    descendants: bool = False
-    release_dir_list: list[str] = []
-
 @system_router.post("/release/course-contents", response_model=dict)
 async def release_course_content(payload: ReleaseCourseContentCreate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
@@ -400,9 +373,6 @@ async def release_course_content(payload: ReleaseCourseContentCreate, permission
       raise NotFoundException()
 
     return await create_course_client(course_id, get_computor_deployment_from_course_id_db(course_id, db), payload.release_dir, payload.ascendants, payload.descendants,payload.release_dir_list)
-
-class StatusQuery(BaseModel):
-   course_id: Optional[str] = None
 
 @system_router.get("/status/{task_id}", response_model=dict)
 async def system_job_status(task_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: StatusQuery = Depends()):
@@ -464,10 +434,6 @@ async def system_job_status(task_id: UUID | str, permissions: Annotated[Principa
 
 
 # SYSTEM RESPONSE ROUTES - NOT CALLABLE FROM NON-SYSTEM CLIENTS
-
-class CourseReleaseUpdate(BaseModel):
-   course: Optional[CourseUpdate] = None
-   course_content_types: list[CourseContentTypeCreate]
 
 @system_router.patch("/release/courses/{course_id}/callback", response_model=bool)
 async def release_course_response(
@@ -536,40 +502,6 @@ async def release_course_response(
 
 
 # HIERARCHY TASK ENDPOINTS
-
-class GitLabCredentials(BaseModel):
-    """GitLab connection credentials."""
-    gitlab_url: str
-    gitlab_token: str
-
-
-class OrganizationTaskRequest(BaseModel):
-    """Request to create an organization via Temporal workflow."""
-    organization: dict  # OrganizationCreate data
-    gitlab: GitLabCredentials
-    parent_group_id: int
-
-
-class CourseFamilyTaskRequest(BaseModel):
-    """Request to create a course family via Temporal workflow."""
-    course_family: dict  # CourseFamilyCreate data
-    organization_id: str
-    gitlab: Optional[GitLabCredentials] = None  # Optional - will use org's GitLab config if not provided
-
-
-class CourseTaskRequest(BaseModel):
-    """Request to create a course via Temporal workflow."""
-    course: dict  # CourseCreate data
-    course_family_id: str
-    gitlab: Optional[GitLabCredentials] = None  # Optional - will use course family's GitLab config if not provided
-
-
-class TaskResponse(BaseModel):
-    """Response with task ID for async operation."""
-    task_id: str
-    status: str
-    message: str
-
 
 def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: Optional[int], path: str) -> dict:
     """Convert GitLab credentials to config format."""
@@ -749,47 +681,6 @@ async def create_course_async(
 
 
 # GitLab Release System Endpoints
-
-class PendingChange(BaseModel):
-    """Represents a pending change for template generation."""
-    type: str = Field(description="new, update, remove")
-    content_id: str
-    path: str
-    title: str
-    example_name: Optional[str] = None
-    example_id: Optional[str] = None
-    from_version: Optional[str] = None
-    to_version: Optional[str] = None
-
-
-class PendingChangesResponse(BaseModel):
-    """Response for pending changes check."""
-    total_changes: int
-    changes: List[PendingChange]
-    last_release: Optional[Dict[str, Any]] = None
-
-
-class GenerateTemplateRequest(BaseModel):
-    """Request to generate student template."""
-    commit_message: Optional[str] = Field(
-        default=None,
-        description="Custom commit message (optional)"
-    )
-
-
-class GenerateTemplateResponse(BaseModel):
-    """Response for template generation request."""
-    workflow_id: str
-    status: str = "started"
-    contents_to_process: int
-
-
-class BulkAssignExamplesRequest(BaseModel):
-    """Request to assign multiple examples to course contents."""
-    assignments: List[Dict[str, str]] = Field(
-        description="List of assignments with course_content_id, example_id, and example_version"
-    )
-
 
 @system_router.get(
     "/courses/{course_id}/pending-changes",
@@ -1174,5 +1065,121 @@ async def get_course_gitlab_status(
     status["can_generate_template"] = status["has_student_template_url"]
     
     return status
+
+
+# DEPLOYMENT CONFIGURATION ENDPOINTS
+
+@system_router.post("/hierarchy/create", response_model=dict)
+async def create_hierarchy(
+    payload: dict,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Create a complete organization -> course family -> course hierarchy from a configuration.
+    
+    This endpoint accepts a deployment configuration and creates the entire hierarchy
+    using the DeployComputorHierarchyWorkflow Temporal workflow.
+    """
+    # Check admin permissions
+    if not check_admin(permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can deploy configurations"
+        )
+    
+    # Extract configuration
+    deployment_config = payload.get("deployment_config")
+    validate_only = payload.get("validate_only", False)
+    
+    if not deployment_config:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="deployment_config is required"
+        )
+    
+    # Validate the configuration structure
+    from ctutor_backend.interface.deployments_refactored import ComputorDeploymentConfig
+    try:
+        config = ComputorDeploymentConfig(**deployment_config)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid deployment configuration: {str(e)}"
+        )
+    
+    if validate_only:
+        return {
+            "status": "validated",
+            "message": "Configuration is valid",
+            "deployment_path": config.get_full_course_path()
+        }
+    
+    # Submit to Temporal workflow
+    task_executor = get_task_executor()
+    
+    task_submission = TaskSubmission(
+        task_name="deploy_computor_hierarchy",
+        parameters={
+            "deployment_config": config.model_dump(),
+            "user_id": permissions.user_id
+        },
+        queue="computor-tasks"
+    )
+    
+    workflow_id = await task_executor.submit_task(task_submission)
+    
+    return {
+        "workflow_id": workflow_id,
+        "status": "started",
+        "deployment_path": config.get_full_course_path(),
+        "message": f"Deployment started for {config.organization.name}"
+    }
+
+
+@system_router.get("/hierarchy/status/{workflow_id}", response_model=dict)
+async def get_hierarchy_status(
+    workflow_id: str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)]
+):
+    """
+    Get the status of a deployment workflow.
+    
+    Returns the current status of the deployment workflow, including any errors
+    or the final result if completed.
+    """
+    task_executor = get_task_executor()
+    
+    try:
+        # Get workflow status
+        result = await task_executor.get_task_status(workflow_id)
+        
+        if result:
+            # Map status to what CLI expects
+            status = result.status_display.lower()
+            if status == "finished":
+                status = "completed"  # CLI expects "completed" not "finished"
+            
+            return {
+                "workflow_id": workflow_id,
+                "status": status,
+                "error": result.error,
+                "result": None,  # TaskInfo doesn't have result field
+                "started_at": result.started_at.isoformat() if result.started_at else None,
+                "completed_at": result.completed_at.isoformat() if result.completed_at else None
+            }
+        else:
+            return {
+                "workflow_id": workflow_id,
+                "status": "not_found",
+                "error": "Workflow not found or expired"
+            }
+    except Exception as e:
+        logger.error(f"Error getting deployment status: {e}")
+        return {
+            "workflow_id": workflow_id,
+            "status": "error",
+            "error": str(e)
+        }
 
 

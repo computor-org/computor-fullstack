@@ -39,6 +39,7 @@ from .temporal_hierarchy_management import (
     CreateOrganizationWorkflow,
     CreateCourseFamilyWorkflow,
     CreateCourseWorkflow,
+    DeployComputorHierarchyWorkflow,
     create_organization_activity,
     create_course_family_activity,
     create_course_activity
@@ -83,6 +84,7 @@ class TemporalWorker:
             CreateOrganizationWorkflow,
             CreateCourseFamilyWorkflow,
             CreateCourseWorkflow,
+            DeployComputorHierarchyWorkflow,
             # DeployExamplesToCourseWorkflow,  # Deprecated - removed
             GenerateStudentTemplateWorkflowV2,
         ]

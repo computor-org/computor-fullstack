@@ -5,12 +5,10 @@ This module provides commands for working with ComputorDeploymentConfig,
 including generating example configurations and deploying hierarchies.
 """
 
-import os
 import sys
 import yaml
 import click
 from pathlib import Path
-from typing import Optional
 
 from ..interface.deployments_refactored import (
     ComputorDeploymentConfig,
@@ -22,9 +20,9 @@ from ..interface.deployments_refactored import (
     CourseProjects,
     EXAMPLE_DEPLOYMENT
 )
-# Temporal client will be imported dynamically to avoid circular imports
-from ..database import get_db
-from ..model.auth import User
+from .auth import authenticate
+from .config import CLIAuthConfig
+from ..client.crud_client import CustomClient
 
 
 @click.group()
@@ -100,7 +98,6 @@ def init(output: str, format: str):
                 name="Introduction to Python",
                 path="python-2025s",
                 description="Learn Python from basics to advanced",
-                term="2025S",
                 projects=CourseProjects(
                     tests="tests",
                     student_template="student-template",
@@ -168,16 +165,13 @@ def init(output: str, format: str):
     help='Validate configuration without deploying'
 )
 @click.option(
-    '--user-id',
-    help='User ID for deployment (defaults to admin user)'
-)
-@click.option(
     '--wait',
     is_flag=True,
     default=True,
     help='Wait for deployment to complete'
 )
-def apply(config_file: str, dry_run: bool, user_id: Optional[str], wait: bool):
+@authenticate
+def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
     """
     Apply a deployment configuration to create the hierarchy.
     
@@ -218,38 +212,17 @@ def apply(config_file: str, dry_run: bool, user_id: Optional[str], wait: bool):
         click.echo(f"❌ Error loading configuration: {e}", err=True)
         sys.exit(1)
     
-    # Get user ID
-    if not user_id:
-        # Try to get admin user from database
-        db = next(get_db())
-        try:
-            admin_user = db.query(User).filter(User.username == "admin").first()
-            if admin_user:
-                user_id = str(admin_user.id)
-            else:
-                click.echo("❌ No admin user found. Please specify --user-id", err=True)
-                sys.exit(1)
-        finally:
-            db.close()
+    # Setup client with authentication
+    if auth.basic != None:
+        custom_client = CustomClient(url_base=auth.api_url, auth=(auth.basic.username, auth.basic.password))
+    elif auth.gitlab != None:
+        custom_client = CustomClient(url_base=auth.api_url, glp_auth_header=auth.gitlab.model_dump())
+    else:
+        click.echo("❌ No valid authentication method found", err=True)
+        sys.exit(1)
     
     # Deploy using API endpoint
     click.echo(f"\nStarting deployment via API...")
-    
-    # Use the deployment API endpoint
-    import requests
-    import json
-    
-    # Get API URL from environment or use default
-    api_url = os.environ.get("API_URL", "http://localhost:8000")
-    
-    # Prepare the request
-    endpoint = f"{api_url}/api/deploy/from-config"
-    headers = {"Content-Type": "application/json"}
-    
-    # Check for auth token
-    auth_token = os.environ.get("API_TOKEN")
-    if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token}"
     
     payload = {
         "deployment_config": config.model_dump(),
@@ -258,10 +231,9 @@ def apply(config_file: str, dry_run: bool, user_id: Optional[str], wait: bool):
     
     try:
         # Send deployment request
-        response = requests.post(endpoint, json=payload, headers=headers)
+        result = custom_client.create("system/hierarchy/create", payload)
         
-        if response.status_code == 200:
-            result = response.json()
+        if result:
             click.echo(f"✅ Deployment workflow started!")
             click.echo(f"  Workflow ID: {result.get('workflow_id')}")
             click.echo(f"  Status: {result.get('status')}")
@@ -275,35 +247,24 @@ def apply(config_file: str, dry_run: bool, user_id: Optional[str], wait: bool):
                 
                 for _ in range(60):  # Wait up to 5 minutes
                     time.sleep(5)
-                    status_response = requests.get(
-                        f"{api_url}/api/deploy/status/{workflow_id}",
-                        headers=headers
-                    )
-                    if status_response.status_code == 200:
-                        status_data = status_response.json()
+                    try:
+                        status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
                         if status_data.get('status') == 'completed':
-                            click.echo("✅ Deployment completed successfully!")
+                            click.echo("\n✅ Deployment completed successfully!")
                             break
                         elif status_data.get('status') == 'failed':
-                            click.echo(f"❌ Deployment failed: {status_data.get('error')}", err=True)
+                            click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
                             sys.exit(1)
-                    click.echo(".", nl=False)
+                        click.echo(".", nl=False)
+                    except Exception as e:
+                        click.echo(f"\n⚠️  Error checking status: {e}")
+                        break
                 else:
                     click.echo("\n⚠️  Deployment is still running. Check status later.")
-                    
-        elif response.status_code == 401:
-            click.echo("❌ Authentication required. Set API_TOKEN environment variable.", err=True)
-            sys.exit(1)
-        elif response.status_code == 403:
-            click.echo("❌ Admin permissions required for deployment.", err=True)
-            sys.exit(1)
         else:
-            click.echo(f"❌ Deployment failed: {response.text}", err=True)
+            click.echo("❌ Failed to start deployment", err=True)
             sys.exit(1)
             
-    except requests.exceptions.ConnectionError:
-        click.echo(f"❌ Cannot connect to API at {api_url}. Is the server running?", err=True)
-        sys.exit(1)
     except Exception as e:
         click.echo(f"❌ Error during deployment: {e}", err=True)
         sys.exit(1)

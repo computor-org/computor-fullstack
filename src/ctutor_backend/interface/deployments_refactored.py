@@ -119,7 +119,6 @@ class CourseConfig(BaseDeployment):
     name: str = Field(description="Course display name")
     path: str = Field(description="Course path/slug")
     description: Optional[str] = Field(None, description="Course description")
-    term: Optional[str] = Field(None, description="Course term (e.g., '2024W', '2025S')")
     projects: Optional[CourseProjects] = Field(None, description="Course project structure")
     execution_backends: Optional[List[ExecutionBackendConfig]] = Field(
         default_factory=list, 
@@ -181,7 +180,6 @@ EXAMPLE_DEPLOYMENT = ComputorDeploymentConfig(
     course=CourseConfig(
         name="Python Programming",
         path="python-2025s",
-        term="2025S",
         description="Introduction to Python programming",
         projects=CourseProjects(
             tests="tests",

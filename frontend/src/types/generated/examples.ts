@@ -2,13 +2,21 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-30T13:24:26.748329
+ * Generated on: 2025-08-05T10:07:38.596232
 
  * Category: Examples
 
  */
 
 
+
+/**
+ * Request to assign multiple examples to course contents.
+ */
+export interface BulkAssignExamplesRequest {
+  /** List of assignments with course_content_id, example_id, and example_version */
+  assignments: Record<string, string>[];
+}
 
 /**
  * Create a new example repository.
@@ -214,7 +222,6 @@ export interface ExampleDependencyGet {
 export interface ExampleUploadRequest {
   repository_id: string;
   directory: string;
-  version_tag: string;
   /** Map of filename to content (must include meta.yaml) */
   files: Record<string, string>;
 }
@@ -224,7 +231,6 @@ export interface ExampleUploadRequest {
  */
 export interface ExampleBatchUploadRequest {
   repository_id: string;
-  version_tag: string;
   /** List of examples with directory and files */
   examples: Record<string, any>[];
 }

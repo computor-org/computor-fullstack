@@ -229,7 +229,6 @@ def upgrade() -> None:
     sa.Column('identifier', sqlalchemy_utils.types.ltree.LtreeType(), nullable=False, comment='Hierarchical identifier using dots as separators'),
     sa.Column('title', sa.String(length=255), nullable=False, comment='Human-readable title of the example'),
     sa.Column('description', sa.Text(), nullable=True, comment='Detailed description of the example'),
-    sa.Column('subject', sa.String(length=50), nullable=True, comment="Primary programming language (e.g., 'python', 'java')"),
     sa.Column('category', sa.String(length=100), nullable=True, comment='Category for grouping examples'),
     sa.Column('tags', postgresql.ARRAY(sa.String()), nullable=False, server_default='{}', comment='Tags for searching and filtering'),
     sa.Column('version_identifier', sa.String(length=64), nullable=True, comment='Version Identifier (e.g. hash) of example directory contents for change detection'),

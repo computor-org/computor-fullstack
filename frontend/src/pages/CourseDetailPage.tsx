@@ -331,7 +331,6 @@ const CourseDetailPage: React.FC = () => {
         {item.example_id && course && (
           <DeploymentStatusChip
             courseId={course.id}
-            deploymentTaskId={item.deployment_task_id}
             deploymentStatus={item.deployment_status}
             exampleVersion={item.example_version}
           />

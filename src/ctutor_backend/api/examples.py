@@ -367,25 +367,15 @@ async def upload_example(
     description = meta_data.get('description', '')
     slug = meta_data.get('slug', request.directory.replace('-', '.').replace('_', '.'))
     
+    # Extract version from meta.yaml
+    version = meta_data.get('version', '1.0')
+    # Add 'v' prefix if not present for consistency
+    version_tag = version if version.startswith('v') else f'v{version}'
+    
     # Extract tags and other metadata
     tags = []
     if 'tags' in meta_data:
         tags = meta_data['tags'] if isinstance(meta_data['tags'], list) else [meta_data['tags']]
-    
-    # Determine subject from meta.yaml or directory name
-    subject = meta_data.get('language', meta_data.get('subject'))
-    if not subject:
-        # Try to infer from directory name or file extensions
-        for filename in request.files.keys():
-            if filename.endswith('.py'):
-                subject = 'python'
-                break
-            elif filename.endswith('.java'):
-                subject = 'java'
-                break
-            elif filename.endswith(('.cpp', '.c', '.h')):
-                subject = 'cpp'
-                break
     
     # Check if example exists
     example = db.query(Example).filter(
@@ -401,7 +391,6 @@ async def upload_example(
             identifier=Ltree(slug),
             title=title,
             description=description,
-            subject=subject,
             tags=tags,
             created_by=permissions.user_id,
             updated_by=permissions.user_id,
@@ -413,14 +402,13 @@ async def upload_example(
         example.identifier = Ltree(slug)
         example.title = title
         example.description = description
-        example.subject = subject
         example.tags = tags
         example.updated_by = permissions.user_id
     
     # Check if this version already exists
     existing_version = db.query(ExampleVersion).filter(
         ExampleVersion.example_id == example.id,
-        ExampleVersion.version_tag == request.version_tag
+        ExampleVersion.version_tag == version_tag
     ).first()
     
     # Check if meta.yaml indicates this should update an existing version
@@ -428,7 +416,7 @@ async def upload_example(
     
     if existing_version and not should_update:
         raise BadRequestException(
-            f"Version '{request.version_tag}' already exists for this example. "
+            f"Version '{version_tag}' already exists for this example. "
             f"To update it, add 'update_existing: true' to meta.yaml or use a different version tag."
         )
     
@@ -480,7 +468,7 @@ async def upload_example(
         # Create new version
         version = ExampleVersion(
             example_id=example.id,
-            version_tag=request.version_tag,
+            version_tag=version_tag,
             version_number=version_number,
             storage_path=storage_path,
             meta_yaml=meta_content,

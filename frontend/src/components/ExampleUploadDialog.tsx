@@ -42,7 +42,6 @@ const JSZip = require('jszip');
 
 const uploadSchema = z.object({
   repository_id: z.string().min(1, 'Repository is required'),
-  version_tag: z.string().min(1, 'Version tag is required'),
 });
 
 type UploadFormData = z.infer<typeof uploadSchema>;
@@ -93,7 +92,6 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
     resolver: zodResolver(uploadSchema),
     defaultValues: {
       repository_id: '',
-      version_tag: 'v1.0',
     },
   });
 
@@ -313,7 +311,6 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
         const uploadRequest: ExampleUploadRequest = {
           repository_id: data.repository_id,
           directory: example.directory,
-          version_tag: data.version_tag,
           files: filesMap,
         };
 
@@ -441,23 +438,6 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
                     </Typography>
                   )}
                 </FormControl>
-              )}
-            />
-
-            {/* Version Tag */}
-            <Controller
-              name="version_tag"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  {...field}
-                  label="Version Tag"
-                  fullWidth
-                  error={!!errors.version_tag}
-                  helperText={errors.version_tag?.message}
-                  placeholder="v1.0"
-                  disabled={uploading}
-                />
               )}
             />
 

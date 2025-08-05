@@ -121,7 +121,6 @@ class Example(Base):
     # Example metadata
     title = Column(String(255), nullable=False, comment="Human-readable title of the example")
     description = Column(Text, comment="Detailed description of the example")
-    subject = Column(String(50), comment="Primary programming language (e.g., 'python', 'java')")
     
     # Organization and categorization
     category = Column(String(100), comment="Category for grouping examples")

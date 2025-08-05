@@ -278,6 +278,19 @@ class ExampleBatchUploadRequest(BaseModel):
     examples: List[Dict[str, Any]] = Field(..., description="List of examples with directory and files")
 
 
+class ExampleFileSet(BaseModel):
+    """Files for a single example."""
+    example_id: UUID
+    version_id: UUID
+    version_tag: str
+    directory: str
+    identifier: str
+    title: str
+    files: Dict[str, str] = Field(..., description="Map of filename to content")
+    meta_yaml: str
+    test_yaml: Optional[str] = None
+
+
 class ExampleDownloadResponse(BaseModel):
     """Response containing downloaded example files."""
     example_id: UUID
@@ -286,6 +299,8 @@ class ExampleDownloadResponse(BaseModel):
     files: Dict[str, str] = Field(..., description="Map of filename to content")
     meta_yaml: str
     test_yaml: Optional[str] = None
+    # Dependencies included when with_dependencies=True
+    dependencies: Optional[List[ExampleFileSet]] = Field(None, description="Dependency examples when with_dependencies=True")
 
 
 # Fix forward references

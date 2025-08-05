@@ -26,6 +26,7 @@ from ..interface.example import (
     ExampleDependencyGet,
     ExampleUploadRequest,
     ExampleDownloadResponse,
+    ExampleFileSet,
 )
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..api.auth import get_current_permissions
@@ -545,11 +546,12 @@ async def upload_example(
 @examples_router.get("/download/{version_id}", response_model=ExampleDownloadResponse)
 async def download_example(
     version_id: UUID,
+    with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
     storage_service=Depends(get_storage_service),
 ):
-    """Download an example version from storage."""
+    """Download an example version from storage, optionally with all dependencies."""
     # Check permissions
     if not permissions.permitted("example", "read"):
         raise ForbiddenException("You don't have permission to download examples")
@@ -566,50 +568,118 @@ async def download_example(
     example = version.example
     repository = example.repository
     
-    if repository.source_type == "git":
-        raise NotImplementedException("Git download not implemented - use git clone instead")
-    
-    if repository.source_type not in ["minio", "s3"]:
-        raise BadRequestException(f"Download not supported for {repository.source_type} repositories")
-    
-    # Get files from MinIO
-    bucket_name = repository.source_url.split('/')[0]
-    
-    # List all objects in the version path
-    objects = await storage_service.list_objects(
-        bucket_name=bucket_name,
-        prefix=version.storage_path,
-    )
-    
-    # Download files
-    files = {}
-    for obj in objects:
-        if obj.object_name.endswith('/'):
-            continue  # Skip directories
+    # Helper function to get all dependencies recursively
+    def get_all_dependencies(example_id: UUID, visited: set = None) -> List[UUID]:
+        if visited is None:
+            visited = set()
         
-        # Get relative filename
-        filename = obj.object_name.replace(f"{version.storage_path}/", "")
+        if example_id in visited:
+            return []  # Avoid circular dependencies
         
-        # Skip meta.yaml and test.yaml (returned separately)
-        if filename in ["meta.yaml", "test.yaml"]:
-            continue
+        visited.add(example_id)
+        all_deps = []
         
-        # Download file content
-        file_data = await storage_service.download_file(
+        # Get direct dependencies
+        dependencies = db.query(ExampleDependency).filter(
+            ExampleDependency.example_id == example_id
+        ).all()
+        
+        for dep in dependencies:
+            if dep.depends_id not in visited:
+                all_deps.append(dep.depends_id)
+                # Recursively get dependencies of dependencies
+                sub_deps = get_all_dependencies(dep.depends_id, visited.copy())
+                all_deps.extend(sub_deps)
+        
+        return list(set(all_deps))  # Remove duplicates
+    
+    # Helper function to download files for an example version
+    async def download_example_files(ex_version: ExampleVersion):
+        ex_example = ex_version.example
+        ex_repository = ex_example.repository
+        
+        if ex_repository.source_type == "git":
+            raise NotImplementedException("Git download not implemented - use git clone instead")
+        
+        if ex_repository.source_type not in ["minio", "s3"]:
+            raise BadRequestException(f"Download not supported for {ex_repository.source_type} repositories")
+        
+        # Get files from MinIO
+        bucket_name = ex_repository.source_url.split('/')[0]
+        
+        # List all objects in the version path
+        objects = await storage_service.list_objects(
             bucket_name=bucket_name,
-            object_key=obj.object_name,
+            prefix=ex_version.storage_path,
         )
         
-        # file_data is already bytes, no need to read()
-        files[filename] = file_data.decode('utf-8')
+        files = {}
+        for obj in objects:
+            if obj.object_name.endswith('/'):
+                continue  # Skip directories
+            
+            # Get relative filename
+            filename = obj.object_name.replace(f"{ex_version.storage_path}/", "")
+            
+            # Skip meta.yaml and test.yaml (returned separately)
+            if filename in ["meta.yaml", "test.yaml"]:
+                continue
+            
+            # Download file content
+            file_data = await storage_service.download_file(
+                bucket_name=bucket_name,
+                object_key=obj.object_name,
+            )
+            
+            files[filename] = file_data.decode('utf-8')
+        
+        return files
+    
+    # Download main example files
+    main_files = await download_example_files(version)
+    
+    # Handle dependencies if requested
+    dependency_files = []
+    if with_dependencies:
+        dependency_ids = get_all_dependencies(example.id)
+        
+        for dep_id in dependency_ids:
+            # Get the latest version of the dependency
+            dep_example = db.query(Example).filter(Example.id == dep_id).first()
+            if not dep_example:
+                continue
+                
+            # Get latest version of dependency
+            dep_version = db.query(ExampleVersion).filter(
+                ExampleVersion.example_id == dep_id
+            ).order_by(ExampleVersion.version_number.desc()).first()
+            
+            if not dep_version:
+                continue
+            
+            # Download dependency files
+            dep_files = await download_example_files(dep_version)
+            
+            dependency_files.append({
+                "example_id": str(dep_example.id),
+                "version_id": str(dep_version.id),
+                "version_tag": dep_version.version_tag,
+                "directory": dep_example.directory,
+                "identifier": str(dep_example.identifier),
+                "title": dep_example.title,
+                "files": dep_files,
+                "meta_yaml": dep_version.meta_yaml,
+                "test_yaml": dep_version.test_yaml,
+            })
     
     return ExampleDownloadResponse(
         example_id=example.id,
         version_id=version.id,
         version_tag=version.version_tag,
-        files=files,
+        files=main_files,
         meta_yaml=version.meta_yaml,
         test_yaml=version.test_yaml,
+        dependencies=dependency_files if with_dependencies else None,
     )
 
 

@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-05T10:07:38.596232
+ * Generated on: 2025-08-05T10:25:26.708275
 
  * Category: Examples
 
@@ -236,6 +236,22 @@ export interface ExampleBatchUploadRequest {
 }
 
 /**
+ * Files for a single example.
+ */
+export interface ExampleFileSet {
+  example_id: string;
+  version_id: string;
+  version_tag: string;
+  directory: string;
+  identifier: string;
+  title: string;
+  /** Map of filename to content */
+  files: Record<string, string>;
+  meta_yaml: string;
+  test_yaml?: string | null;
+}
+
+/**
  * Response containing downloaded example files.
  */
 export interface ExampleDownloadResponse {
@@ -246,4 +262,6 @@ export interface ExampleDownloadResponse {
   files: Record<string, string>;
   meta_yaml: string;
   test_yaml?: string | null;
+  /** Dependency examples when with_dependencies=True */
+  dependencies?: ExampleFileSet[] | null;
 }

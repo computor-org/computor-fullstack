@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-05T10:07:38.598604
+ * Generated on: 2025-08-05T10:25:26.710536
 
  * Category: Common
 
@@ -993,14 +993,6 @@ export interface CourseConfig {
   content_types?: CourseContentTypeConfig[] | null;
   /** Course-specific settings */
   settings?: Record<string, any> | null;
-}
-
-export interface HierarchicalOrganizationConfig {
-  id?: string | null;
-  name: string;
-  path: string;
-  description?: string | null;
-  course_families?: any[];
 }
 
 /**

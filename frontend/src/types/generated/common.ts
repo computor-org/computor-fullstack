@@ -995,6 +995,14 @@ export interface CourseConfig {
   settings?: Record<string, any> | null;
 }
 
+export interface HierarchicalOrganizationConfig {
+  id?: string | null;
+  name: string;
+  path: string;
+  description?: string | null;
+  course_families?: any[];
+}
+
 /**
  * Hierarchical deployment configuration for creating organization -> course family -> course structures.
  * 

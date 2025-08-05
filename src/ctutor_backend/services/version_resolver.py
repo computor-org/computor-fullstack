@@ -6,7 +6,6 @@ Handles semantic version constraint resolution for example dependencies.
 
 import re
 from typing import List, Optional
-from packaging import version
 from sqlalchemy.orm import Session
 
 from ..model.example import Example, ExampleVersion
@@ -55,7 +54,10 @@ class VersionResolver:
     
     def _resolve_constraint_against_versions(self, constraint: str, versions: List[ExampleVersion]) -> Optional[ExampleVersion]:
         """
-        Resolve version constraint against a list of available versions.
+        Resolve version constraint against a list of available versions using database-level ordering.
+        
+        Uses version_number for proper ordering and version_tag for matching.
+        This approach works with arbitrary version tag strings.
         
         Args:
             constraint: Version constraint string
@@ -64,76 +66,152 @@ class VersionResolver:
         Returns:
             First version that satisfies constraint, or None
         """
-        try:
-            # Parse constraint
-            if constraint.startswith('>='):
-                min_version = version.parse(constraint[2:])
-                for v in reversed(versions):  # Start from oldest to get minimum satisfying version
-                    if version.parse(v.version_tag) >= min_version:
-                        return v
-                        
-            elif constraint.startswith('<='):
-                max_version = version.parse(constraint[2:])
-                for v in versions:  # Start from newest
-                    if version.parse(v.version_tag) <= max_version:
-                        return v
-                        
-            elif constraint.startswith('>'):
-                min_version = version.parse(constraint[1:])
-                for v in reversed(versions):
-                    if version.parse(v.version_tag) > min_version:
-                        return v
-                        
-            elif constraint.startswith('<'):
-                max_version = version.parse(constraint[1:])
-                for v in versions:
-                    if version.parse(v.version_tag) < max_version:
-                        return v
-                        
-            elif constraint.startswith('^'):
-                # Compatible version range (same major version)
-                target_version = version.parse(constraint[1:])
-                target_major = target_version.major
-                
-                for v in reversed(versions):
-                    v_parsed = version.parse(v.version_tag)
-                    if (v_parsed.major == target_major and 
-                        v_parsed >= target_version):
-                        return v
-                        
-            elif constraint.startswith('~'):
-                # Patch-level compatibility
-                target_version = version.parse(constraint[1:])
-                target_major = target_version.major
-                target_minor = target_version.minor
-                
-                for v in reversed(versions):
-                    v_parsed = version.parse(v.version_tag)
-                    if (v_parsed.major == target_major and 
-                        v_parsed.minor == target_minor and
-                        v_parsed >= target_version):
-                        return v
-                        
-            elif constraint.startswith('=='):
-                # Exact version match
-                exact_version = constraint[2:]
-                for v in versions:
-                    if v.version_tag == exact_version:
-                        return v
-                        
-            else:
-                # No operator prefix - treat as exact match
-                for v in versions:
-                    if v.version_tag == constraint:
-                        return v
-                        
-        except Exception:
-            # If parsing fails, fall back to string comparison
-            for v in versions:
-                if v.version_tag == constraint:
-                    return v
+        
+        # Handle different constraint operators
+        if constraint.startswith('>='):
+            target_tag = constraint[2:]
+            return self._find_version_with_number_constraint(target_tag, versions, '>=')
+            
+        elif constraint.startswith('<='):
+            target_tag = constraint[2:]
+            return self._find_version_with_number_constraint(target_tag, versions, '<=')
+            
+        elif constraint.startswith('>'):
+            target_tag = constraint[1:]
+            return self._find_version_with_number_constraint(target_tag, versions, '>')
+            
+        elif constraint.startswith('<'):
+            target_tag = constraint[1:]
+            return self._find_version_with_number_constraint(target_tag, versions, '<')
+            
+        elif constraint.startswith('^'):
+            # Compatible version range - use semantic versioning concept but with version_number
+            target_tag = constraint[1:]
+            return self._find_compatible_version(target_tag, versions)
+            
+        elif constraint.startswith('~'):
+            # Patch-level compatibility - similar to ^ but more restrictive
+            target_tag = constraint[1:]
+            return self._find_patch_compatible_version(target_tag, versions)
+            
+        elif constraint.startswith('=='):
+            # Exact version match
+            target_tag = constraint[2:]
+            return self._find_exact_version(target_tag, versions)
+            
+        else:
+            # No operator prefix - treat as exact match
+            return self._find_exact_version(constraint, versions)
+    
+    def _find_version_with_number_constraint(self, target_tag: str, versions: List[ExampleVersion], operator: str) -> Optional[ExampleVersion]:
+        """Find version using version_number for ordering."""
+        # First, find the target version to get its version_number
+        target_version = self._find_exact_version(target_tag, versions)
+        if not target_version:
+            return None
+        
+        target_number = target_version.version_number
+        
+        # Apply the constraint using version_number
+        if operator == '>=':
+            # Find the oldest version that satisfies >= constraint
+            candidates = [v for v in versions if v.version_number >= target_number]
+            return min(candidates, key=lambda v: v.version_number) if candidates else None
+            
+        elif operator == '<=':
+            # Find the newest version that satisfies <= constraint
+            candidates = [v for v in versions if v.version_number <= target_number]
+            return max(candidates, key=lambda v: v.version_number) if candidates else None
+            
+        elif operator == '>':
+            # Find the oldest version that satisfies > constraint
+            candidates = [v for v in versions if v.version_number > target_number]
+            return min(candidates, key=lambda v: v.version_number) if candidates else None
+            
+        elif operator == '<':
+            # Find the newest version that satisfies < constraint
+            candidates = [v for v in versions if v.version_number < target_number]
+            return max(candidates, key=lambda v: v.version_number) if candidates else None
         
         return None
+    
+    def _find_exact_version(self, target_tag: str, versions: List[ExampleVersion]) -> Optional[ExampleVersion]:
+        """Find exact version by version_tag."""
+        for v in versions:
+            if v.version_tag == target_tag:
+                return v
+        return None
+    
+    def _find_compatible_version(self, target_tag: str, versions: List[ExampleVersion]) -> Optional[ExampleVersion]:
+        """
+        Find compatible version (^ operator).
+        
+        For database-level ordering, we interpret ^ as "same major version or higher"
+        based on version_number, falling back to newest available if semantic parsing fails.
+        """
+        target_version = self._find_exact_version(target_tag, versions)
+        if not target_version:
+            return None
+        
+        try:
+            # Try semantic version parsing for major version extraction
+            from packaging import version
+            target_parsed = version.parse(target_tag)
+            target_major = target_parsed.major
+            
+            # Find versions with same major version and >= version_number
+            compatible = []
+            for v in versions:
+                if v.version_number >= target_version.version_number:
+                    try:
+                        v_parsed = version.parse(v.version_tag)
+                        if v_parsed.major == target_major:
+                            compatible.append(v)
+                    except:
+                        # If parsing fails, include version if it's >= target number
+                        compatible.append(v)
+            
+            return min(compatible, key=lambda v: v.version_number) if compatible else None
+            
+        except:
+            # Fallback: just use >= constraint
+            return self._find_version_with_number_constraint(target_tag, versions, '>=')
+    
+    def _find_patch_compatible_version(self, target_tag: str, versions: List[ExampleVersion]) -> Optional[ExampleVersion]:
+        """
+        Find patch-compatible version (~ operator).
+        
+        For database-level ordering, we interpret ~ as "same major.minor version or higher patch"
+        based on version_number, falling back to >= constraint if semantic parsing fails.
+        """
+        target_version = self._find_exact_version(target_tag, versions)
+        if not target_version:
+            return None
+        
+        try:
+            # Try semantic version parsing for major.minor version extraction
+            from packaging import version
+            target_parsed = version.parse(target_tag)
+            target_major = target_parsed.major
+            target_minor = target_parsed.minor
+            
+            # Find versions with same major.minor version and >= version_number
+            compatible = []
+            for v in versions:
+                if v.version_number >= target_version.version_number:
+                    try:
+                        v_parsed = version.parse(v.version_tag)
+                        if v_parsed.major == target_major and v_parsed.minor == target_minor:
+                            compatible.append(v)
+                    except:
+                        # If parsing fails, include version if it's >= target number
+                        compatible.append(v)
+            
+            return min(compatible, key=lambda v: v.version_number) if compatible else None
+            
+        except:
+            # Fallback: just use >= constraint
+            return self._find_version_with_number_constraint(target_tag, versions, '>=')
     
     def resolve_multiple_constraints(self, constraints: List[tuple]) -> List[ExampleVersion]:
         """

@@ -479,6 +479,7 @@ def upgrade() -> None:
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_id', postgresql.UUID(), nullable=False, comment='Example that has the dependency'),
     sa.Column('depends_id', postgresql.UUID(), nullable=False, comment='Example that this depends on'),
+    sa.Column('version_constraint', sa.String(100), nullable=True, comment="Version constraint (e.g., '>=1.2.0', '^2.1.0', '~1.3.0'). NULL means latest version."),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['depends_id'], ['example.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['example_id'], ['example.id'], ondelete='CASCADE'),

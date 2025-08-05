@@ -39,6 +39,7 @@ from ..api.exceptions import (
 from ..redis_cache import get_redis_client
 from ..services.storage_service import get_storage_service
 from ..services.version_resolver import VersionResolver
+from ..services.dependency_sync import DependencySyncService
 
 logger = logging.getLogger(__name__)
 
@@ -489,51 +490,14 @@ async def upload_example(
     if 'properties' in meta_data:
         logger.info(f"Properties keys: {list(meta_data['properties'].keys())}")
     logger.info(f"testDependencies found: {test_dependencies}")
-    if test_dependencies:
-        logger.info(f"Processing {len(test_dependencies)} test dependencies for example {example.identifier}")
-        
-        # First, remove existing dependencies for this example (in case they changed)
-        db.query(ExampleDependency).filter(
-            ExampleDependency.example_id == example.id
-        ).delete()
-        
-        # Validate all dependencies exist first
-        missing_dependencies = []
-        found_dependencies = []
-        
-        for dep_identifier in test_dependencies:
-            # Find the dependency example by identifier
-            dep_example = db.query(Example).filter(
-                Example.identifier == Ltree(dep_identifier),
-                Example.example_repository_id == repository.id  # Dependencies must be in same repository
-            ).first()
-            
-            if dep_example:
-                found_dependencies.append((dep_identifier, dep_example))
-            else:
-                missing_dependencies.append(dep_identifier)
-        
-        # If any dependencies are missing, return 400 error
-        if missing_dependencies:
-            missing_list = ", ".join(missing_dependencies)
-            raise BadRequestException(
-                f"Cannot upload example '{example.identifier}'. "
-                f"Missing dependencies: {missing_list}. "
-                f"Please upload the dependency examples first."
-            )
-        
-        # All dependencies found, add them
-        for dep_identifier, dep_example in found_dependencies:
-            dependency = ExampleDependency(
-                example_id=example.id,
-                depends_id=dep_example.id
-            )
-            db.add(dependency)
-            logger.info(f"Added dependency: {example.identifier} -> {dep_identifier}")
-        
-        db.commit()
-    else:
-        logger.info(f"No test dependencies found for example {example.identifier}")
+    
+    # Sync dependencies from meta.yaml to database
+    dependency_sync = DependencySyncService(db)
+    dependency_sync.sync_dependencies_from_meta(
+        example=example,
+        test_dependencies=test_dependencies,
+        repository_id=repository.id
+    )
     
     # Invalidate cache
     redis_client = await get_redis_client()
@@ -692,6 +656,103 @@ async def download_example(
         test_yaml=version.test_yaml,
         dependencies=dependency_files if with_dependencies else None,
     )
+
+
+@examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
+async def get_example_dependencies(
+    example_id: UUID,
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions),
+):
+    """Get all dependencies for an example with version constraints."""
+    # Check permissions
+    if not permissions.permitted("example", "read"):
+        raise ForbiddenException("You don't have permission to read example dependencies")
+    
+    # Check if example exists
+    example = db.query(Example).filter(Example.id == example_id).first()
+    if not example:
+        raise NotFoundException(f"Example {example_id} not found")
+    
+    # Get dependencies
+    dependencies = db.query(ExampleDependency).filter(
+        ExampleDependency.example_id == example_id
+    ).all()
+    
+    return dependencies
+
+
+@examples_router.post("/{example_id}/dependencies", response_model=ExampleDependencyGet)
+async def create_example_dependency(
+    example_id: UUID,
+    dependency_data: ExampleDependencyCreate,
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions),
+):
+    """Create a new dependency relationship between examples."""
+    # Check permissions
+    if not permissions.permitted("example", "create"):
+        raise ForbiddenException("You don't have permission to create example dependencies")
+    
+    # Validate example exists
+    example = db.query(Example).filter(Example.id == example_id).first()
+    if not example:
+        raise NotFoundException(f"Example {example_id} not found")
+    
+    # Validate dependency example exists
+    dependency_example = db.query(Example).filter(Example.id == dependency_data.depends_id).first()
+    if not dependency_example:
+        raise NotFoundException(f"Dependency example {dependency_data.depends_id} not found")
+    
+    # Check if dependency already exists
+    existing = db.query(ExampleDependency).filter(
+        ExampleDependency.example_id == example_id,
+        ExampleDependency.depends_id == dependency_data.depends_id
+    ).first()
+    
+    if existing:
+        raise BadRequestException(f"Dependency already exists between {example_id} and {dependency_data.depends_id}")
+    
+    # Create dependency
+    dependency = ExampleDependency(
+        example_id=example_id,
+        depends_id=dependency_data.depends_id,
+        version_constraint=dependency_data.version_constraint
+    )
+    
+    db.add(dependency)
+    db.commit()
+    db.refresh(dependency)
+    
+    return dependency
+
+
+@examples_router.delete("/{example_id}/dependencies/{dependency_id}")
+async def delete_example_dependency(
+    example_id: UUID,
+    dependency_id: UUID,
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions),
+):
+    """Delete a dependency relationship between examples."""
+    # Check permissions
+    if not permissions.permitted("example", "delete"):
+        raise ForbiddenException("You don't have permission to delete example dependencies")
+    
+    # Find dependency
+    dependency = db.query(ExampleDependency).filter(
+        ExampleDependency.id == dependency_id,
+        ExampleDependency.example_id == example_id
+    ).first()
+    
+    if not dependency:
+        raise NotFoundException(f"Dependency {dependency_id} not found for example {example_id}")
+    
+    # Delete dependency
+    db.delete(dependency)
+    db.commit()
+    
+    return {"message": "Dependency deleted successfully"}
 
 
 

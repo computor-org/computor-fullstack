@@ -492,6 +492,45 @@ async def upload_example(
     db.commit()
     db.refresh(version)
     
+    # Process testDependencies from meta.yaml (check both root and properties)
+    test_dependencies = meta_data.get('testDependencies', [])
+    if not test_dependencies and 'properties' in meta_data:
+        test_dependencies = meta_data['properties'].get('testDependencies', [])
+    
+    logger.info(f"Meta data keys: {list(meta_data.keys())}")
+    if 'properties' in meta_data:
+        logger.info(f"Properties keys: {list(meta_data['properties'].keys())}")
+    logger.info(f"testDependencies found: {test_dependencies}")
+    if test_dependencies:
+        logger.info(f"Processing {len(test_dependencies)} test dependencies for example {example.identifier}")
+        
+        # First, remove existing dependencies for this example (in case they changed)
+        db.query(ExampleDependency).filter(
+            ExampleDependency.example_id == example.id
+        ).delete()
+        
+        # Now add the new dependencies
+        for dep_identifier in test_dependencies:
+            # Find the dependency example by identifier
+            dep_example = db.query(Example).filter(
+                Example.identifier == Ltree(dep_identifier),
+                Example.example_repository_id == repository.id  # Dependencies must be in same repository
+            ).first()
+            
+            if dep_example:
+                dependency = ExampleDependency(
+                    example_id=example.id,
+                    depends_id=dep_example.id
+                )
+                db.add(dependency)
+                logger.info(f"Added dependency: {example.identifier} -> {dep_identifier}")
+            else:
+                logger.warning(f"Dependency not found: {dep_identifier} for example {example.identifier}")
+        
+        db.commit()
+    else:
+        logger.info(f"No test dependencies found for example {example.identifier}")
+    
     # Invalidate cache
     redis_client = await get_redis_client()
     await redis_client.delete(f"example:{example.id}")

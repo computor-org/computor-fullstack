@@ -10,6 +10,14 @@ import {
   ListItemIcon,
   ListItemText,
   Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  FormControlLabel,
+  Checkbox,
+  Alert,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -44,6 +52,9 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
   const [searchValue, setSearchValue] = useState('');
   const [actionMenuAnchor, setActionMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedExample, setSelectedExample] = useState<ExampleList | null>(null);
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [includeDependencies, setIncludeDependencies] = useState(false);
+  const [exampleHasDependencies, setExampleHasDependencies] = useState(false);
 
   // Filter data based on search
   const filteredData = data.filter(example =>
@@ -87,7 +98,7 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
   const handleDownload = async () => {
     if (selectedExample) {
       try {
-        // First, get the full example details with versions
+        // First, get the full example details with versions and dependencies
         const fullExample = await apiClient.get<ExampleGet>(`/examples/${selectedExample.id}`);
         
         if (!fullExample.versions || fullExample.versions.length === 0) {
@@ -96,46 +107,96 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
           return;
         }
         
-        // Download the latest version
-        const latestVersion = fullExample.versions[0];
-        const response = await apiClient.get<ExampleDownloadResponse>(`/examples/download/${latestVersion.id}`);
+        // Check if example has dependencies
+        const hasDependencies = !!(fullExample.dependencies && fullExample.dependencies.length > 0);
+        setExampleHasDependencies(hasDependencies);
         
-        // Create a ZIP file with all the example files
-        const JSZip = require('jszip');
-        const zip = new JSZip();
-        
-        // Add all files to the ZIP
-        for (const [filename, content] of Object.entries(response.files)) {
-          zip.file(filename, content);
+        if (hasDependencies) {
+          // Show dialog to ask about including dependencies
+          setDownloadDialogOpen(true);
+        } else {
+          // Proceed with direct download
+          await performDownload(false);
         }
-        
-        // Add meta.yaml and test.yaml if they exist
-        if (response.meta_yaml) {
-          zip.file('meta.yaml', response.meta_yaml);
-        }
-        if (response.test_yaml) {
-          zip.file('test.yaml', response.test_yaml);
-        }
-        
-        // Generate and download the ZIP
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const downloadUrl = URL.createObjectURL(zipBlob);
-        
-        // Create temporary download link
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `${selectedExample.directory}-${latestVersion.version_tag}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up
-        URL.revokeObjectURL(downloadUrl);
         
       } catch (err) {
         alert(`Download failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        handleActionClose();
       }
     }
+  };
+
+  const performDownload = async (withDependencies: boolean) => {
+    if (!selectedExample) return;
+    
+    try {
+      // Get the full example details again
+      const fullExample = await apiClient.get<ExampleGet>(`/examples/${selectedExample.id}`);
+      const latestVersion = fullExample.versions![0];
+      
+      // Download with or without dependencies
+      const apiUrl = `/examples/download/${latestVersion.id}${withDependencies ? '?with_dependencies=true' : ''}`;
+      const response = await apiClient.get<ExampleDownloadResponse>(apiUrl);
+      
+      // Create a ZIP file with all the example files
+      const JSZip = require('jszip');
+      const zip = new JSZip();
+      
+      // Add main example files to the ZIP (using its identifier as directory name)
+      const mainExampleFolder = fullExample.identifier;
+      for (const [filename, content] of Object.entries(response.files)) {
+        zip.file(`${mainExampleFolder}/${filename}`, content);
+      }
+      
+      // Add meta.yaml and test.yaml if they exist
+      if (response.meta_yaml) {
+        zip.file(`${mainExampleFolder}/meta.yaml`, response.meta_yaml);
+      }
+      if (response.test_yaml) {
+        zip.file(`${mainExampleFolder}/test.yaml`, response.test_yaml);
+      }
+      
+      // Add dependencies if included (each as separate directory with identifier name)
+      if (withDependencies && response.dependencies) {
+        for (const dep of response.dependencies) {
+          const depFolder = dep.identifier; // Use identifier as directory name
+          
+          // Add dependency files
+          for (const [filename, content] of Object.entries(dep.files)) {
+            zip.file(`${depFolder}/${filename}`, content);
+          }
+          
+          // Add dependency meta.yaml and test.yaml
+          if (dep.meta_yaml) {
+            zip.file(`${depFolder}/meta.yaml`, dep.meta_yaml);
+          }
+          if (dep.test_yaml) {
+            zip.file(`${depFolder}/test.yaml`, dep.test_yaml);
+          }
+        }
+      }
+      
+      // Generate and download the ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      
+      // Create temporary download link
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const suffix = withDependencies ? '-with-dependencies' : '';
+      link.download = `${selectedExample.directory}-${latestVersion.version_tag}${suffix}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up
+      URL.revokeObjectURL(downloadUrl);
+      
+    } catch (err) {
+      alert(`Download failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+    
+    setDownloadDialogOpen(false);
     handleActionClose();
   };
 
@@ -326,6 +387,35 @@ const ExamplesTable: React.FC<ExamplesTableProps> = ({
           <ListItemText>Delete</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Download Dependencies Dialog */}
+      <Dialog open={downloadDialogOpen} onClose={() => setDownloadDialogOpen(false)}>
+        <DialogTitle>Download Options</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            This example has dependencies. You can choose to download them along with the main example.
+          </Alert>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={includeDependencies}
+                onChange={(e) => setIncludeDependencies(e.target.checked)}
+              />
+            }
+            label="Include dependencies"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDownloadDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => performDownload(includeDependencies)}
+            variant="contained"
+            color="primary"
+          >
+            Download
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

@@ -247,10 +247,10 @@ class ExampleVersion(Base):
 
 class ExampleDependency(Base):
     """
-    Dependency relationship between examples.
+    Dependency relationship between examples with version constraints.
     
-    Tracks when one example depends on another.
-    Uses a simplified model where dependencies always refer to the current version.
+    Tracks when one example depends on another with optional version constraints.
+    Supports semantic versioning constraints like '>=1.2.0', '^2.1.0', '~1.3.0', etc.
     """
     
     __tablename__ = "example_dependency"
@@ -272,6 +272,13 @@ class ExampleDependency(Base):
         comment="Example that this depends on"
     )
     
+    # Version constraint
+    version_constraint = Column(
+        String(100),
+        nullable=True,
+        comment="Version constraint (e.g., '>=1.2.0', '^2.1.0', '~1.3.0'). NULL means latest version."
+    )
+    
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     
@@ -288,4 +295,5 @@ class ExampleDependency(Base):
     )
     
     def __repr__(self):
-        return f"<ExampleDependency(example_id={self.example_id}, depends_id={self.depends_id})>"
+        constraint = f", version_constraint='{self.version_constraint}'" if self.version_constraint else ""
+        return f"<ExampleDependency(example_id={self.example_id}, depends_id={self.depends_id}{constraint})>"

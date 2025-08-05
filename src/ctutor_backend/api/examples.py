@@ -38,6 +38,7 @@ from ..api.exceptions import (
 )
 from ..redis_cache import get_redis_client
 from ..services.storage_service import get_storage_service
+from ..services.version_resolver import VersionResolver
 
 logger = logging.getLogger(__name__)
 
@@ -568,8 +569,8 @@ async def download_example(
     example = version.example
     repository = example.repository
     
-    # Helper function to get all dependencies recursively
-    def get_all_dependencies(example_id: UUID, visited: set = None) -> List[UUID]:
+    # Helper function to get all dependencies with version constraints recursively
+    def get_all_dependencies_with_constraints(example_id: UUID, visited: set = None) -> List[tuple]:
         if visited is None:
             visited = set()
         
@@ -579,19 +580,28 @@ async def download_example(
         visited.add(example_id)
         all_deps = []
         
-        # Get direct dependencies
+        # Get direct dependencies with version constraints
         dependencies = db.query(ExampleDependency).filter(
             ExampleDependency.example_id == example_id
         ).all()
         
         for dep in dependencies:
             if dep.depends_id not in visited:
-                all_deps.append(dep.depends_id)
+                all_deps.append((dep.depends_id, dep.version_constraint))
                 # Recursively get dependencies of dependencies
-                sub_deps = get_all_dependencies(dep.depends_id, visited.copy())
+                sub_deps = get_all_dependencies_with_constraints(dep.depends_id, visited.copy())
                 all_deps.extend(sub_deps)
         
-        return list(set(all_deps))  # Remove duplicates
+        # Remove duplicates while preserving version constraints
+        # If same dependency appears with different constraints, keep the first one
+        seen = set()
+        unique_deps = []
+        for dep_id, constraint in all_deps:
+            if dep_id not in seen:
+                unique_deps.append((dep_id, constraint))
+                seen.add(dep_id)
+        
+        return unique_deps
     
     # Helper function to download files for an example version
     async def download_example_files(ex_version: ExampleVersion):
@@ -641,18 +651,19 @@ async def download_example(
     # Handle dependencies if requested
     dependency_files = []
     if with_dependencies:
-        dependency_ids = get_all_dependencies(example.id)
+        dependencies = get_all_dependencies_with_constraints(example.id)
+        version_resolver = VersionResolver(db)
         
-        for dep_id in dependency_ids:
-            # Get the latest version of the dependency
-            dep_example = db.query(Example).filter(Example.id == dep_id).first()
+        for dep_example_id, version_constraint in dependencies:
+            dep_example = db.query(Example).filter(Example.id == dep_example_id).first()
             if not dep_example:
                 continue
                 
-            # Get latest version of dependency
-            dep_version = db.query(ExampleVersion).filter(
-                ExampleVersion.example_id == dep_id
-            ).order_by(ExampleVersion.version_number.desc()).first()
+            # Resolve version constraint to specific version
+            dep_version = version_resolver.resolve_constraint(
+                str(dep_example.identifier), 
+                version_constraint
+            )
             
             if not dep_version:
                 continue

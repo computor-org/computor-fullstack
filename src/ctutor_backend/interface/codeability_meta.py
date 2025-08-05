@@ -9,7 +9,7 @@ Examples are course-agnostic and can be assigned to multiple courses through
 the CourseContent model which links examples to specific course contexts.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_yaml import to_yaml_str
 
@@ -18,6 +18,60 @@ from pydantic_yaml import to_yaml_str
 
 # Version regex pattern
 VERSION_REGEX = "^([1-9]\\d*|0)(\\.(([1-9]\\d*)|0)){0,3}$"
+
+
+class TestDependency(BaseModel):
+    """Represents a test dependency with slug and version constraint."""
+    
+    slug: str = Field(
+        ...,
+        description="Hierarchical slug of the dependency example (e.g., 'physics.math.vectors')"
+    )
+    version: Optional[str] = Field(
+        None,
+        description="Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version."
+    )
+    
+    @field_validator('slug')
+    @classmethod
+    def validate_slug(cls, v):
+        """Validate that slug follows hierarchical format."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Slug must be a non-empty string")
+        
+        # Basic validation - could be more strict
+        parts = v.split('.')
+        if len(parts) < 2:
+            raise ValueError("Slug must be hierarchical (e.g., 'domain.subdomain.name')")
+        
+        return v
+    
+    @field_validator('version')
+    @classmethod
+    def validate_version_constraint(cls, v):
+        """Validate version constraint format."""
+        if v is None:
+            return v
+        
+        if not isinstance(v, str):
+            raise ValueError("Version constraint must be a string")
+        
+        # Basic validation for common patterns
+        # Could be enhanced with proper semantic versioning parser
+        valid_prefixes = ['>=', '<=', '>', '<', '^', '~', '==', '']
+        
+        # Remove prefix to check version format
+        version_part = v
+        for prefix in sorted(valid_prefixes, key=len, reverse=True):
+            if v.startswith(prefix):
+                version_part = v[len(prefix):]
+                break
+        
+        # Basic version format check (could be more comprehensive)
+        if version_part and not version_part.replace('.', '').replace('-', '').replace('+', '').isalnum():
+            raise ValueError(f"Invalid version format: {v}")
+        
+        return v
 
 
 class CodeAbilityBase(BaseModel):
@@ -80,10 +134,36 @@ class CodeAbilityMetaProperties(CodeAbilityBase):
         default_factory=list,
         description="Template files for student projects"
     )
-    testDependencies: Optional[List[str]] = Field(
+    testDependencies: Optional[List[Union[str, TestDependency]]] = Field(
         default_factory=list,
-        description="List of example identifiers that this example depends on (e.g., functions called from other examples)"
+        description="List of example dependencies. Can be simple strings (slugs) or objects with slug and version constraints"
     )
+    
+    @field_validator('testDependencies', mode='before')
+    @classmethod
+    def normalize_test_dependencies(cls, v):
+        """Normalize testDependencies to handle mixed string/object format."""
+        if not v:
+            return v
+        
+        if not isinstance(v, list):
+            raise ValueError("testDependencies must be a list")
+        
+        normalized = []
+        for item in v:
+            if isinstance(item, str):
+                # Convert string to TestDependency object with no version constraint (= latest)
+                normalized.append(TestDependency(slug=item, version=None))
+            elif isinstance(item, dict):
+                # Let Pydantic handle dict -> TestDependency conversion
+                normalized.append(item)
+            elif isinstance(item, TestDependency):
+                # Already a TestDependency object
+                normalized.append(item)
+            else:
+                raise ValueError(f"testDependencies items must be strings or objects, got {type(item)}")
+        
+        return normalized
     executionBackend: Optional[CourseExecutionBackendConfig] = Field(
         None,
         description="Execution backend configuration for this assignment"

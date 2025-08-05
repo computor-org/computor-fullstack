@@ -160,6 +160,7 @@ class ExampleDependencyCreate(BaseModel):
     """Create example dependency."""
     example_id: UUID
     depends_id: UUID
+    version_constraint: Optional[str] = Field(None, description="Version constraint (e.g., '>=1.2.0', '^2.1.0'). NULL means latest version.")
 
 
 class ExampleDependencyGet(BaseModel):
@@ -167,6 +168,7 @@ class ExampleDependencyGet(BaseModel):
     id: UUID
     example_id: UUID
     depends_id: UUID
+    version_constraint: Optional[str] = Field(None, description="Version constraint string")
     created_at: datetime
     
     # Relationship

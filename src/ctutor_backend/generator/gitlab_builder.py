@@ -668,6 +668,18 @@ class GitLabBuilder:
                     else:
                         logger.info(f"Ensured students group exists: {students_group_result['gitlab_group'].full_path}")
                     
+                    # Ensure tutors group exists for existing course
+                    tutors_group_result = self._create_tutors_group(
+                        course=existing_course,
+                        parent_group=result["gitlab_group"],
+                        deployment=deployment
+                    )
+                    
+                    if not tutors_group_result["success"]:
+                        logger.warning(f"Failed to create tutors group: {tutors_group_result['error']}")
+                    else:
+                        logger.info(f"Ensured tutors group exists: {tutors_group_result['gitlab_group'].full_path}")
+                    
                     # Ensure course projects exist for existing course
                     projects_result = self._create_course_projects(
                         course=existing_course,
@@ -750,6 +762,19 @@ class GitLabBuilder:
                 # Don't fail the entire course creation, just log the warning
             else:
                 logger.info(f"Created students group: {students_group_result['gitlab_group'].full_path}")
+            
+            # Create tutors group under the course
+            tutors_group_result = self._create_tutors_group(
+                course=new_course,
+                parent_group=gitlab_group,
+                deployment=deployment
+            )
+            
+            if not tutors_group_result["success"]:
+                logger.warning(f"Failed to create tutors group: {tutors_group_result['error']}")
+                # Don't fail the entire course creation, just log the warning
+            else:
+                logger.info(f"Created tutors group: {tutors_group_result['gitlab_group'].full_path}")
             
             # Create course projects (assignments, student-template, reference)
             projects_result = self._create_course_projects(
@@ -1030,17 +1055,89 @@ class GitLabBuilder:
         
         return result
     
+    def _create_tutors_group(
+        self,
+        course: Course,
+        parent_group: Group,
+        deployment: ComputorDeploymentConfig
+    ) -> Dict[str, Any]:
+        """Create tutors group under a course."""
+        result = {
+            "success": False,
+            "gitlab_group": None,
+            "error": None
+        }
+        
+        try:
+            # Check if tutors group already exists
+            tutors_path = "tutors"
+            full_path = f"{parent_group.full_path}/{tutors_path}"
+            
+            # Try to find existing tutors group
+            existing_groups = parent_group.subgroups.list(search=tutors_path)
+            tutors_group = None
+            
+            for group in existing_groups:
+                if group.path == tutors_path:
+                    tutors_group = self.gitlab.groups.get(group.id)
+                    logger.info(f"Tutors group already exists: {tutors_group.full_path}")
+                    result["gitlab_group"] = tutors_group
+                    result["success"] = True
+                    return result
+            
+            # Create tutors group
+            group_data = {
+                'name': 'Tutors',
+                'path': tutors_path,
+                'parent_id': parent_group.id,
+                'description': f'Tutors group for {course.title}',
+                'visibility': 'private'  # Tutors group should be private
+            }
+            
+            tutors_group = self.gitlab.groups.create(group_data)
+            logger.info(f"Created tutors group: {tutors_group.full_path}")
+            
+            # Update course properties to include tutors group info
+            if not course.properties:
+                course.properties = {}
+            
+            if "gitlab" not in course.properties:
+                course.properties["gitlab"] = {}
+            
+            course.properties["gitlab"]["tutors_group"] = {
+                "group_id": tutors_group.id,
+                "full_path": tutors_group.full_path,
+                "web_url": f"{self.gitlab_url}/groups/{tutors_group.full_path}",
+                "created_at": datetime.now().isoformat()
+            }
+            
+            flag_modified(course, "properties")
+            self.db.flush()
+            self.db.refresh(course)
+            
+            result["gitlab_group"] = tutors_group
+            result["success"] = True
+            
+        except GitlabCreateError as e:
+            logger.error(f"Failed to create tutors group: {e}")
+            result["error"] = str(e)
+        except Exception as e:
+            logger.error(f"Unexpected error creating tutors group: {e}")
+            result["error"] = str(e)
+        
+        return result
+    
     def _create_course_projects(
         self,
         course: Course,
         parent_group: Group,
         deployment: ComputorDeploymentConfig
     ) -> Dict[str, Any]:
-        """Create course project (student-template only) under a course.
+        """Create course projects (student-template and assignments) under a course.
         
-        With the Example Library paradigm, assignments and reference repositories
-        are no longer needed. Examples are stored in MinIO and deployed directly
-        to the student-template repository.
+        Creates:
+        - student-template: Processed version for students (no solutions)
+        - assignments: Full example content with solutions for lecturers/tutors (reference repository)
         """
         result = {
             "success": False,
@@ -1049,12 +1146,18 @@ class GitLabBuilder:
             "error": None
         }
         
-        # Only create student-template project
+        # Create both student-template and assignments repositories
         project_configs = [
             {
                 "name": "Student Template",
                 "path": "student-template",
                 "description": f"Template repository for students in {course.title}",
+                "visibility": "private"
+            },
+            {
+                "name": "Assignments",
+                "path": "assignments",
+                "description": f"Reference repository with full example content for {course.title}",
                 "visibility": "private"
             }
         ]
@@ -1110,11 +1213,18 @@ class GitLabBuilder:
                     "web_url": f"{self.gitlab_url}/{parent_group.full_path}/student-template",
                     "description": "Template repository for students"
                 },
+                "assignments": {
+                    "path": "assignments",
+                    "full_path": f"{parent_group.full_path}/assignments",
+                    "web_url": f"{self.gitlab_url}/{parent_group.full_path}/assignments",
+                    "description": "Reference repository with full example content"
+                },
                 "created_at": datetime.now().isoformat()
             }
             
-            # Store the student-template URL at the top level for easy access
+            # Store URLs at the top level for easy access
             course.properties["gitlab"]["student_template_url"] = f"{self.gitlab_url}/{parent_group.full_path}/student-template"
+            course.properties["gitlab"]["assignments_url"] = f"{self.gitlab_url}/{parent_group.full_path}/assignments"
             
             # Tell SQLAlchemy that the properties field has been modified
             flag_modified(course, "properties")

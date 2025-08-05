@@ -451,6 +451,279 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         db_gen.close()
 
 
+@activity.defn(name="generate_student_and_assignments_repositories")
+async def generate_student_and_assignments_repositories(
+    course_id: str, 
+    student_template_url: str, 
+    assignments_url: str
+) -> Dict[str, Any]:
+    """
+    Generate both student template and assignments repositories.
+    
+    This generates:
+    1. student-template: Processed version for students (no solutions)
+    2. assignments: Full example content with solutions (reference repository)
+    """
+    logger.info(f"Generating student template and assignments repositories for course {course_id}")
+    
+    db_gen = get_db()
+    db = next(db_gen)
+    
+    try:
+        # Get course details
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise ValueError(f"Course {course_id} not found")
+        
+        # Generate student template (existing logic)
+        student_result = await generate_student_template_v2(course_id, student_template_url)
+        
+        # Generate assignments repository (full example content)
+        assignments_result = await generate_assignments_repository(course_id, assignments_url)
+        
+        return {
+            "success": student_result.get("success", False) and assignments_result.get("success", False),
+            "student_template": student_result,
+            "assignments": assignments_result
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to generate repositories: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+    finally:
+        db_gen.close()
+
+
+@activity.defn(name="generate_assignments_repository")
+async def generate_assignments_repository(course_id: str, assignments_url: str) -> Dict[str, Any]:
+    """
+    Generate assignments repository with full example content (unmodified).
+    This serves as the reference repository for lecturers and tutors.
+    """
+    logger.info(f"Generating assignments repository for course {course_id}")
+    
+    db_gen = get_db()
+    db = next(db_gen)
+    
+    try:
+        # Get course details
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise ValueError(f"Course {course_id} not found")
+        
+        organization = course.organization
+        
+        # Get GitLab token from organization properties
+        gitlab_token = None
+        if organization.properties and 'gitlab' in organization.properties:
+            gitlab_config = organization.properties.get('gitlab', {})
+            encrypted_token = gitlab_config.get('token')
+            
+            if encrypted_token:
+                from ..interface.tokens import decrypt_api_key
+                try:
+                    gitlab_token = decrypt_api_key(encrypted_token)
+                    logger.info(f"Using decrypted GitLab token from organization {organization.title}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt GitLab token: {str(e)}")
+                    gitlab_token = None
+        
+        if not gitlab_token:
+            logger.warning(f"No GitLab token found in organization {organization.title} properties")
+        
+        # Transform URL for Docker environment
+        assignments_url = transform_localhost_url(assignments_url)
+        logger.info(f"Using assignments URL: {assignments_url}")
+        
+        # Create temporary directories
+        temp_dir = tempfile.mkdtemp(prefix='assignments-gen-')
+        assignments_staging_path = os.path.join(temp_dir, 'staging')
+        assignments_repo_path = os.path.join(temp_dir, 'assignments')
+        os.makedirs(assignments_staging_path, exist_ok=True)
+        
+        import git
+        from datetime import datetime, timezone
+        
+        # Clone or create assignments repository
+        try:
+            if gitlab_token and 'http' in assignments_url:
+                from urllib.parse import urlparse, urlunparse
+                parsed = urlparse(assignments_url)
+                auth_netloc = f"oauth2:{gitlab_token}@{parsed.netloc}"
+                auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, 
+                                     parsed.params, parsed.query, parsed.fragment))
+                assignments_repo = git.Repo.clone_from(auth_url, assignments_repo_path)
+            else:
+                assignments_repo = git.Repo.clone_from(assignments_url, assignments_repo_path)
+        except Exception as e:
+            logger.error(f"Failed to clone assignments repository: {e}")
+            return {"success": False, "error": f"Failed to clone repository: {str(e)}"}
+        
+        # Clear existing content except .git
+        for item in os.listdir(assignments_repo_path):
+            if item == '.git':
+                continue
+            item_path = os.path.join(assignments_repo_path, item)
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+        
+        # Get course contents with examples
+        course_contents = db.query(CourseContent).filter(
+            CourseContent.course_id == course_id,
+            CourseContent.example_id.isnot(None)
+        ).all()
+        
+        processed_count = 0
+        errors = []
+        
+        # Process each course content
+        for content in course_contents:
+            try:
+                if not content.example:
+                    logger.warning(f"CourseContent {content.path} has example_id but no example relationship")
+                    continue
+                
+                if not content.example_version:
+                    logger.warning(f"CourseContent {content.path} has no example_version specified")
+                    continue
+                
+                # Find the specific version
+                version = None
+                for v in content.example.versions:
+                    if v.version == content.example_version:
+                        version = v
+                        break
+                
+                if not version:
+                    logger.error(f"Version {content.example_version} not found for example {content.example.identifier}")
+                    continue
+                
+                # Download example files
+                example_files = await download_example_files(content.example.repository, version)
+                
+                # For assignments repository, copy ALL files unmodified to preserve full example
+                content_path_str = str(content.example.identifier)
+                assignment_path = Path(assignments_repo_path) / content_path_str
+                
+                # Process full example content for assignments repository
+                await process_full_example_for_assignments_repository(
+                    example_files, assignment_path, content, version
+                )
+                
+                processed_count += 1
+                
+            except Exception as e:
+                error_msg = f"Failed to process content {content.path}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+        
+        # Create README for assignments repository
+        readme_content = f"""# Assignments Repository - {course.title}
+
+This repository contains the complete example content with solutions for course assignments.
+
+## Purpose
+- **Reference repository** for lecturers and tutors
+- Contains **full example content** including solutions, test files, and metadata
+- **Do not share** with students (contains solutions)
+
+## Usage
+- Lecturers: Edit and improve examples
+- Tutors: Reference for grading and student assistance
+- Generated automatically from Example Library
+
+## Contents
+"""
+        
+        for content in course_contents:
+            if content.example:
+                readme_content += f"- `{content.example.identifier}/` - {content.title}\n"
+        
+        readme_content += f"""
+---
+*Last updated: {datetime.now(timezone.utc).isoformat()}*
+*Generated by Computor Example Library*
+"""
+        
+        readme_path = os.path.join(assignments_repo_path, 'README.md')
+        with open(readme_path, 'w', encoding='utf-8') as f:
+            f.write(readme_content)
+        
+        # Commit and push changes
+        assignments_repo.git.add('.')
+        if assignments_repo.git.diff('--staged'):
+            commit_message = f"Update assignments repository for {course.title}\n\n" \
+                           f"Processed {processed_count} examples from Example Library\n" \
+                           f"Generated: {datetime.now(timezone.utc).isoformat()}"
+            assignments_repo.git.commit('-m', commit_message)
+            
+            # Push changes
+            try:
+                if gitlab_token and 'http' in assignments_url:
+                    origin = assignments_repo.remote('origin')
+                    origin.set_url(auth_url)
+                assignments_repo.git.push('origin', 'main')
+                commit_hash = assignments_repo.head.commit.hexsha
+                logger.info(f"Pushed assignments repository changes: {commit_hash}")
+            except Exception as e:
+                logger.error(f"Failed to push assignments repository: {e}")
+                return {"success": False, "error": f"Failed to push: {str(e)}"}
+        else:
+            logger.info("No changes to commit in assignments repository")
+            commit_hash = assignments_repo.head.commit.hexsha if assignments_repo.head.is_valid() else "no-changes"
+        
+        # Clean up
+        shutil.rmtree(temp_dir)
+        
+        return {
+            "success": True,
+            "commit_hash": commit_hash,
+            "processed_contents": processed_count,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to generate assignments repository: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+    finally:
+        db_gen.close()
+
+
+async def process_full_example_for_assignments_repository(
+    example_files: Dict[str, bytes],
+    target_path: Path,
+    course_content: CourseContent,
+    version: ExampleVersion
+) -> Dict[str, Any]:
+    """
+    Process example files for assignments repository (full, unmodified content).
+    Copies ALL files from the example to preserve complete reference.
+    """
+    try:
+        # Create target directory
+        target_path.mkdir(parents=True, exist_ok=True)
+        
+        # Copy ALL files unmodified (including solutions, meta.yaml, etc.)
+        for filename, content in example_files.items():
+            file_path = target_path / filename
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_bytes(content)
+        
+        return {"success": True}
+        
+    except Exception as e:
+        logger.error(f"Failed to process full example content for {course_content.path}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 async def process_example_for_student_template_v2(
     example_files: Dict[str, bytes],
     target_path: Path,
@@ -609,10 +882,10 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         """
         logger.info(f"Starting student template generation v2 for course {params['course_id']}")
         
-        # Generate student template
+        # Generate both student template and assignments repository
         result = await workflow.execute_activity(
-            generate_student_template_v2,
-            args=[params['course_id'], params['student_template_url']],
+            generate_student_and_assignments_repositories,
+            args=[params['course_id'], params.get('student_template_url'), params.get('assignments_url')],
             start_to_close_timeout=timedelta(minutes=15),
             retry_policy=RetryPolicy(maximum_attempts=3)
         )

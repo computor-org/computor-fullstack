@@ -178,9 +178,8 @@ class ExampleDependencyGet(BaseModel):
 class ExampleQuery(ListQuery):
     """Query parameters for listing examples."""
     repository_id: Optional[UUID] = None
-    identifier: Optional[str] = None
+    identifier: Optional[str] = Field(None, description="Filter by identifier (supports Ltree patterns with *)")
     title: Optional[str] = None
-    subject: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
     search: Optional[str] = None
@@ -217,11 +216,15 @@ def example_search(db: Session, query, params: Optional[ExampleQuery]):
     if params.repository_id:
         query = query.filter(Example.example_repository_id == params.repository_id)
     if params.identifier:
-        query = query.filter(Example.identifier == Ltree(params.identifier))
+        # Support Ltree patterns for identifier filtering
+        if '*' in params.identifier:
+            # Use Ltree pattern matching with ~ operator
+            query = query.filter(Example.identifier.op('~')(params.identifier))
+        else:
+            # Exact match for Ltree
+            query = query.filter(Example.identifier == Ltree(params.identifier))
     if params.title:
         query = query.filter(Example.title.ilike(f"%{params.title}%"))
-    if params.subject:
-        query = query.filter(Example.subject == params.subject)
     if params.category:
         query = query.filter(Example.category == params.category)
     if params.tags:

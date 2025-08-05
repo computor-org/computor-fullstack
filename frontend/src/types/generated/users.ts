@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-05T10:25:26.704608
+ * Generated on: 2025-08-05T10:35:01.501314
 
  * Category: Users
 

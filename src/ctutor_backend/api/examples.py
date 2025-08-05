@@ -495,7 +495,10 @@ async def upload_example(
             ExampleDependency.example_id == example.id
         ).delete()
         
-        # Now add the new dependencies
+        # Validate all dependencies exist first
+        missing_dependencies = []
+        found_dependencies = []
+        
         for dep_identifier in test_dependencies:
             # Find the dependency example by identifier
             dep_example = db.query(Example).filter(
@@ -504,14 +507,27 @@ async def upload_example(
             ).first()
             
             if dep_example:
-                dependency = ExampleDependency(
-                    example_id=example.id,
-                    depends_id=dep_example.id
-                )
-                db.add(dependency)
-                logger.info(f"Added dependency: {example.identifier} -> {dep_identifier}")
+                found_dependencies.append((dep_identifier, dep_example))
             else:
-                logger.warning(f"Dependency not found: {dep_identifier} for example {example.identifier}")
+                missing_dependencies.append(dep_identifier)
+        
+        # If any dependencies are missing, return 400 error
+        if missing_dependencies:
+            missing_list = ", ".join(missing_dependencies)
+            raise BadRequestException(
+                f"Cannot upload example '{example.identifier}'. "
+                f"Missing dependencies: {missing_list}. "
+                f"Please upload the dependency examples first."
+            )
+        
+        # All dependencies found, add them
+        for dep_identifier, dep_example in found_dependencies:
+            dependency = ExampleDependency(
+                example_id=example.id,
+                depends_id=dep_example.id
+            )
+            db.add(dependency)
+            logger.info(f"Added dependency: {example.identifier} -> {dep_identifier}")
         
         db.commit()
     else:

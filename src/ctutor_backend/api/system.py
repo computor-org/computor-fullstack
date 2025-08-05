@@ -804,19 +804,22 @@ async def generate_student_template(
             detail=f"Course {course_id} not found"
         )
     
-    # Get student-template URL
+    # Get student-template and assignments URLs
     student_template_url = None
+    assignments_url = None
     
     # First check if course has GitLab properties
     if course.properties and "gitlab" in course.properties:
         course_gitlab = course.properties["gitlab"]
         
-        # Option 1: Direct URL stored (backward compatibility)
+        # Option 1: Direct URLs stored (backward compatibility)
         if "student_template_url" in course_gitlab:
             student_template_url = course_gitlab["student_template_url"]
+        if "assignments_url" in course_gitlab:
+            assignments_url = course_gitlab["assignments_url"]
         
-        # Option 2: Construct from course's full_path
-        elif "full_path" in course_gitlab:
+        # Option 2: Construct from course's full_path  
+        if "full_path" in course_gitlab and (not student_template_url or not assignments_url):
             # Get GitLab URL from organization
             if not course.course_family_id:
                 raise HTTPException(
@@ -845,8 +848,11 @@ async def generate_student_template(
                     detail="Organization missing GitLab URL"
                 )
             
-            # Construct URL: {gitlab_url}/{course_full_path}/student-template
-            student_template_url = f"{gitlab_url}/{course_gitlab['full_path']}/student-template"
+            # Construct URLs: {gitlab_url}/{course_full_path}/student-template and assignments
+            if not student_template_url:
+                student_template_url = f"{gitlab_url}/{course_gitlab['full_path']}/student-template"
+            if not assignments_url:
+                assignments_url = f"{gitlab_url}/{course_gitlab['full_path']}/assignments"
     
     if not student_template_url:
         raise HTTPException(
@@ -870,6 +876,7 @@ async def generate_student_template(
         parameters={
             "course_id": course_id,
             "student_template_url": student_template_url,
+            "assignments_url": assignments_url,
             "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
         },
         queue="computor-tasks"

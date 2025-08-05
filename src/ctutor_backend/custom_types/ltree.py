@@ -40,6 +40,9 @@ class LtreeType(BaseLtreeType):
     Custom LtreeType that uses our hyphen-supporting Ltree class.
     """
     
+    # Set cache_ok to True to enable SQLAlchemy caching and remove warnings
+    cache_ok = True
+    
     def _coerce(self, value):
         """Override to use our custom Ltree class."""
         if value:

@@ -185,6 +185,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DEBUG_MODE=${DEBUG_MODE}
       - TOKEN_SECRET=${TOKEN_SECRET}
+      - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
+      - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
       - PYTHONPATH=/home/worker/src
     volumes:
       - ./src:/home/worker/src:ro

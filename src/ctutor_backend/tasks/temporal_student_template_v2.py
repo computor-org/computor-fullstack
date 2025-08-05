@@ -14,13 +14,13 @@ from pathlib import Path
 
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .temporal_hierarchy_management import transform_localhost_url
 from .registry import register_task
 from ..database import get_db
-from ..model.course import Course, CourseContent
+from ..model.course import Course, CourseContent, CourseFamily
 from ..model.example import Example, ExampleVersion, ExampleRepository
 from ..model.organization import Organization
 from ..services.storage_service import StorageService
@@ -209,7 +209,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 template_repo.create_remote('origin', student_template_url)
         
         # Get all CourseContent with examples
-        course_contents = db.query(CourseContent).filter(
+        course_contents = db.query(CourseContent).options(
+            joinedload(CourseContent.example).joinedload(Example.versions),
+            joinedload(CourseContent.example).joinedload(Example.repository)
+        ).filter(
             CourseContent.course_id == course_id,
             CourseContent.example_id.isnot(None),
             CourseContent.archived_at.is_(None)
@@ -359,6 +362,12 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             f.write(f"4. Commit and push your solutions regularly\n\n")
             f.write(f"## Submission\n\n")
             f.write(f"Follow your instructor's guidelines for submitting assignments.\n")
+        
+        # Configure git for commits (required in worker container)
+        git_email = os.environ.get('SYSTEM_GIT_EMAIL', 'worker@computor.local')
+        git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
+        template_repo.git.config('user.email', git_email)
+        template_repo.git.config('user.name', git_name)
         
         # Commit and push changes
         template_repo.git.add('.')
@@ -573,10 +582,16 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
                 os.remove(item_path)
         
         # Get course contents with examples
-        course_contents = db.query(CourseContent).filter(
+        course_contents = db.query(CourseContent).options(
+            joinedload(CourseContent.example).joinedload(Example.versions),
+            joinedload(CourseContent.example).joinedload(Example.repository)
+        ).filter(
             CourseContent.course_id == course_id,
-            CourseContent.example_id.isnot(None)
-        ).all()
+            CourseContent.example_id.isnot(None),
+            CourseContent.archived_at.is_(None)
+        ).order_by(CourseContent.path).all()
+        
+        logger.info(f"Found {len(course_contents)} course contents with examples for assignments repository")
         
         processed_count = 0
         errors = []
@@ -584,9 +599,13 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
         # Process each course content
         for content in course_contents:
             try:
+                logger.info(f"Processing content: {content.path}, example_id: {content.example_id}")
+                
                 if not content.example:
                     logger.warning(f"CourseContent {content.path} has example_id but no example relationship")
                     continue
+                
+                logger.info(f"Example found: {content.example.identifier}, versions count: {len(content.example.versions) if content.example.versions else 0}")
                 
                 if not content.example_version:
                     logger.warning(f"CourseContent {content.path} has no example_version specified")
@@ -595,7 +614,7 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
                 # Find the specific version
                 version = None
                 for v in content.example.versions:
-                    if v.version == content.example_version:
+                    if v.version_tag == content.example_version:
                         version = v
                         break
                 
@@ -654,13 +673,19 @@ This repository contains the complete example content with solutions for course 
         with open(readme_path, 'w', encoding='utf-8') as f:
             f.write(readme_content)
         
+        # Configure git for commits (required in worker container)
+        git_email = os.environ.get('SYSTEM_GIT_EMAIL', 'worker@computor.local')
+        git_name = os.environ.get('SYSTEM_GIT_NAME', 'Computor Worker')
+        assignments_repo.git.config('user.email', git_email)
+        assignments_repo.git.config('user.name', git_name)
+        
         # Commit and push changes
         assignments_repo.git.add('.')
-        if assignments_repo.git.diff('--staged'):
+        if assignments_repo.is_dirty(untracked_files=True):
             commit_message = f"Update assignments repository for {course.title}\n\n" \
                            f"Processed {processed_count} examples from Example Library\n" \
                            f"Generated: {datetime.now(timezone.utc).isoformat()}"
-            assignments_repo.git.commit('-m', commit_message)
+            assignments_repo.index.commit(commit_message)
             
             # Push changes
             try:
@@ -673,6 +698,8 @@ This repository contains the complete example content with solutions for course 
             except Exception as e:
                 logger.error(f"Failed to push assignments repository: {e}")
                 return {"success": False, "error": f"Failed to push: {str(e)}"}
+            
+            commit_hash = assignments_repo.head.commit.hexsha
         else:
             logger.info("No changes to commit in assignments repository")
             commit_hash = assignments_repo.head.commit.hexsha if assignments_repo.head.is_valid() else "no-changes"

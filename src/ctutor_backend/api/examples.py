@@ -367,10 +367,8 @@ async def upload_example(
     description = meta_data.get('description', '')
     slug = meta_data.get('slug', request.directory.replace('-', '.').replace('_', '.'))
     
-    # Extract version from meta.yaml
-    version = meta_data.get('version', '1.0')
-    # Add 'v' prefix if not present for consistency
-    version_tag = version if version.startswith('v') else f'v{version}'
+    # Extract version from meta.yaml (use exactly as specified)
+    version_tag = meta_data.get('version', '1.0')
     
     # Extract tags and other metadata
     tags = []

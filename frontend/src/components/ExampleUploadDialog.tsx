@@ -59,6 +59,7 @@ interface DetectedExample {
   files: FileUpload[];
   metaYaml: string;
   testYaml?: string;
+  dependencies: string[];
 }
 
 interface ExampleUploadDialogProps {
@@ -207,6 +208,18 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
             }
           }
 
+          // Extract dependencies from meta.yaml
+          let dependencies: string[] = [];
+          if (metaData.testDependencies) {
+            dependencies = Array.isArray(metaData.testDependencies) 
+              ? metaData.testDependencies 
+              : [metaData.testDependencies];
+          } else if (metaData.properties?.testDependencies) {
+            dependencies = Array.isArray(metaData.properties.testDependencies)
+              ? metaData.properties.testDependencies
+              : [metaData.properties.testDependencies];
+          }
+
           // Create detected example
           examples.push({
             directory: directoryName,
@@ -216,6 +229,7 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
             files: directoryFiles,
             metaYaml: metaContent,
             testYaml: testYaml,
+            dependencies: dependencies,
           });
 
         } catch (err) {
@@ -243,6 +257,55 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
   const isSupportedFile = (fileName: string): boolean => {
     const supportedExtensions = ['.py', '.js', '.java', '.cpp', '.c', '.h', '.txt', '.md', '.yaml', '.yml', '.json'];
     return supportedExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+  };
+
+  const sortExamplesByDependencies = (examples: DetectedExample[]): DetectedExample[] => {
+    const sorted: DetectedExample[] = [];
+    const remaining = [...examples];
+    const processing = new Set<string>();
+
+    while (remaining.length > 0) {
+      const initialLength = remaining.length;
+      
+      for (let i = remaining.length - 1; i >= 0; i--) {
+        const example = remaining[i];
+        
+        // Check if all dependencies are already sorted or being processed
+        const unmetDeps = example.dependencies.filter(dep => 
+          !sorted.some(s => s.slug === dep) && !processing.has(dep)
+        );
+        
+        // If no unmet dependencies, add to sorted list
+        if (unmetDeps.length === 0) {
+          processing.add(example.slug);
+          sorted.push(example);
+          remaining.splice(i, 1);
+        }
+      }
+      
+      // If we couldn't resolve any dependencies in this iteration, we have circular deps or missing deps
+      if (remaining.length === initialLength) {
+        // Add remaining examples anyway (they have unresolvable dependencies)
+        sorted.push(...remaining);
+        break;
+      }
+    }
+    
+    return sorted;
+  };
+
+  const validateDependencies = (examples: DetectedExample[]): { valid: boolean; issues: string[] } => {
+    const issues: string[] = [];
+    const availableSlugs = new Set(examples.map(ex => ex.slug));
+    
+    for (const example of examples) {
+      const missingDeps = example.dependencies.filter(dep => !availableSlugs.has(dep));
+      if (missingDeps.length > 0) {
+        issues.push(`${example.title}: missing dependencies [${missingDeps.join(', ')}]`);
+      }
+    }
+    
+    return { valid: issues.length === 0, issues };
   };
 
   const handleExampleToggle = (slug: string) => {
@@ -285,75 +348,82 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
       return;
     }
 
+    // Get selected examples and validate dependencies
+    const selectedExamplesList = detectedExamples.filter(ex => selectedExamples.has(ex.slug));
+    const dependencyValidation = validateDependencies(selectedExamplesList);
+    
+    if (!dependencyValidation.valid) {
+      setError(`Dependency issues found:\n${dependencyValidation.issues.join('\n')}`);
+      return;
+    }
+
+    // Sort examples by dependency order
+    const sortedExamples = sortExamplesByDependencies(selectedExamplesList);
+
     setUploading(true);
     setError(null);
     setUploadProgress({ current: 0, total: selectedExamples.size });
 
     try {
-      const uploadPromises = [];
-      const selectedExamplesList = detectedExamples.filter(ex => selectedExamples.has(ex.slug));
       let completedCount = 0;
+      const failedUploads: { example: DetectedExample; error: string }[] = [];
+      const successfulUploads: DetectedExample[] = [];
       
-      // Create upload promises with example information for better error tracking
-      for (const example of selectedExamplesList) {
-        // Convert files array to Record<string, string>
-        const filesMap: Record<string, string> = {};
-        for (const file of example.files) {
-          filesMap[file.name] = file.content;
-        }
-        
-        // Add meta.yaml and test.yaml
-        filesMap['meta.yaml'] = example.metaYaml;
-        if (example.testYaml) {
-          filesMap['test.yaml'] = example.testYaml;
-        }
+      // Upload examples sequentially in dependency order
+      for (const example of sortedExamples) {
+        try {
+          // Convert files array to Record<string, string>
+          const filesMap: Record<string, string> = {};
+          for (const file of example.files) {
+            filesMap[file.name] = file.content;
+          }
+          
+          // Add meta.yaml and test.yaml
+          filesMap['meta.yaml'] = example.metaYaml;
+          if (example.testYaml) {
+            filesMap['test.yaml'] = example.testYaml;
+          }
 
-        const uploadRequest: ExampleUploadRequest = {
-          repository_id: data.repository_id,
-          directory: example.directory,
-          files: filesMap,
-        };
+          const uploadRequest: ExampleUploadRequest = {
+            repository_id: data.repository_id,
+            directory: example.directory,
+            files: filesMap,
+          };
 
-        uploadPromises.push({
-          example,
-          promise: apiClient.post('/examples/upload', uploadRequest).then(result => {
-            completedCount++;
-            setUploadProgress({ current: completedCount, total: selectedExamplesList.length });
-            return result;
-          })
-        });
+          await apiClient.post('/examples/upload', uploadRequest);
+          
+          completedCount++;
+          successfulUploads.push(example);
+          setUploadProgress({ current: completedCount, total: sortedExamples.length });
+          console.log(`✅ Uploaded: ${example.title}`);
+          
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
+          failedUploads.push({ example, error: errorMsg });
+          console.error(`❌ Failed to upload ${example.title}:`, errorMsg);
+          
+          // If this example failed, remaining examples that depend on it will also fail
+          // We can continue uploading non-dependent examples
+        }
       }
 
-      // Wait for all uploads to complete with better error handling
-      const results = await Promise.allSettled(uploadPromises.map(up => up.promise));
-      
-      // Check results and provide detailed feedback
-      const successful = results.filter(r => r.status === 'fulfilled').length;
-      const failed = results.filter(r => r.status === 'rejected').length;
-      
-      if (failed > 0) {
-        // Collect error details
-        const failedExamples = [];
-        for (let i = 0; i < results.length; i++) {
-          if (results[i].status === 'rejected') {
-            const reason = (results[i] as PromiseRejectedResult).reason;
-            failedExamples.push(`${uploadPromises[i].example.title}: ${reason.message || reason}`);
-          }
-        }
+      // Handle results
+      if (failedUploads.length > 0) {
+        const failedList = failedUploads.map(f => `${f.example.title}: ${f.error}`);
         
-        if (successful > 0) {
+        if (successfulUploads.length > 0) {
           // Partial success
-          setError(`Uploaded ${successful} of ${selectedExamplesList.length} examples. Failed: ${failedExamples.join('; ')}`);
+          setError(`Uploaded ${successfulUploads.length} of ${sortedExamples.length} examples. Failed: ${failedList.join('; ')}`);
         } else {
           // All failed
-          throw new Error(`All uploads failed. ${failedExamples.join('; ')}`);
+          throw new Error(`All uploads failed. ${failedList.join('; ')}`);
         }
       }
       
-      console.log(`Successfully uploaded ${successful} examples`);
+      console.log(`Successfully uploaded ${successfulUploads.length} examples`);
 
       // Reset form and close dialog only if at least some uploads succeeded
-      if (successful > 0) {
+      if (successfulUploads.length > 0) {
         reset();
         setDetectedExamples([]);
         setSelectedExamples(new Set());
@@ -523,6 +593,9 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
                               )}
                               <Typography variant="caption" color="text.secondary">
                                 {example.files.length} files • Slug: {example.slug}
+                                {example.dependencies.length > 0 && (
+                                  <span> • Dependencies: {example.dependencies.join(', ')}</span>
+                                )}
                               </Typography>
                             </Box>
                           }

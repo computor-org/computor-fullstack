@@ -19,7 +19,6 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             course_content_type_id=course_content.course_content_type_id,
             course_content_kind_id=course_content.course_content_kind_id,
             course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
-            version_identifier=course_content.version_identifier,
             position=course_content.position,
             max_group_size=course_content.max_group_size,
             directory=course_content.properties["gitlab"]["directory"],

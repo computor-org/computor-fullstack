@@ -125,7 +125,6 @@ async def student_list_courses(permissions: Annotated[Principal, Depends(get_cur
             title=course.title,
             course_family_id=course.course_family_id,
             organization_id=course.organization_id,
-            version_identifier=course.version_identifier,
             course_content_types=course.course_content_types,
             path=course.path,
             repository=CourseStudentRepository(
@@ -146,7 +145,6 @@ async def student_get_course(course_id: UUID | str,permissions: Annotated[Princi
         title=course.title,
         course_family_id=course.course_family_id,
         organization_id=course.organization_id,
-        version_identifier=course.version_identifier,
         course_content_types=course.course_content_types,
         path=course.path,
         repository=CourseStudentRepository(

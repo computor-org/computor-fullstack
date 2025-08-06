@@ -43,7 +43,6 @@ class CourseContentStudentGet(BaseEntityGet):
     course_id: str
     course_content_type_id: str
     course_content_kind_id: str
-    version_identifier: str
     position: float
     max_group_size: Optional[int] = None
     submitted: Optional[bool] = None
@@ -65,7 +64,6 @@ class CourseContentStudentList(BaseModel):
     course_id: str
     course_content_type_id: str
     course_content_kind_id: str
-    version_identifier: str
     position: float
     max_group_size: Optional[int] = None
     submitted: Optional[bool] = None

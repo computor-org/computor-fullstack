@@ -91,7 +91,6 @@ class Course(Base):
     path = Column(LtreeType, nullable=False)
     course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    version_identifier = Column(String(2048))
 
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
@@ -205,9 +204,8 @@ class CourseContent(Base):
     path = Column(LtreeType, nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    version_identifier = Column(String(2048), nullable=True)  # Made nullable - deprecated field
     position = Column(Float(53), nullable=False)
-    max_group_size = Column(Integer, nullable=False)
+    max_group_size = Column(Integer, nullable=True)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))

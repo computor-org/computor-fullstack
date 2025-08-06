@@ -131,7 +131,6 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
             course_content_type_id=course_content.course_content_type_id,
             course_content_kind_id=course_content.course_content_kind_id,
             course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
-            version_identifier=course_content.version_identifier,
             position=course_content.position,
             max_group_size=course_content.max_group_size,
             directory=course_content.properties["gitlab"]["directory"],
@@ -169,7 +168,6 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
                 title=course.title,
                 course_family_id=course.course_family_id,
                 organization_id=course.organization_id,
-                version_identifier=course.version_identifier,
                 path=course.path,
                 repository=CourseTutorRepository(
                     provider_url=course.properties["gitlab"]["url"],
@@ -192,7 +190,6 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
             title=course.title,
             course_family_id=course.course_family_id,
             organization_id=course.organization_id,
-            version_identifier=course.version_identifier,
             path=course.path,
             repository=CourseTutorRepository(
                 provider_url=course.properties["gitlab"]["url"],

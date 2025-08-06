@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-06T09:28:26.012868
+ * Generated on: 2025-08-06T13:19:53.337845
 
  * Category: Common
 
@@ -1006,26 +1006,59 @@ export interface CourseConfig {
 }
 
 /**
- * Course configuration with nested courses.
+ * Course configuration for hierarchical deployment.
  */
-export interface HierarchicalCourseConfig extends CourseConfig {
-  // Inherits all properties from CourseConfig
+export interface HierarchicalCourseConfig {
+  /** Course display name */
+  name: string;
+  /** Course path/slug */
+  path: string;
+  /** Course description */
+  description?: string | null;
+  /** Course project structure */
+  projects?: CourseProjects | null;
+  /** Available execution backends for this course */
+  execution_backends?: ExecutionBackendConfig[] | null;
+  /** Course content types to be created (assignments, units, etc.) */
+  content_types?: CourseContentTypeConfig[] | null;
+  /** Course-specific settings */
+  settings?: Record<string, any> | null;
 }
 
 /**
  * Course family configuration with nested courses.
  */
-export interface HierarchicalCourseFamilyConfig extends CourseFamilyConfig {
+export interface HierarchicalCourseFamilyConfig {
+  /** Course family display name */
+  name: string;
+  /** Course family path/slug */
+  path: string;
+  /** Course family description */
+  description?: string | null;
+  /** Course family-specific settings */
+  settings?: Record<string, any> | null;
   /** List of courses in this course family */
-  courses: HierarchicalCourseConfig[];
+  courses?: HierarchicalCourseConfig[];
 }
 
 /**
  * Organization configuration with nested course families.
  */
-export interface HierarchicalOrganizationConfig extends OrganizationConfig {
+export interface HierarchicalOrganizationConfig {
+  /** Organization display name */
+  name: string;
+  /** Organization path/slug */
+  path: string;
+  /** Organization description */
+  description?: string | null;
+  /** Organization-specific settings */
+  settings?: Record<string, any> | null;
+  /** GitLab configuration */
+  gitlab?: GitLabConfig | null;
+  /** GitHub configuration (future) */
+  github?: GitHubConfig | null;
   /** List of course families in this organization */
-  course_families: HierarchicalCourseFamilyConfig[];
+  course_families?: HierarchicalCourseFamilyConfig[];
 }
 
 /**

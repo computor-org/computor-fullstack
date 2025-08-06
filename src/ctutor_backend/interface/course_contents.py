@@ -121,7 +121,6 @@ class CourseContentCreate(BaseModel):
     course_id: str
     course_content_type_id: str
     properties: Optional[CourseContentProperties] = None
-    version_identifier: Optional[str] = None  # Made optional - will be deprecated
     position: float = 0
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
@@ -145,7 +144,6 @@ class CourseContentGet(BaseEntityGet):
     course_content_type_id: str
     course_content_kind_id: str
     properties: Optional[CourseContentPropertiesGet] = None
-    version_identifier: Optional[str] = None  # Made optional - will be deprecated
     position: float
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
@@ -174,7 +172,6 @@ class CourseContentList(BaseModel):
     course_id: str
     course_content_type_id: str
     course_content_kind_id: str
-    version_identifier: Optional[str] = None  # Made optional - will be deprecated
     position: float
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
@@ -202,7 +199,6 @@ class CourseContentUpdate(BaseModel):
     description: Optional[str] = None
     course_content_type_id: Optional[str] = None
     properties: Optional[CourseContentProperties] = None
-    version_identifier: Optional[str] = None
     position: Optional[float] = None
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
@@ -215,7 +211,6 @@ class CourseContentQuery(ListQuery):
     path: Optional[str] = None
     course_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     properties: Optional[CourseContentProperties] = None
     archived: Optional[bool] = None
     position: Optional[float] = None
@@ -240,8 +235,6 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
         query = query.filter(CourseContent.course_id == params.course_id)
     if params.course_content_type_id != None:
         query = query.filter(CourseContent.course_content_type_id == params.course_content_type_id)
-    if params.version_identifier != None:
-        query = query.filter(CourseContent.version_identifier == params.version_identifier)
     if params.position != None:
         query = query.filter(CourseContent.position == params.position)
     if params.max_group_size != None:
@@ -262,6 +255,10 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
 
 def post_create(course_content: CourseContent, db: Session):
     
+    # Only create submission groups if max_group_size is set to 1
+    if course_content.max_group_size != 1:
+        return
+    
     course_members = (
         db.scalars(db.query(CourseMember.id)
         .join(User, User.id == CourseMember.user_id)
@@ -270,7 +267,6 @@ def post_create(course_content: CourseContent, db: Session):
         .filter(
             CourseMember.course_id == course_content.course_id,
             CourseContentKind.submittable == True,
-            course_content.max_group_size == 1,
             User.user_type == "user"
         )).all()
     )

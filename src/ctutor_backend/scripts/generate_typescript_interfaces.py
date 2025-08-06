@@ -200,7 +200,11 @@ class TypeScriptGenerator:
                             # Check for BaseModel or classes that might inherit from it
                             if base_name in ['BaseModel', 'BaseDeployment', 'RepositoryConfig', 
                                            'GitLabConfigGet', 'BaseEntityList', 'BaseEntityGet',
-                                           'BaseEntityCreate', 'BaseEntityUpdate']:
+                                           'BaseEntityCreate', 'BaseEntityUpdate',
+                                           # Add deployment configuration classes
+                                           'OrganizationConfig', 'CourseFamilyConfig', 'CourseConfig',
+                                           'HierarchicalOrganizationConfig', 'HierarchicalCourseFamilyConfig',
+                                           'HierarchicalCourseConfig']:
                                 # Try to import the module and get the class
                                 try:
                                     # Convert file path to module path

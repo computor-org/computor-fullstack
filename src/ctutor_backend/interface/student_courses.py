@@ -15,7 +15,6 @@ class CourseStudentGet(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     course_content_types: list[CourseContentTypeGet]
     path: str
 
@@ -33,7 +32,6 @@ class CourseStudentList(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     path: str
     course_content_types: list[CourseContentTypeList]
 
@@ -53,7 +51,6 @@ class CourseStudentQuery(ListQuery):
     path: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
     full_path_student: Optional[str] = None

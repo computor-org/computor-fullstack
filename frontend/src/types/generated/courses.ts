@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-06T09:28:26.007879
+ * Generated on: 2025-08-06T13:19:53.334099
 
  * Category: Courses
 
@@ -58,7 +58,6 @@ export interface CourseCreate {
   description?: string | null;
   path: string;
   course_family_id: string;
-  version_identifier?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -68,7 +67,6 @@ export interface CourseGet {
   description?: string | null;
   path: string;
   course_family_id: string;
-  version_identifier?: string | null;
   properties?: CoursePropertiesGet | null;
   /** Creation timestamp */
   created_at?: string | null;
@@ -85,7 +83,6 @@ export interface CourseList {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   properties?: CoursePropertiesGet | null;
 }
@@ -93,7 +90,6 @@ export interface CourseList {
 export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
-  version_identifier?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -290,7 +286,6 @@ export interface CourseContentStudentGet {
   course_id: string;
   course_content_type_id: string;
   course_content_kind_id: string;
-  version_identifier: string;
   position: number;
   max_group_size?: number | null;
   submitted?: boolean | null;
@@ -306,7 +301,6 @@ export interface CourseContentStudentList {
   course_id: string;
   course_content_type_id: string;
   course_content_kind_id: string;
-  version_identifier: string;
   position: number;
   max_group_size?: number | null;
   submitted?: boolean | null;
@@ -334,7 +328,6 @@ export interface CourseStudentGet {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   course_content_types: CourseContentTypeGet[];
   path: string;
   repository: CourseStudentRepository;
@@ -345,7 +338,6 @@ export interface CourseStudentList {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   course_content_types: CourseContentTypeList[];
   repository: CourseStudentRepository;
@@ -501,7 +493,6 @@ export interface CourseContentCreate {
   course_id: string;
   course_content_type_id: string;
   properties?: CourseContentProperties | null;
-  version_identifier?: string | null;
   position?: number;
   max_group_size?: number | null;
   max_test_runs?: number | null;
@@ -529,7 +520,6 @@ export interface CourseContentGet {
   course_content_type_id: string;
   course_content_kind_id: string;
   properties?: CourseContentPropertiesGet | null;
-  version_identifier?: string | null;
   position: number;
   max_group_size?: number | null;
   max_test_runs?: number | null;
@@ -549,7 +539,6 @@ export interface CourseContentList {
   course_id: string;
   course_content_type_id: string;
   course_content_kind_id: string;
-  version_identifier?: string | null;
   position: number;
   max_group_size?: number | null;
   max_test_runs?: number | null;
@@ -568,7 +557,6 @@ export interface CourseContentUpdate {
   description?: string | null;
   course_content_type_id?: string | null;
   properties?: CourseContentProperties | null;
-  version_identifier?: string | null;
   position?: number | null;
   max_group_size?: number | null;
   max_test_runs?: number | null;
@@ -625,7 +613,6 @@ export interface CourseTutorGet {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   repository: CourseTutorRepository;
 }
@@ -635,7 +622,6 @@ export interface CourseTutorList {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   repository: CourseTutorRepository;
 }

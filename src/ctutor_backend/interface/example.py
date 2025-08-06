@@ -66,7 +66,6 @@ class ExampleCreate(BaseModel):
     subject: Optional[str] = None
     category: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
-    version_identifier: Optional[str] = None
 
 
 class ExampleGet(BaseEntityGet, ExampleCreate):
@@ -99,7 +98,6 @@ class ExampleList(BaseEntityList):
     subject: Optional[str] = None
     category: Optional[str] = None
     tags: List[str] = []
-    version_identifier: Optional[str] = None
     example_repository_id: UUID
     
     @field_validator('identifier', mode='before')
@@ -118,7 +116,6 @@ class ExampleUpdate(BaseModel):
     subject: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
-    version_identifier: Optional[str] = None
 
 
 class ExampleVersionCreate(BaseModel):

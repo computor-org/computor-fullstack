@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-05T10:35:01.508363
+ * Generated on: 2025-08-06T09:28:26.012868
 
  * Category: Common
 
@@ -552,6 +552,16 @@ export interface GitCommit {
 }
 
 /**
+ * Represents a test dependency with slug and version constraint.
+ */
+export interface TestDependency {
+  /** Hierarchical slug of the dependency example (e.g., 'physics.math.vectors') */
+  slug: string;
+  /** Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version. */
+  version?: string | null;
+}
+
+/**
  * Base class for all CodeAbility meta models.
  */
 export interface CodeAbilityBase {
@@ -995,12 +1005,27 @@ export interface CourseConfig {
   settings?: Record<string, any> | null;
 }
 
-export interface HierarchicalOrganizationConfig {
-  id?: string | null;
-  name: string;
-  path: string;
-  description?: string | null;
-  course_families?: any[];
+/**
+ * Course configuration with nested courses.
+ */
+export interface HierarchicalCourseConfig extends CourseConfig {
+  // Inherits all properties from CourseConfig
+}
+
+/**
+ * Course family configuration with nested courses.
+ */
+export interface HierarchicalCourseFamilyConfig extends CourseFamilyConfig {
+  /** List of courses in this course family */
+  courses: HierarchicalCourseConfig[];
+}
+
+/**
+ * Organization configuration with nested course families.
+ */
+export interface HierarchicalOrganizationConfig extends OrganizationConfig {
+  /** List of course families in this organization */
+  course_families: HierarchicalCourseFamilyConfig[];
 }
 
 /**

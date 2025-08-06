@@ -69,7 +69,6 @@ const ExampleForm: React.FC<ExampleFormProps> = ({
       subject: example?.subject || '',
       category: example?.category || '',
       tags: example?.tags || [],
-      version_identifier: example?.version_identifier || '',
     },
   });
 

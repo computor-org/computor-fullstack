@@ -126,8 +126,6 @@ class Example(Base):
     category = Column(String(100), comment="Category for grouping examples")
     tags = Column(ARRAY(String), nullable=False, default=[], comment="Tags for searching and filtering")
     
-    version_identifier = Column(String(64), comment="Version Identifier (e.g. hash) of example directory contents for change detection")
-    
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

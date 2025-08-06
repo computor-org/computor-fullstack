@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-05T10:35:01.506181
+ * Generated on: 2025-08-06T09:28:26.010372
 
  * Category: Examples
 
@@ -96,7 +96,6 @@ export interface ExampleCreate {
   subject?: string | null;
   category?: string | null;
   tags?: string[];
-  version_identifier?: string | null;
 }
 
 /**
@@ -112,7 +111,6 @@ export interface ExampleGet {
   subject?: string | null;
   category?: string | null;
   tags?: string[];
-  version_identifier?: string | null;
   created_at: string;
   updated_at: string;
   created_by?: string | null;
@@ -138,7 +136,6 @@ export interface ExampleList {
   subject?: string | null;
   category?: string | null;
   tags?: string[];
-  version_identifier?: string | null;
   example_repository_id: string;
 }
 
@@ -152,7 +149,6 @@ export interface ExampleUpdate {
   subject?: string | null;
   category?: string | null;
   tags?: string[] | null;
-  version_identifier?: string | null;
 }
 
 /**
@@ -203,6 +199,8 @@ export interface ExampleVersionList {
 export interface ExampleDependencyCreate {
   example_id: string;
   depends_id: string;
+  /** Version constraint (e.g., '>=1.2.0', '^2.1.0'). NULL means latest version. */
+  version_constraint?: string | null;
 }
 
 /**
@@ -212,6 +210,8 @@ export interface ExampleDependencyGet {
   id: string;
   example_id: string;
   depends_id: string;
+  /** Version constraint string */
+  version_constraint?: string | null;
   created_at: string;
   dependency?: ExampleList | null;
 }

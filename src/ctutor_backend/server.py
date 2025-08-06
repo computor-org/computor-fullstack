@@ -15,7 +15,7 @@ from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.sso import sso_router
-from ctutor_backend.plugins.registry import initialize_plugin_registry
+from ctutor_backend.plugins.registry import initialize_plugin_registry, PluginConfig
 from sqlalchemy.orm import Session
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.deployments import DeploymentFactory
@@ -54,6 +54,58 @@ from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.examples import examples_router
 from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
+import json
+import tempfile
+from pathlib import Path
+
+async def initialize_plugin_registry_with_config():
+    """Initialize plugin registry with configuration from settings."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Check if we should use a custom config file
+    if settings.AUTH_PLUGINS_CONFIG:
+        config_file = settings.AUTH_PLUGINS_CONFIG
+        logger.info(f"Using custom plugin config from: {config_file}")
+    else:
+        # Create a temporary config based on settings
+        config = {}
+        
+        # Configure Keycloak based on settings
+        if settings.ENABLE_KEYCLOAK:
+            logger.info("Keycloak authentication is ENABLED")
+            config["keycloak"] = {
+                "enabled": True,
+                "settings": {
+                    # These can be overridden by environment variables in KeycloakAuthPlugin
+                    "server_url": os.environ.get("KEYCLOAK_SERVER_URL", "http://localhost:8180"),
+                    "realm": os.environ.get("KEYCLOAK_REALM", "computor"),
+                    "client_id": os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend"),
+                    "client_secret": os.environ.get("KEYCLOAK_CLIENT_SECRET", "computor-backend-secret")
+                }
+            }
+        else:
+            logger.info("Keycloak authentication is DISABLED")
+            config["keycloak"] = {
+                "enabled": False
+            }
+        
+        # Write config to temporary file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(config, f, indent=2)
+            config_file = f.name
+            logger.debug(f"Created temporary plugin config at: {config_file}")
+    
+    # Initialize registry with the config file
+    await initialize_plugin_registry(config_file)
+    
+    # Clean up temp file if we created one
+    if not settings.AUTH_PLUGINS_CONFIG and config_file:
+        try:
+            Path(config_file).unlink()
+            logger.debug("Cleaned up temporary plugin config")
+        except:
+            pass
 
 async def init_execution_backend_api(db: Session):
 
@@ -125,8 +177,8 @@ async def startup_logic():
         await init_execution_backend_api(db)
         await mirror_db_to_filesystem(db)
     
-    # Initialize plugin registry
-    await initialize_plugin_registry()
+    # Initialize plugin registry with configuration
+    await initialize_plugin_registry_with_config()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -137,7 +189,7 @@ async def lifespan(app: FastAPI):
         await startup_logic()
     else:
         # Initialize plugin registry in development mode
-        await initialize_plugin_registry()
+        await initialize_plugin_registry_with_config()
     
     yield
 

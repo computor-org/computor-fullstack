@@ -296,7 +296,7 @@ class ExampleFileSet(BaseModel):
 class ExampleDownloadResponse(BaseModel):
     """Response containing downloaded example files."""
     example_id: UUID
-    version_id: UUID
+    version_id: Optional[UUID] = None
     version_tag: str
     files: Dict[str, str] = Field(..., description="Map of filename to content")
     meta_yaml: str

@@ -508,15 +508,76 @@ async def upload_example(
     return version
 
 
+@examples_router.get("/{example_id}/download", response_model=ExampleDownloadResponse)
+async def download_example_latest(
+    example_id: UUID,
+    with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
+    db: Session = Depends(get_db),
+    permissions: Principal = Depends(get_current_permissions),
+    storage_service=Depends(get_storage_service),
+):
+    """Download the latest version of an example from storage, optionally with all dependencies."""
+    # Check permissions
+    if not permissions.permitted("example", "read"):
+        raise ForbiddenException("You don't have permission to download examples")
+    
+    # Get example with repository relationship
+    example = db.query(Example).filter(Example.id == example_id).first()
+    if not example:
+        raise NotFoundException(f"Example {example_id} not found")
+    
+    # Get the latest version
+    latest_version = db.query(ExampleVersion).filter(
+        ExampleVersion.example_id == example_id
+    ).order_by(ExampleVersion.version_number.desc()).first()
+    
+    if not latest_version:
+        # If no version exists, return minimal response with just the example directory structure
+        # Load repository relationship
+        repository = db.query(ExampleRepository).filter(
+            ExampleRepository.id == example.example_repository_id
+        ).first()
+        
+        if not repository:
+            raise NotFoundException(f"Repository for example {example_id} not found")
+        
+        # For Git repositories, we can't download directly
+        if repository.source_type == "git":
+            # Return basic structure for Git-based examples
+            return ExampleDownloadResponse(
+                example_id=example.id,
+                version_id=None,
+                version_tag="latest",
+                files={
+                    "README.md": f"# {example.title}\n\n{example.description or 'No description available'}\n\nThis example is stored in a Git repository.\nClone the repository to access the files.",
+                    "meta.yaml": f"slug: {example.identifier}\ntitle: {example.title}\ndescription: {example.description or ''}\n"
+                },
+                meta_yaml=f"slug: {example.identifier}\ntitle: {example.title}\n",
+                test_yaml=None,
+                dependencies=None,
+            )
+        
+        raise NotFoundException(f"No versions found for example {example_id}")
+    
+    # Use the existing download logic with the version ID
+    return await download_example_version(
+        latest_version.id,
+        with_dependencies,
+        db,
+        permissions,
+        storage_service
+    )
+
+
 @examples_router.get("/download/{version_id}", response_model=ExampleDownloadResponse)
-async def download_example(
+async def download_example_version(
     version_id: UUID,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
     storage_service=Depends(get_storage_service),
 ):
-    """Download an example version from storage, optionally with all dependencies."""
+    """Download a specific example version from storage, optionally with all dependencies."""
     # Check permissions
     if not permissions.permitted("example", "read"):
         raise ForbiddenException("You don't have permission to download examples")

@@ -540,18 +540,6 @@ const CourseDetailPage: React.FC = () => {
                   </Box>
                 )}
                 
-                {course.version_identifier && (
-                  <Box>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                      <CodeIcon fontSize="small" color="action" />
-                      <Typography variant="subtitle2" color="text.secondary">
-                        Version
-                      </Typography>
-                    </Stack>
-                    <Typography variant="body1">{course.version_identifier}</Typography>
-                  </Box>
-                )}
-                
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Technical Details

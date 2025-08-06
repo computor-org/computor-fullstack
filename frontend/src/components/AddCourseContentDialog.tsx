@@ -160,7 +160,6 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
         path,
         course_id: courseId,
         course_content_type_id: formData.contentTypeId,
-        version_identifier: 'initial',
         position: formData.position,
         max_group_size: 1,
       };

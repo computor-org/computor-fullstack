@@ -95,7 +95,6 @@ class CourseContentStudentQuery(ListQuery):
     path: Optional[str] = None
     course_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     
     directory: Optional[str] = None
     project: Optional[str] = None
@@ -117,8 +116,6 @@ def course_content_student_search(db: Session, query, params: Optional[CourseCon
         query = query.filter(CourseContent.course_id == params.course_id)
     if params.course_content_type_id != None:
         query = query.filter(CourseContent.course_content_type_id == params.course_content_type_id)
-    if params.version_identifier != None:
-        query = query.filter(CourseContent.version_identifier == params.version_identifier)
 
     # TODO: only for gitlab courses. This has to be checked
     if params.directory != None:

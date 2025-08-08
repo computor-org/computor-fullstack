@@ -95,13 +95,12 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
         .join(CourseMember, CourseMember.id == course_member_id) \
         .join(Course,(Course.id == CourseContent.course_id) & (Course.id == CourseMember.course_id)) \
-        .outerjoin(CourseSubmissionGroupMember,
-              (CourseSubmissionGroupMember.course_member_id == CourseMember.id) &
-              (CourseSubmissionGroupMember.course_content_id == CourseContent.id)) \
-        .outerjoin(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
+        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
+        .join(CourseSubmissionGroup, (CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) & 
+              (CourseSubmissionGroup.course_content_id == CourseContent.id)) \
         .outerjoin(
             latest_result_sub,
-            CourseSubmissionGroupMember.course_content_id == latest_result_sub.c.course_content_id
+            CourseContent.id == latest_result_sub.c.course_content_id
         ).outerjoin(
             Result,
             (Result.course_content_id == latest_result_sub.c.course_content_id) &
@@ -109,7 +108,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         ) \
         .outerjoin(
             results_count_sub,
-            (CourseSubmissionGroupMember.course_content_id == results_count_sub.c.course_content_id)
+            CourseContent.id == results_count_sub.c.course_content_id
         ).first()
 
     course_content, result_count, result, course_submission_group, submitted_count = query

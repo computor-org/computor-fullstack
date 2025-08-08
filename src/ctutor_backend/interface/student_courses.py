@@ -68,8 +68,6 @@ def course_student_search(db: Session, query, params: Optional[CourseStudentQuer
         query = query.filter(Course.course_family_id == params.course_family_id)
     if params.organization_id != None:
         query = query.filter(Course.organization_id == params.organization_id)
-    if params.version_identifier != None:
-        query = query.filter(Course.version_identifier == params.version_identifier)
 
     if params.provider_url != None:
         query = query.filter(Course.properties["gitlab"].op("->>")("url") == params.provider_url)

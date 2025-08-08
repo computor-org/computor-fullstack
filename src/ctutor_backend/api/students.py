@@ -17,10 +17,18 @@ from ctutor_backend.api.auth import HeaderAuthCredentials, get_auth_credentials,
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
+from ctutor_backend.interface.submission_groups import (
+    SubmissionGroupStudent, SubmissionGroupStudentQuery, SubmissionGroupRepository,
+    SubmissionGroupMemberBasic, SubmissionGroupGradingStudent
+)
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseMember
+from ctutor_backend.model.course import (
+    Course, CourseContent, CourseMember, CourseSubmissionGroup, 
+    CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+)
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
+from sqlalchemy import func
 
 student_router = APIRouter()
 
@@ -234,3 +242,132 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
         repositories.append(f"{props.gitlab.url}/{props.gitlab.full_path}")
 
     return repositories
+
+
+@student_router.get("/submission-groups", response_model=list[SubmissionGroupStudent])
+async def student_list_submission_groups(
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    params: SubmissionGroupStudentQuery = Depends(),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all submission groups for the current student.
+    Returns only submission groups where the student is a member.
+    Includes repository information and latest grading.
+    """
+    user_id = permissions.get_user_id_or_throw()
+    
+    # Base query for submission groups where the user is a member
+    query = db.query(CourseSubmissionGroup).join(
+        CourseSubmissionGroupMember,
+        CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
+    ).join(
+        CourseMember,
+        CourseSubmissionGroupMember.course_member_id == CourseMember.id
+    ).filter(
+        CourseMember.user_id == user_id
+    )
+    
+    # Apply filters
+    if params.course_id:
+        query = query.filter(CourseSubmissionGroup.course_id == params.course_id)
+    if params.course_content_id:
+        query = query.filter(CourseSubmissionGroup.course_content_id == params.course_content_id)
+    if params.has_repository is not None:
+        if params.has_repository:
+            query = query.filter(CourseSubmissionGroup.properties['gitlab'] != None)
+        else:
+            query = query.filter(CourseSubmissionGroup.properties['gitlab'] == None)
+    
+    submission_groups = query.all()
+    
+    response = []
+    for sg in submission_groups:
+        # Get course content info
+        course_content = db.query(CourseContent).filter(
+            CourseContent.id == sg.course_content_id
+        ).first()
+        
+        # Get all members
+        members_query = db.query(
+            CourseSubmissionGroupMember,
+            User.id.label('user_id'),
+            User.username,
+            User.full_name
+        ).join(
+            CourseMember,
+            CourseSubmissionGroupMember.course_member_id == CourseMember.id
+        ).join(
+            User,
+            CourseMember.user_id == User.id
+        ).filter(
+            CourseSubmissionGroupMember.course_submission_group_id == sg.id
+        )
+        
+        members = []
+        for member_row in members_query.all():
+            members.append(SubmissionGroupMemberBasic(
+                id=str(member_row[0].id),
+                user_id=str(member_row.user_id),
+                course_member_id=str(member_row[0].course_member_id),
+                username=member_row.username,
+                full_name=member_row.full_name
+            ))
+        
+        # Get latest grading
+        latest_grading = None
+        if params.is_graded is None or params.is_graded:
+            grading_query = db.query(
+                CourseSubmissionGroupGrading,
+                User.full_name.label('grader_name')
+            ).join(
+                CourseMember,
+                CourseSubmissionGroupGrading.graded_by_course_member_id == CourseMember.id
+            ).join(
+                User,
+                CourseMember.user_id == User.id
+            ).filter(
+                CourseSubmissionGroupGrading.course_submission_group_id == sg.id
+            ).order_by(
+                CourseSubmissionGroupGrading.created_at.desc()
+            ).first()
+            
+            if grading_query:
+                grading, grader_name = grading_query
+                latest_grading = SubmissionGroupGradingStudent(
+                    id=str(grading.id),
+                    grading=grading.grading,
+                    status=grading.status,
+                    graded_by=grader_name,
+                    created_at=grading.created_at
+                )
+        
+        # Build repository info if available
+        repository = None
+        if sg.properties and sg.properties.get('gitlab'):
+            gitlab_info = sg.properties['gitlab']
+            repository = SubmissionGroupRepository(
+                provider="gitlab",
+                url=gitlab_info.get('url', ''),
+                full_path=gitlab_info.get('full_path', ''),
+                clone_url=gitlab_info.get('clone_url'),
+                web_url=gitlab_info.get('web_url')
+            )
+        
+        # Create response object
+        response.append(SubmissionGroupStudent(
+            id=str(sg.id),
+            course_id=str(sg.course_id),
+            course_content_id=str(sg.course_content_id),
+            course_content_title=course_content.title if course_content else None,
+            course_content_path=str(course_content.path) if course_content else None,
+            max_group_size=sg.max_group_size,
+            current_group_size=len(members),
+            members=members,
+            repository=repository,
+            latest_grading=latest_grading,
+            created_at=sg.created_at,
+            updated_at=sg.updated_at
+        ))
+    
+    return response

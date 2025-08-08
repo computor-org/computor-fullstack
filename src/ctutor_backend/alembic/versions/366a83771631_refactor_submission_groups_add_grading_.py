@@ -36,8 +36,6 @@ def upgrade() -> None:
         sa.Column('graded_by_course_member_id', postgresql.UUID(), nullable=False),
         sa.Column('grading', sa.Float(precision=53), nullable=False),
         sa.Column('status', sa.String(length=50), nullable=True),
-        sa.Column('feedback', sa.String(length=4096), nullable=True),
-        sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], 
                                 ondelete='CASCADE', onupdate='RESTRICT'),
         sa.ForeignKeyConstraint(['graded_by_course_member_id'], ['course_member.id'], 

@@ -385,10 +385,6 @@ class CourseSubmissionGroupGrading(Base):
     grading = Column(Float(53), nullable=False)  # Value between 0.0 and 1.0
     status = Column(String(50))  # 'corrected', 'correction_necessary', 'correction_possible', null, etc.
     
-    # Optional fields
-    feedback = Column(String(4096))  # Written feedback from grader
-    metadata = Column('properties', JSONB)  # Additional metadata (rubric scores, etc.)
-    
     # Relationships
     course_submission_group = relationship(
         'CourseSubmissionGroup',

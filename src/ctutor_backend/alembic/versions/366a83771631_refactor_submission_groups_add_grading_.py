@@ -63,7 +63,7 @@ def upgrade() -> None:
                  LIMIT 1),
                 (SELECT cm.id FROM course_member cm 
                  WHERE cm.course_id = csg.course_id 
-                 AND cm.role IN ('lecturer', 'tutor', 'staff')
+                 AND cm.course_role_id IN ('_lecturer', '_tutor', '_staff')
                  LIMIT 1)
             ),
             csg.grading,

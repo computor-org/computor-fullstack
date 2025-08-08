@@ -16,10 +16,10 @@ Tracks who graded what, when, and the result:
   - `"correction_necessary"` - Needs regrading
   - `"correction_possible"` - Can be regraded
   - `null` - Not yet graded
-- `feedback`: Optional text feedback from grader
-- `properties`: JSONB for additional metadata (rubric scores, etc.)
 - `created_at`: When the grading was performed
 - `updated_at`: Last update time
+
+**Note**: Originally planned `feedback` and `properties` fields were removed due to SQLAlchemy 'metadata' reserved attribute conflict.
 
 ### 2. Modified: `CourseSubmissionGroup`
 - **Removed fields:**
@@ -160,6 +160,15 @@ The migration (`366a83771631_refactor_submission_groups_add_grading_.py`) handle
 - `GET /course-submission-groups/{id}/gradings` - Get grading history
 - `GET /course-members/{id}/gradings` - Get all grades given by a member
 - `PATCH /course-submission-group-gradings/{id}` - Update a grade
+
+### Student Endpoints Implemented
+- ✅ `GET /students/submission-groups` - Get all submission groups for student with repository URLs
+  - Supports filtering by `course_id`, `course_content_id`, `has_repository`, `is_graded`
+  - Returns complete submission group data including:
+    - Repository information (GitLab URLs, clone URLs)
+    - Team members for group assignments
+    - Latest grading information
+    - Course content details
 
 ### Modified Responses
 - CourseSubmissionGroup responses should include:

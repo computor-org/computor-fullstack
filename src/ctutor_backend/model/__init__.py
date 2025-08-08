@@ -13,6 +13,7 @@ from .course import (
     CourseMember,
     CourseSubmissionGroup,
     CourseSubmissionGroupMember,
+    CourseSubmissionGroupGrading,
     CourseMemberComment
 )
 from .execution import ExecutionBackend
@@ -48,6 +49,7 @@ __all__ = [
     'CourseMember',
     'CourseSubmissionGroup',
     'CourseSubmissionGroupMember',
+    'CourseSubmissionGroupGrading',
     'CourseMemberComment',
     # Execution
     'ExecutionBackend',

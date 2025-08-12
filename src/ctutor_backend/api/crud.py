@@ -49,34 +49,22 @@ async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_t
         return response
     except exc.IntegrityError as e:
         db.rollback()
+        # Just provide a cleaner version of the database error without hardcoding constraint names
         error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
-        
-        # Parse common PostgreSQL constraint violations for better error messages
-        if 'duplicate key value violates unique constraint' in error_msg:
-            # Extract the constraint name and details
-            if 'course_member_key' in error_msg:
-                raise BadRequestException(detail="A course member already exists for this user and course combination.")
-            elif 'user_key' in error_msg or 'email' in error_msg.lower():
-                raise BadRequestException(detail="A user with this email already exists.")
-            elif 'username' in error_msg.lower():
-                raise BadRequestException(detail="A user with this username already exists.")
-            else:
-                # Generic duplicate key message
-                raise BadRequestException(detail="This record already exists (duplicate key violation).")
-        elif 'violates foreign key constraint' in error_msg:
-            raise BadRequestException(detail="Referenced record does not exist.")
-        elif 'violates not-null constraint' in error_msg:
-            raise BadRequestException(detail="Required field is missing.")
+        # Try to extract just the first line and clean it up a bit
+        if 'DETAIL:' in error_msg:
+            # Include the DETAIL part which often has useful info
+            main_error = error_msg.split('\n')[0]
+            detail_part = error_msg.split('DETAIL:')[1].split('\n')[0].strip()
+            clean_msg = f"{main_error}. {detail_part}"
         else:
-            # For other integrity errors, provide a cleaner message
-            raise BadRequestException(detail=f"Database constraint violation: {error_msg.split('DETAIL:')[0].strip()}")
+            clean_msg = error_msg.split('\n')[0] if '\n' in error_msg else error_msg
+        raise BadRequestException(detail=clean_msg)
             
     except Exception as e:
-        print(f"Unexpected error in create_db: {e}")
+        print(e.args)
         db.rollback()
-        # For non-database errors, keep original behavior but clean up the message
-        error_detail = str(e.args[0]) if e.args else str(e)
-        raise BadRequestException(detail=error_detail)
+        raise BadRequestException(detail=e.args)
 
 async def get_id_db(permissions: Principal, db: Session, id: UUID | str, interface: EntityInterface, scope: str = "get"):
 

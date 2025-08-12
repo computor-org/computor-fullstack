@@ -51,6 +51,118 @@ class DeploymentFactory:
             return yaml.safe_load(file)
 
 
+# User and Account Configuration Classes
+
+class UserDeployment(BaseDeployment):
+    """User deployment configuration for creating users in the system."""
+    given_name: Optional[str] = Field(None, description="User's given name")
+    family_name: Optional[str] = Field(None, description="User's family name")
+    email: Optional[str] = Field(None, description="User's email address")
+    number: Optional[str] = Field(None, description="User number/identifier (student ID)")
+    username: Optional[str] = Field(None, description="Unique username")
+    user_type: str = Field("user", description="Type of user account (user or token)")
+    properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional user properties")
+    
+    # Password for local authentication (optional)
+    password: Optional[str] = Field(None, description="Initial password for the user")
+    
+    # GitLab-specific properties
+    gitlab_username: Optional[str] = Field(None, description="GitLab username (if different from username)")
+    gitlab_email: Optional[str] = Field(None, description="GitLab email (if different from email)")
+    
+    @property
+    def full_name(self) -> str:
+        """Get the user's full name."""
+        parts = []
+        if self.given_name:
+            parts.append(self.given_name)
+        if self.family_name:
+            parts.append(self.family_name)
+        return ' '.join(parts) if parts else ''
+    
+    @property
+    def display_name(self) -> str:
+        """Get the user's display name."""
+        full_name = self.full_name
+        return full_name if full_name else (self.username or "Unknown User")
+
+
+class AccountDeployment(BaseDeployment):
+    """Account deployment configuration for external service accounts (e.g., GitLab)."""
+    provider: str = Field(description="Account provider (e.g., 'gitlab', 'github')")
+    type: str = Field(description="Account type (e.g., 'oauth', 'api_token')")
+    provider_account_id: str = Field(description="Account ID in the provider system")
+    
+    # Additional provider-specific properties
+    properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Provider-specific account properties")
+    
+    # GitLab-specific properties
+    access_token: Optional[str] = Field(None, description="Access token for API access")
+    refresh_token: Optional[str] = Field(None, description="Refresh token for token renewal")
+    gitlab_username: Optional[str] = Field(None, description="GitLab username")
+    gitlab_email: Optional[str] = Field(None, description="GitLab email")
+    gitlab_user_id: Optional[int] = Field(None, description="GitLab user ID")
+    is_admin: Optional[bool] = Field(False, description="Whether the GitLab user has admin privileges")
+    can_create_group: Optional[bool] = Field(True, description="Whether the user can create GitLab groups")
+
+
+class CourseMemberDeployment(BaseDeployment):
+    """Course member deployment configuration for assigning users to courses."""
+    # Course identification - either by ID or by path
+    id: Optional[str] = Field(None, description="Direct course ID")
+    # Alternative: specify by path
+    organization: Optional[str] = Field(None, description="Organization path (e.g., 'kit')")
+    course_family: Optional[str] = Field(None, description="Course family path (e.g., 'prog')")
+    course: Optional[str] = Field(None, description="Course path (e.g., 'prog1')")
+    
+    # Course role - built-in roles: _student, _tutor, _lecturer, _maintainer, _owner
+    role: str = Field("_student", description="Course role ID (e.g., '_student', '_tutor', '_lecturer')")
+    
+    # Course group - for students (by name or ID)
+    group: Optional[str] = Field(None, description="Course group name or ID (required for students)")
+    
+    @property
+    def is_path_based(self) -> bool:
+        """Check if this deployment uses path-based identification."""
+        return self.organization is not None and self.course_family is not None and self.course is not None
+    
+    @property
+    def is_id_based(self) -> bool:
+        """Check if this deployment uses ID-based identification."""
+        return self.id is not None
+
+
+class UserAccountDeployment(BaseDeployment):
+    """Combined user and account deployment configuration."""
+    user: UserDeployment = Field(description="User configuration")
+    accounts: List[AccountDeployment] = Field(default_factory=list, description="Associated external accounts")
+    course_members: List[CourseMemberDeployment] = Field(default_factory=list, description="Course memberships for this user")
+    
+    def get_primary_gitlab_account(self) -> Optional[AccountDeployment]:
+        """Get the primary GitLab account if it exists."""
+        for account in self.accounts:
+            if account.type.lower() == "gitlab":
+                return account
+        return None
+
+
+class UsersDeploymentConfig(BaseDeployment):
+    """Configuration for deploying multiple users and their accounts."""
+    users: List[UserAccountDeployment] = Field(description="List of users to deploy")
+    
+    def count_users(self) -> int:
+        """Count the total number of users to be created."""
+        return len(self.users)
+    
+    def count_accounts(self) -> int:
+        """Count the total number of accounts to be created."""
+        return sum(len(user.accounts) for user in self.users)
+    
+    def get_gitlab_users(self) -> List[UserAccountDeployment]:
+        """Get users that have GitLab accounts."""
+        return [user for user in self.users if user.get_primary_gitlab_account() is not None]
+
+
 # Repository Configuration Classes
 
 class GitLabConfig(BaseDeployment):
@@ -389,4 +501,79 @@ EXAMPLE_MULTI_DEPLOYMENT = ComputorDeploymentConfig(
         "deployment_notes": "Multi-university deployment example",
         "created_by": "system_admin"
     }
+)
+
+# Example user deployment configurations
+
+EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
+    users=[
+        UserAccountDeployment(
+            user=UserDeployment(
+                given_name="John",
+                family_name="Doe",
+                email="john.doe@university.edu",
+                username="jdoe",
+                number="12345678",
+                password="Bv7#nM2$kL9@"
+            ),
+            accounts=[
+                AccountDeployment(
+                    provider="gitlab",
+                    type="oauth",
+                    provider_account_id="jdoe",
+                    gitlab_username="jdoe",
+                    gitlab_email="john.doe@university.edu",
+                    can_create_group=False,
+                    is_admin=False
+                )
+            ]
+        ),
+        UserAccountDeployment(
+            user=UserDeployment(
+                given_name="Jane",
+                family_name="Smith",
+                email="jane.smith@university.edu",
+                username="jsmith",
+                number="87654321",
+                password="Wz4#pT6$mH8@"
+            ),
+            accounts=[
+                AccountDeployment(
+                    provider="gitlab",
+                    type="oauth", 
+                    provider_account_id="jsmith",
+                    gitlab_username="jsmith",
+                    gitlab_email="jane.smith@university.edu",
+                    can_create_group=True,
+                    is_admin=False
+                )
+            ]
+        ),
+        UserAccountDeployment(
+            user=UserDeployment(
+                given_name="Course",
+                family_name="Manager",
+                email="course.manager@university.edu",
+                username="course_manager",
+                user_type="user",
+                password="Xk9#mZ8$qR7@"
+            ),
+            accounts=[
+                AccountDeployment(
+                    provider="gitlab",
+                    type="oauth",
+                    provider_account_id="course_manager",
+                    gitlab_username="course_manager",
+                    gitlab_email="course.manager@university.edu",
+                    can_create_group=True,
+                    is_admin=True
+                )
+            ]
+        )
+    ],
+    default_password="DefaultPass123!",
+    send_welcome_email=True,
+    auto_activate=True,
+    gitlab_create_users=True,
+    gitlab_admin_token="<leave_empty_for_now>"
 )

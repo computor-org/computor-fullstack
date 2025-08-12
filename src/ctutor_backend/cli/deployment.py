@@ -27,7 +27,7 @@ from ..client.crud_client import CustomClient
 from ..interface.users import UserCreate, UserInterface, UserQuery
 from ..interface.accounts import AccountCreate, AccountInterface, AccountQuery
 from ..interface.courses import CourseInterface, CourseQuery
-from ..interface.course_members import CourseMemberCreate, CourseMemberInterface
+from ..interface.course_members import CourseMemberCreate, CourseMemberInterface, CourseMemberQuery
 from ..interface.course_groups import CourseGroupInterface, CourseGroupQuery, CourseGroupCreate
 from ..interface.organizations import OrganizationInterface, OrganizationQuery
 from ..interface.course_families import CourseFamilyInterface, CourseFamilyQuery
@@ -252,16 +252,44 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                                     click.echo(f"  ⚠️  Failed to create course group {cm_dep.group}: {e}")
                                     continue
                         
-                        # Create course member
-                        member_create = CourseMemberCreate(
+                        # Check if course member already exists
+                        existing_members = course_member_client.list(CourseMemberQuery(
                             user_id=str(user.id),
-                            course_id=str(course.id),
-                            course_role_id=cm_dep.role,
-                            course_group_id=course_group_id
-                        )
+                            course_id=str(course.id)
+                        ))
                         
-                        course_member_client.create(member_create)
-                        click.echo(f"  ✅ Added to course: {course.path} as {cm_dep.role}")
+                        if existing_members:
+                            existing_member = existing_members[0]
+                            # Check if we need to update role or group
+                            needs_update = False
+                            if existing_member.course_role_id != cm_dep.role:
+                                click.echo(f"  Updating role from {existing_member.course_role_id} to {cm_dep.role}")
+                                needs_update = True
+                            if course_group_id and existing_member.course_group_id != course_group_id:
+                                click.echo(f"  Updating group assignment")
+                                needs_update = True
+                            
+                            if needs_update:
+                                # Update existing member
+                                member_update = {
+                                    'course_role_id': cm_dep.role,
+                                    'course_group_id': course_group_id
+                                }
+                                course_member_client.update(str(existing_member.id), member_update)
+                                click.echo(f"  ✅ Updated course membership: {course.path} as {cm_dep.role}")
+                            else:
+                                click.echo(f"  Already member of course: {course.path} as {cm_dep.role}")
+                        else:
+                            # Create new course member
+                            member_create = CourseMemberCreate(
+                                user_id=str(user.id),
+                                course_id=str(course.id),
+                                course_role_id=cm_dep.role,
+                                course_group_id=course_group_id
+                            )
+                            
+                            course_member_client.create(member_create)
+                            click.echo(f"  ✅ Added to course: {course.path} as {cm_dep.role}")
                         
                 except Exception as e:
                     click.echo(f"  ⚠️  Failed to add course membership: {e}")

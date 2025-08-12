@@ -20,6 +20,39 @@ DOCKER_ARGS="$@"
 
 DOCKERCFILE="docker-compose-${ENVIRONMENT}.yaml"
 
+# Function to safely create directories
+create_dir_if_needed() {
+    local dir_path="$1"
+    if [ ! -d "$dir_path" ]; then
+        echo "Creating directory: $dir_path"
+        mkdir -p "$dir_path"
+    elif [ ! -w "$dir_path" ]; then
+        echo "ERROR: Directory $dir_path exists but is not writable!"
+        echo "  Owner: $(stat -c '%U:%G' "$dir_path" 2>/dev/null)"
+        echo "  Please run: sudo chown -R $(whoami):$(whoami) ${SYSTEM_DEPLOYMENT_PATH}"
+        echo "  Or remove it: sudo rm -rf ${SYSTEM_DEPLOYMENT_PATH}"
+        exit 1
+    fi
+}
+
+# Pre-create ALL Docker volume mount points with correct ownership
+# This prevents Docker from creating them as root
+echo "=== Pre-creating Docker volume directories ==="
+
+# # Database directories
+# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/postgres"
+# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/temporal-postgres"
+# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/redis"
+# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/redis-data"
+
+# # MinIO storage
+# create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/minio/data"
+
+# CRITICAL: Create execution-backend BEFORE Docker mounts it
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/execution-backend"
+create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+
+# Now create the application subdirectories
 destination="${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
 
 directories=(
@@ -30,31 +63,24 @@ directories=(
     "repositories"
 )
 
+echo "=== Creating application directories ==="
 for dir in "${directories[@]}"; do
-
     full_path="${destination}/${dir}"
-
-    if [ ! -d "$full_path" ]; then
-        echo "Create Directory: $full_path"
-        mkdir -p "$full_path"
-    fi
+    create_dir_if_needed "$full_path"
 done
 
-cp -r src/defaults "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+# Copy defaults if source exists
+if [ -d "src/defaults" ]; then
+    echo "Copying defaults..."
+    cp -r src/defaults "${SYSTEM_DEPLOYMENT_PATH}/execution-backend/shared"
+fi
 
 # Create Keycloak directories if they don't exist
 keycloak_imports="${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
 keycloak_themes="${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
 
-if [ ! -d "$keycloak_imports" ]; then
-    echo "Create Directory: $keycloak_imports"
-    mkdir -p "$keycloak_imports"
-fi
-
-if [ ! -d "$keycloak_themes" ]; then
-    echo "Create Directory: $keycloak_themes"
-    mkdir -p "$keycloak_themes"
-fi
+create_dir_if_needed "$keycloak_imports"
+create_dir_if_needed "$keycloak_themes"
 
 # Copy Keycloak realm configuration if it exists
 if [ -f "data/keycloak/computor-realm.json" ]; then
@@ -62,6 +88,8 @@ if [ -f "data/keycloak/computor-realm.json" ]; then
     cp data/keycloak/computor-realm.json "$keycloak_imports/"
 fi
 
-echo "[Starting Computor Server]"
+echo "=== Starting Computor Server ==="
+echo "Environment: $ENVIRONMENT"
+echo "Docker compose file: $DOCKERCFILE"
 
 docker-compose -f $DOCKERCFILE up $DOCKER_ARGS

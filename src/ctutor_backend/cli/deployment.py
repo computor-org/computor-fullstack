@@ -21,9 +21,16 @@ from ..interface.deployments_refactored import (
     EXAMPLE_DEPLOYMENT,
     EXAMPLE_MULTI_DEPLOYMENT
 )
-from .auth import authenticate
+from .auth import authenticate, get_crud_client
 from .config import CLIAuthConfig
 from ..client.crud_client import CustomClient
+from ..interface.users import UserCreate, UserInterface, UserQuery
+from ..interface.accounts import AccountCreate, AccountInterface, AccountQuery
+from ..interface.courses import CourseInterface, CourseQuery
+from ..interface.course_members import CourseMemberCreate, CourseMemberInterface
+from ..interface.course_groups import CourseGroupInterface, CourseGroupQuery, CourseGroupCreate
+from ..interface.organizations import OrganizationInterface, OrganizationQuery
+from ..interface.course_families import CourseFamilyInterface, CourseFamilyQuery
 
 
 @click.group()
@@ -112,6 +119,168 @@ def init(output: str, format: str):
     click.echo(f"3. Run: ctutor deployment apply {output_path}")
 
 
+def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
+    """Deploy users and their course memberships from configuration."""
+    
+    # Get API clients
+    user_client = get_crud_client(auth, UserInterface)
+    account_client = get_crud_client(auth, AccountInterface)
+    course_client = get_crud_client(auth, CourseInterface)
+    course_member_client = get_crud_client(auth, CourseMemberInterface)
+    course_group_client = get_crud_client(auth, CourseGroupInterface)
+    org_client = get_crud_client(auth, OrganizationInterface)
+    family_client = get_crud_client(auth, CourseFamilyInterface)
+    
+    created_users = []
+    failed_users = []
+    
+    for user_deployment in config.users:
+        user_dep = user_deployment.user
+        click.echo(f"\n👤 Processing: {user_dep.display_name} ({user_dep.username})")
+        
+        try:
+            # Check if user already exists
+            existing_users = []
+            if user_dep.email:
+                existing_users.extend(user_client.list(UserQuery(email=user_dep.email)))
+            
+            if existing_users:
+                user = existing_users[0]
+                click.echo(f"  User already exists: {user.display_name}")
+            else:
+                # Create new user
+                user_create = UserCreate(
+                    given_name=user_dep.given_name,
+                    family_name=user_dep.family_name,
+                    email=user_dep.email,
+                    number=user_dep.number,
+                    username=user_dep.username,
+                    user_type=user_dep.user_type,
+                    properties=user_dep.properties
+                )
+                
+                user = user_client.create(user_create)
+                click.echo(f"  ✅ Created user: {user.display_name}")
+            
+            # Create accounts
+            for account_dep in user_deployment.accounts:
+                # Check if account already exists
+                existing_accounts = account_client.list(AccountQuery(
+                    provider_account_id=account_dep.provider_account_id
+                ))
+                
+                if existing_accounts:
+                    click.echo(f"  Account already exists: {account_dep.type} @ {account_dep.provider}")
+                else:
+                    # Create new account
+                    account_create = AccountCreate(
+                        provider=account_dep.provider,
+                        type=account_dep.type,
+                        provider_account_id=account_dep.provider_account_id,
+                        user_id=str(user.id),
+                        properties=account_dep.properties or {}
+                    )
+                    
+                    account_client.create(account_create)
+                    click.echo(f"  ✅ Created account: {account_dep.type} @ {account_dep.provider}")
+            
+            # Create course memberships
+            for cm_dep in user_deployment.course_members:
+                try:
+                    course = None
+                    
+                    # Resolve course by path or ID
+                    if cm_dep.is_path_based:
+                        # Find organization
+                        orgs = org_client.list(OrganizationQuery(path=cm_dep.organization))
+                        if not orgs:
+                            click.echo(f"  ⚠️  Organization not found: {cm_dep.organization}")
+                            continue
+                        org = orgs[0]
+                        
+                        # Find course family
+                        families = family_client.list(CourseFamilyQuery(
+                            organization_id=str(org.id),
+                            path=cm_dep.course_family
+                        ))
+                        if not families:
+                            click.echo(f"  ⚠️  Course family not found: {cm_dep.course_family}")
+                            continue
+                        family = families[0]
+                        
+                        # Find course
+                        courses = course_client.list(CourseQuery(
+                            course_family_id=str(family.id),
+                            path=cm_dep.course
+                        ))
+                        if not courses:
+                            click.echo(f"  ⚠️  Course not found: {cm_dep.course}")
+                            continue
+                        course = courses[0]
+                    
+                    elif cm_dep.is_id_based:
+                        # Direct course lookup by ID
+                        course = course_client.get(cm_dep.id)
+                        if not course:
+                            click.echo(f"  ⚠️  Course not found: {cm_dep.id}")
+                            continue
+                    
+                    if course:
+                        # Handle course group for students
+                        course_group_id = None
+                        if cm_dep.role == "_student" and cm_dep.group:
+                            # Find or create course group
+                            groups = course_group_client.list(CourseGroupQuery(
+                                course_id=str(course.id),
+                                title=cm_dep.group
+                            ))
+                            if groups:
+                                course_group_id = str(groups[0].id)
+                                click.echo(f"  Using existing group: {cm_dep.group}")
+                            else:
+                                # Create the course group
+                                try:
+                                    group_create = CourseGroupCreate(
+                                        title=cm_dep.group,
+                                        description=f"Course group {cm_dep.group}",
+                                        course_id=str(course.id)
+                                    )
+                                    new_group = course_group_client.create(group_create)
+                                    course_group_id = str(new_group.id)
+                                    click.echo(f"  ✅ Created course group: {cm_dep.group}")
+                                except Exception as e:
+                                    click.echo(f"  ⚠️  Failed to create course group {cm_dep.group}: {e}")
+                                    continue
+                        
+                        # Create course member
+                        member_create = CourseMemberCreate(
+                            user_id=str(user.id),
+                            course_id=str(course.id),
+                            course_role_id=cm_dep.role,
+                            course_group_id=course_group_id
+                        )
+                        
+                        course_member_client.create(member_create)
+                        click.echo(f"  ✅ Added to course: {course.path} as {cm_dep.role}")
+                        
+                except Exception as e:
+                    click.echo(f"  ⚠️  Failed to add course membership: {e}")
+            
+            created_users.append(user_dep)
+            
+        except Exception as e:
+            click.echo(f"  ❌ Failed to create user: {e}")
+            failed_users.append(user_dep)
+    
+    # Summary
+    click.echo(f"\n📊 User Deployment Summary:")
+    click.echo(f"  ✅ Successfully created: {len(created_users)} users")
+    if failed_users:
+        click.echo(f"  ❌ Failed: {len(failed_users)} users")
+        for user_dep in failed_users:
+            click.echo(f"    - {user_dep.display_name}")
+
+
 @deployment.command()
 @click.argument('config_file', type=click.Path(exists=True))
 @click.option(
@@ -150,6 +319,8 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
             # Show entity counts
             counts = config.count_entities()
             click.echo(f"Total: {counts['organizations']} organizations, {counts['course_families']} course families, {counts['courses']} courses")
+            if counts.get('users', 0) > 0:
+                click.echo(f"       {counts['users']} users, {counts['course_members']} course memberships")
             
             # Show hierarchical structure
             for org_idx, org in enumerate(config.organizations):
@@ -171,6 +342,28 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 click.echo(f"\nPaths to be created:")
                 for path in paths:
                     click.echo(f"  - {path}")
+            
+            # Show users to be created
+            if config.users:
+                click.echo(f"\nUsers to be created:")
+                for user_deployment in config.users:
+                    user = user_deployment.user
+                    click.echo(f"  - {user.display_name} ({user.username})")
+                    if user_deployment.accounts:
+                        for account in user_deployment.accounts:
+                            click.echo(f"    Account: {account.type} @ {account.provider}")
+                    if user_deployment.course_members:
+                        for cm in user_deployment.course_members:
+                            if cm.is_path_based:
+                                member_str = f"    Member: {cm.organization}/{cm.course_family}/{cm.course} as {cm.role}"
+                                if cm.group:
+                                    member_str += f" (group: {cm.group})"
+                                click.echo(member_str)
+                            elif cm.is_id_based:
+                                member_str = f"    Member: Course {cm.id} as {cm.role}"
+                                if cm.group:
+                                    member_str += f" (group: {cm.group})"
+                                click.echo(member_str)
             
             click.echo("\n✅ Dry run completed. No changes made.")
             return
@@ -218,6 +411,11 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                         status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
                         if status_data.get('status') == 'completed':
                             click.echo("\n✅ Deployment completed successfully!")
+                            
+                            # Deploy users if configured
+                            if config.users:
+                                click.echo(f"\n📥 Creating {len(config.users)} users...")
+                                _deploy_users(config, auth)
                             break
                         elif status_data.get('status') == 'failed':
                             click.echo(f"\n❌ Deployment failed: {status_data.get('error')}", err=True)
@@ -228,6 +426,11 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                         break
                 else:
                     click.echo("\n⚠️  Deployment is still running. Check status later.")
+            
+            # If not waiting but deployment started, try to deploy users anyway
+            if not wait and config.users:
+                click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
+                _deploy_users(config, auth)
         else:
             click.echo("❌ Failed to start deployment", err=True)
             sys.exit(1)
@@ -262,6 +465,9 @@ def validate(config_file: str):
         click.echo(f"  Organizations: {counts['organizations']}")
         click.echo(f"  Course Families: {counts['course_families']}")
         click.echo(f"  Courses: {counts['courses']}")
+        if counts.get('users', 0) > 0:
+            click.echo(f"  Users: {counts['users']}")
+            click.echo(f"  Course Memberships: {counts['course_members']}")
         
         # Show paths
         paths = config.get_deployment_paths()

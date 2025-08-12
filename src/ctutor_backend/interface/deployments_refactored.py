@@ -287,6 +287,12 @@ class ComputorDeploymentConfig(BaseDeployment):
         description="List of organizations with nested course families and courses"
     )
     
+    # Users to be created and assigned to courses (optional)
+    users: List[UserAccountDeployment] = Field(
+        default_factory=list,
+        description="List of users with their accounts and course memberships"
+    )
+    
     # Global deployment settings
     settings: Optional[Dict[str, Any]] = Field(
         default_factory=dict, 
@@ -306,10 +312,15 @@ class ComputorDeploymentConfig(BaseDeployment):
             for org in self.organizations 
             for family in org.course_families
         )
+        user_count = len(self.users)
+        course_member_count = sum(len(user.course_members) for user in self.users)
+        
         return {
             "organizations": org_count, 
             "course_families": family_count, 
-            "courses": course_count
+            "courses": course_count,
+            "users": user_count,
+            "course_members": course_member_count
         }
     
     def get_deployment_paths(self) -> List[str]:

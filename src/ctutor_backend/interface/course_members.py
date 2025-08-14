@@ -7,6 +7,12 @@ from ctutor_backend.interface.users import UserList
 from ctutor_backend.model import CourseMember
 from ctutor_backend.model import CourseContent, CourseContentKind, CourseContentType, CourseSubmissionGroup, CourseSubmissionGroupMember
 from ctutor_backend.model import User
+from temporalio.client import Client as TemporalClient
+from ctutor_backend.settings import settings
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class CourseMemberGitLabConfig(GitLabConfigGet):
@@ -91,6 +97,7 @@ def post_create(course_member: CourseMember, db: Session):
     if course_member.user.user_type != "user":
         return
     
+    # Get all individual submittable course contents
     course_contents = (
         db.query(
             CourseContent.id,
@@ -107,6 +114,8 @@ def post_create(course_member: CourseMember, db: Session):
         ).all()
     )
 
+    submission_group_ids = []
+    
     for id, course_id, max_test_runs, max_submissions, max_group_size in course_contents:
         submission_group = CourseSubmissionGroup(
             course_id=course_id,
@@ -122,12 +131,67 @@ def post_create(course_member: CourseMember, db: Session):
         
         submission_group_member = CourseSubmissionGroupMember(
             course_submission_group_id = submission_group.id,
-            course_member_id = course_member.id
+            course_member_id = course_member.id,
+            course_id = course_id  # Add course_id for consistency
         )
 
         db.add(submission_group_member)
         db.commit()
         db.refresh(submission_group_member)
+        
+        submission_group_ids.append(str(submission_group.id))
+    
+    # Trigger Temporal workflow to create student repository
+    if submission_group_ids:
+        try:
+            # Run async operation in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(
+                trigger_student_repository_creation(
+                    course_member_id=str(course_member.id),
+                    course_id=str(course_member.course_id),
+                    submission_group_ids=submission_group_ids
+                )
+            )
+        except Exception as e:
+            logger.error(f"Failed to trigger student repository creation: {e}")
+            # Don't fail the course member creation if repository creation fails
+
+
+async def trigger_student_repository_creation(
+    course_member_id: str,
+    course_id: str,
+    submission_group_ids: list[str]
+):
+    """
+    Trigger the Temporal workflow to create student repositories.
+    """
+    try:
+        client = await TemporalClient.connect(
+            f"{settings.temporal_host}:{settings.temporal_port}",
+            namespace=settings.temporal_namespace
+        )
+        
+        workflow_id = f"student-repo-{course_member_id}-{course_id}"
+        
+        await client.start_workflow(
+            "StudentRepositoryCreationWorkflow",
+            {
+                "course_member_id": course_member_id,
+                "course_id": course_id,
+                "submission_group_ids": submission_group_ids,
+                "is_team": False
+            },
+            id=workflow_id,
+            task_queue="computor-tasks"
+        )
+        
+        logger.info(f"Started student repository creation workflow: {workflow_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to start Temporal workflow: {e}")
+        raise e
 
 class CourseMemberInterface(EntityInterface):
     create = CourseMemberCreate

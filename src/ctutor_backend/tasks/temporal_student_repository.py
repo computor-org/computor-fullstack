@@ -114,6 +114,37 @@ async def create_student_repository(
             except Exception as e:
                 logger.warning(f"Could not unprotect master branch: {e}")
                 
+            # Add student as maintainer of the repository
+            try:
+                # Get student's GitLab user ID (should be stored in course member properties)
+                course_member_props = course_member.properties or {}
+                gitlab_user_id = course_member_props.get('gitlab_user_id')
+                
+                if not gitlab_user_id:
+                    # Try to find user by email
+                    users = gitlab.users.list(search=user.email)
+                    if users:
+                        gitlab_user_id = users[0].id
+                        # Store for future use
+                        course_member.properties = course_member_props
+                        course_member.properties['gitlab_user_id'] = gitlab_user_id
+                        db.add(course_member)
+                        db.commit()
+                
+                if gitlab_user_id:
+                    # Add as maintainer (access level 40)
+                    forked_project.members.create({
+                        'user_id': gitlab_user_id,
+                        'access_level': 40  # Maintainer access
+                    })
+                    logger.info(f"Added user {gitlab_user_id} as maintainer to project {forked_project.id}")
+                else:
+                    logger.warning(f"Could not find GitLab user for {user.email}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to add student as maintainer: {e}")
+                # Don't fail the whole operation if we can't add maintainer rights
+                
             # Update submission group with repository information
             submission_group = db.query(CourseSubmissionGroup).filter(
                 CourseSubmissionGroup.id == submission_group_id
@@ -149,6 +180,39 @@ async def create_student_repository(
                 projects = gitlab.groups.get(gitlab_namespace_id).projects.list(search=repo_path)
                 for project in projects:
                     if project.path == repo_path:
+                        existing_project = gitlab.projects.get(project.id)
+                        
+                        # Ensure student is maintainer even for existing repo
+                        try:
+                            course_member_props = course_member.properties or {}
+                            gitlab_user_id = course_member_props.get('gitlab_user_id')
+                            
+                            if not gitlab_user_id:
+                                users = gitlab.users.list(search=user.email)
+                                if users:
+                                    gitlab_user_id = users[0].id
+                                    course_member.properties = course_member_props
+                                    course_member.properties['gitlab_user_id'] = gitlab_user_id
+                                    db.add(course_member)
+                                    db.commit()
+                            
+                            if gitlab_user_id:
+                                # Check if already a member
+                                try:
+                                    member = existing_project.members.get(gitlab_user_id)
+                                    if member.access_level < 40:
+                                        # Upgrade to maintainer
+                                        member.access_level = 40
+                                        member.save()
+                                except:
+                                    # Not a member yet, add as maintainer
+                                    existing_project.members.create({
+                                        'user_id': gitlab_user_id,
+                                        'access_level': 40
+                                    })
+                        except Exception as e:
+                            logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
+                        
                         repository_info = {
                             "gitlab_project_id": project.id,
                             "gitlab_project_path": project.path_with_namespace,
@@ -268,18 +332,39 @@ async def create_team_repository(
         gitlab_unprotect_branches(gitlab, team_project.id, "main")
         gitlab_unprotect_branches(gitlab, team_project.id, "master")
         
-        # Add team members as developers
+        # Add team members as maintainers
         for member_id in team_members:
             member = db.query(CourseMember).filter(CourseMember.id == member_id).first()
-            if member and member.properties and member.properties.get('gitlab_user_id'):
-                gitlab_user_id = member.properties['gitlab_user_id']
-                try:
-                    team_project.members.create({
-                        'user_id': gitlab_user_id,
-                        'access_level': 30  # Developer access
-                    })
-                except Exception as e:
-                    logger.warning(f"Could not add member {gitlab_user_id} to project: {e}")
+            if member:
+                gitlab_user_id = None
+                member_props = member.properties or {}
+                
+                # Get or find GitLab user ID
+                if member_props.get('gitlab_user_id'):
+                    gitlab_user_id = member_props['gitlab_user_id']
+                elif member.user and member.user.email:
+                    # Try to find by email
+                    try:
+                        users = gitlab.users.list(search=member.user.email)
+                        if users:
+                            gitlab_user_id = users[0].id
+                            # Store for future use
+                            member.properties = member_props
+                            member.properties['gitlab_user_id'] = gitlab_user_id
+                            db.add(member)
+                            db.commit()
+                    except Exception as e:
+                        logger.warning(f"Could not find GitLab user for {member.user.email}: {e}")
+                
+                if gitlab_user_id:
+                    try:
+                        team_project.members.create({
+                            'user_id': gitlab_user_id,
+                            'access_level': 40  # Maintainer access for all team members
+                        })
+                        logger.info(f"Added team member {gitlab_user_id} as maintainer")
+                    except Exception as e:
+                        logger.warning(f"Could not add member {gitlab_user_id} to project: {e}")
                     
         # Update submission group with repository information
         repository_info = {

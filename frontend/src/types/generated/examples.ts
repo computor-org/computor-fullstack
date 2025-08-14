@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-06T16:59:59.146143
+ * Generated on: 2025-08-13T17:59:27.571441
 
  * Category: Examples
 
@@ -256,7 +256,7 @@ export interface ExampleFileSet {
  */
 export interface ExampleDownloadResponse {
   example_id: string;
-  version_id: string;
+  version_id?: string | null;
   version_tag: string;
   /** Map of filename to content */
   files: Record<string, string>;

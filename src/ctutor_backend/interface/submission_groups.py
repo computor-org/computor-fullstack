@@ -1,7 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
-from uuid import UUID
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.deployments import GitLabConfig
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
@@ -135,7 +134,7 @@ class SubmissionGroupStudent(BaseModel):
 
 class SubmissionGroupStudentQuery(BaseModel):
     """Query parameters for student submission groups"""
-    course_id: Optional[UUID] = None
-    course_content_id: Optional[UUID] = None
+    course_id: Optional[str] = None
+    course_content_id: Optional[str] = None
     has_repository: Optional[bool] = None
     is_graded: Optional[bool] = None

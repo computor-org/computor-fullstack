@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-06T16:59:59.148726
+ * Generated on: 2025-08-13T17:59:27.574075
 
  * Category: Common
 
@@ -613,6 +613,67 @@ export interface SubmissionGroupUpdate {
 }
 
 /**
+ * Repository information for a submission group
+ */
+export interface SubmissionGroupRepository {
+  provider?: string;
+  url: string;
+  full_path: string;
+  clone_url?: string | null;
+  web_url?: string | null;
+}
+
+/**
+ * Basic member information
+ */
+export interface SubmissionGroupMemberBasic {
+  id: string;
+  user_id: string;
+  course_member_id: string;
+  username?: string | null;
+  full_name?: string | null;
+}
+
+/**
+ * Student's view of grading
+ */
+export interface SubmissionGroupGradingStudent {
+  id: string;
+  grading: number;
+  status?: string | null;
+  graded_by?: string | null;
+  created_at: string;
+}
+
+/**
+ * Student's view of a submission group
+ */
+export interface SubmissionGroupStudent {
+  id: string;
+  course_id: string;
+  course_content_id: string;
+  course_content_title?: string | null;
+  course_content_path?: string | null;
+  max_group_size: number;
+  current_group_size?: number;
+  members?: SubmissionGroupMemberBasic[];
+  repository?: SubmissionGroupRepository | null;
+  latest_grading?: SubmissionGroupGradingStudent | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Query parameters for student submission groups
+ */
+export interface SubmissionGroupStudentQuery {
+  course_id?: string | null;
+  course_content_id?: string | null;
+  has_repository?: boolean | null;
+  is_graded?: boolean | null;
+}
+
+/**
  * Single deployment history action entry.
  */
 export interface DeploymentHistoryAction {
@@ -866,6 +927,98 @@ export interface BaseDeployment {
 }
 
 /**
+ * User deployment configuration for creating users in the system.
+ */
+export interface UserDeployment {
+  /** User's given name */
+  given_name?: string | null;
+  /** User's family name */
+  family_name?: string | null;
+  /** User's email address */
+  email?: string | null;
+  /** User number/identifier (student ID) */
+  number?: string | null;
+  /** Unique username */
+  username?: string | null;
+  /** Type of user account (user or token) */
+  user_type?: string;
+  /** Additional user properties */
+  properties?: Record<string, any> | null;
+  /** Initial password for the user */
+  password?: string | null;
+  /** GitLab username (if different from username) */
+  gitlab_username?: string | null;
+  /** GitLab email (if different from email) */
+  gitlab_email?: string | null;
+}
+
+/**
+ * Account deployment configuration for external service accounts (e.g., GitLab).
+ */
+export interface AccountDeployment {
+  /** Account provider (e.g., 'gitlab', 'github') */
+  provider: string;
+  /** Account type (e.g., 'oauth', 'api_token') */
+  type: string;
+  /** Account ID in the provider system */
+  provider_account_id: string;
+  /** Provider-specific account properties */
+  properties?: Record<string, any> | null;
+  /** Access token for API access */
+  access_token?: string | null;
+  /** Refresh token for token renewal */
+  refresh_token?: string | null;
+  /** GitLab username */
+  gitlab_username?: string | null;
+  /** GitLab email */
+  gitlab_email?: string | null;
+  /** GitLab user ID */
+  gitlab_user_id?: number | null;
+  /** Whether the GitLab user has admin privileges */
+  is_admin?: boolean | null;
+  /** Whether the user can create GitLab groups */
+  can_create_group?: boolean | null;
+}
+
+/**
+ * Course member deployment configuration for assigning users to courses.
+ */
+export interface CourseMemberDeployment {
+  /** Direct course ID */
+  id?: string | null;
+  /** Organization path (e.g., 'kit') */
+  organization?: string | null;
+  /** Course family path (e.g., 'prog') */
+  course_family?: string | null;
+  /** Course path (e.g., 'prog1') */
+  course?: string | null;
+  /** Course role ID (e.g., '_student', '_tutor', '_lecturer') */
+  role?: string;
+  /** Course group name or ID (required for students) */
+  group?: string | null;
+}
+
+/**
+ * Combined user and account deployment configuration.
+ */
+export interface UserAccountDeployment {
+  /** User configuration */
+  user: UserDeployment;
+  /** Associated external accounts */
+  accounts?: AccountDeployment[];
+  /** Course memberships for this user */
+  course_members?: CourseMemberDeployment[];
+}
+
+/**
+ * Configuration for deploying multiple users and their accounts.
+ */
+export interface UsersDeploymentConfig {
+  /** List of users to deploy */
+  users: UserAccountDeployment[];
+}
+
+/**
  * GitLab repository configuration.
  */
 export interface GitLabConfig {
@@ -1069,6 +1222,8 @@ export interface HierarchicalOrganizationConfig {
 export interface ComputorDeploymentConfig {
   /** List of organizations with nested course families and courses */
   organizations: HierarchicalOrganizationConfig[];
+  /** List of users with their accounts and course memberships */
+  users?: UserAccountDeployment[];
   /** Global deployment settings */
   settings?: Record<string, any> | null;
 }

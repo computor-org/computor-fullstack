@@ -396,6 +396,7 @@ async def create_team_repository(
         db.close()
 
 
+@register_task
 @workflow.defn(name="StudentRepositoryCreationWorkflow")
 class StudentRepositoryCreationWorkflow(BaseWorkflow):
     """
@@ -465,7 +466,3 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                 message=str(e),
                 error=str(e)
             )
-
-
-# Register the workflow
-register_task("student_repository_creation", StudentRepositoryCreationWorkflow)

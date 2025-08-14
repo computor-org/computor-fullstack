@@ -56,20 +56,40 @@ async def create_student_repository(
             
         # Get GitLab properties from course
         course_properties = course.properties or {}
-        gitlab_namespace_id = course_properties.get('gitlab_students_group_id')
-        student_template_id = course_properties.get('gitlab_student_template_id')
+        gitlab_props = course_properties.get('gitlab', {})
+        gitlab_namespace_id = gitlab_props.get('students_group', {}).get('group_id')
         
         if not gitlab_namespace_id:
-            raise ValueError(f"Course {course_id} missing gitlab_students_group_id")
-        if not student_template_id:
-            raise ValueError(f"Course {course_id} missing gitlab_student_template_id")
+            raise ValueError(f"Course {course_id} missing gitlab.students_group.group_id")
+        
+        # Initialize GitLab client to find student-template project
+        gitlab = Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
+        
+        # Get student-template project path from course properties
+        student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
+        if not student_template_path:
+            # Fallback to URL parsing
+            student_template_url = gitlab_props.get('student_template_url')
+            if student_template_url:
+                # Extract path from URL: http://localhost:8084/itpcp/progphys/python.2026/student-template
+                import re
+                match = re.search(r'/([^/]+/[^/]+/[^/]+/student-template)$', student_template_url)
+                if match:
+                    student_template_path = match.group(1)
+        
+        if not student_template_path:
+            raise ValueError(f"Course {course_id} missing student-template project path")
+        
+        # Find the student-template project
+        try:
+            student_template_project = gitlab.projects.get(student_template_path.replace('/', '%2F'))
+            student_template_id = student_template_project.id
+        except Exception as e:
+            raise ValueError(f"Could not find student-template project at {student_template_path}: {e}")
             
         # Get user information for repository naming
         user = course_member.user
         username = user.email.split('@')[0] if user.email else f"user_{user.id}"
-        
-        # Initialize GitLab client
-        gitlab = Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
         
         # Generate repository name and path
         repo_name = f"{username}-{course.slug}"
@@ -279,11 +299,36 @@ async def create_team_repository(
             
         # Get GitLab properties
         course_properties = course.properties or {}
-        gitlab_namespace_id = course_properties.get('gitlab_students_group_id')
-        student_template_id = course_properties.get('gitlab_student_template_id')
+        gitlab_props = course_properties.get('gitlab', {})
+        gitlab_namespace_id = gitlab_props.get('students_group', {}).get('group_id')
         
-        if not gitlab_namespace_id or not student_template_id:
-            raise ValueError(f"Course {course_id} missing GitLab configuration")
+        if not gitlab_namespace_id:
+            raise ValueError(f"Course {course_id} missing gitlab.students_group.group_id")
+        
+        # Initialize GitLab client to find student-template project
+        gitlab = Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
+        
+        # Get student-template project path from course properties
+        student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
+        if not student_template_path:
+            # Fallback to URL parsing
+            student_template_url = gitlab_props.get('student_template_url')
+            if student_template_url:
+                # Extract path from URL
+                import re
+                match = re.search(r'/([^/]+/[^/]+/[^/]+/student-template)$', student_template_url)
+                if match:
+                    student_template_path = match.group(1)
+        
+        if not student_template_path:
+            raise ValueError(f"Course {course_id} missing student-template project path")
+        
+        # Find the student-template project
+        try:
+            student_template_project = gitlab.projects.get(student_template_path.replace('/', '%2F'))
+            student_template_id = student_template_project.id
+        except Exception as e:
+            raise ValueError(f"Could not find student-template project at {student_template_path}: {e}")
             
         # Get team member names for repository naming
         team_name_parts = []
@@ -294,9 +339,6 @@ async def create_team_repository(
                 team_name_parts.append(username)
                 
         team_name = "-".join(team_name_parts) if team_name_parts else f"team-{submission_group_id[:8]}"
-        
-        # Initialize GitLab client
-        gitlab = Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
         
         # Generate repository name and path
         content_path = submission_group.course_content.path.replace('.', '-')
@@ -397,7 +439,7 @@ async def create_team_repository(
 
 
 @register_task
-@workflow.defn(name="StudentRepositoryCreationWorkflow")
+@workflow.defn(name="StudentRepositoryCreationWorkflow", sandboxed=False)
 class StudentRepositoryCreationWorkflow(BaseWorkflow):
     """
     Workflow to create student repositories when they join a course.

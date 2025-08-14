@@ -131,7 +131,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
     org_client = get_crud_client(auth, OrganizationInterface)
     family_client = get_crud_client(auth, CourseFamilyInterface)
     
-    created_users = []
+    processed_users = []
     failed_users = []
     
     for user_deployment in config.users:
@@ -139,14 +139,18 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
         click.echo(f"\n👤 Processing: {user_dep.display_name} ({user_dep.username})")
         
         try:
-            # Check if user already exists
+            # Check if user already exists by email or username
             existing_users = []
             if user_dep.email:
                 existing_users.extend(user_client.list(UserQuery(email=user_dep.email)))
             
+            # Also check by username if not found by email
+            if not existing_users and user_dep.username:
+                existing_users.extend(user_client.list(UserQuery(username=user_dep.username)))
+            
             if existing_users:
                 user = existing_users[0]
-                click.echo(f"  User already exists: {user.display_name}")
+                click.echo(f"  ℹ️  User already exists: {user.display_name}")
             else:
                 # Create new user
                 user_create = UserCreate(
@@ -164,9 +168,10 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             
             # Create accounts
             for account_dep in user_deployment.accounts:
-                # Check if account already exists
+                # Check if account already exists for this user
                 existing_accounts = account_client.list(AccountQuery(
-                    provider_account_id=account_dep.provider_account_id
+                    provider_account_id=account_dep.provider_account_id,
+                    user_id=str(user.id)
                 ))
                 
                 if existing_accounts:
@@ -294,15 +299,15 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 except Exception as e:
                     click.echo(f"  ⚠️  Failed to add course membership: {e}")
             
-            created_users.append(user_dep)
+            processed_users.append(user_dep)
             
         except Exception as e:
-            click.echo(f"  ❌ Failed to create user: {e}")
+            click.echo(f"  ❌ Failed to process user: {e}")
             failed_users.append(user_dep)
     
     # Summary
     click.echo(f"\n📊 User Deployment Summary:")
-    click.echo(f"  ✅ Successfully created: {len(created_users)} users")
+    click.echo(f"  ✅ Successfully processed: {len(processed_users)} users")
     if failed_users:
         click.echo(f"  ❌ Failed: {len(failed_users)} users")
         for user_dep in failed_users:

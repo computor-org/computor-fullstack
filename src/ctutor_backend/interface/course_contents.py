@@ -255,18 +255,33 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
 
 def post_create(course_content: CourseContent, db: Session):
     
-    # Only create submission groups if max_group_size is set to 1
+    # Only create submission groups for individual assignments (max_group_size == 1)
+    # Team assignments (max_group_size > 1) are handled differently
     if course_content.max_group_size != 1:
         return
     
+    # Check if this course content type is submittable
+    course_content_type = db.query(CourseContentType).filter(
+        CourseContentType.id == course_content.course_content_type_id
+    ).first()
+    
+    if not course_content_type:
+        return
+        
+    course_content_kind = db.query(CourseContentKind).filter(
+        CourseContentKind.id == course_content_type.course_content_kind_id
+    ).first()
+    
+    if not course_content_kind or not course_content_kind.submittable:
+        return
+    
+    # Get all student course members (not tutors, lecturers, etc.)
     course_members = (
         db.scalars(db.query(CourseMember.id)
         .join(User, User.id == CourseMember.user_id)
-        .join(CourseContentType, CourseContentType.id == course_content.course_content_type_id)
-        .join(CourseContentKind, CourseContentKind.id == CourseContentType.course_content_kind_id)
         .filter(
             CourseMember.course_id == course_content.course_id,
-            CourseContentKind.submittable == True,
+            CourseMember.course_role_id == "_student",  # Only students
             User.user_type == "user"
         )).all()
     )

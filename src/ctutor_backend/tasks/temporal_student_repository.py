@@ -492,6 +492,11 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
     Handles both individual and team repositories.
     """
     
+    @classmethod
+    def get_name(cls) -> str:
+        """Get the workflow name."""
+        return "StudentRepositoryCreationWorkflow"
+    
     @workflow.run
     async def run(self, params: Dict[str, Any]) -> WorkflowResult:
         """

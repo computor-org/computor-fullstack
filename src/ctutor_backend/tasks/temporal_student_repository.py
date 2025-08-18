@@ -340,13 +340,22 @@ async def create_student_repository(
                 db=db
             )
                 
-            # Prepare repository information
+            # Prepare repository information in the expected GitLabConfig format
             repository_info = {
+                "gitlab": {
+                    "url": gitlab_url,  # GitLab instance URL
+                    "full_path": forked_project.path_with_namespace,
+                    "directory": None,  # Will be set per assignment
+                    "web_url": forked_project.web_url,
+                    "group_id": forked_project.id,  # Project ID
+                    "namespace_id": gitlab_namespace_id,
+                    "namespace_path": forked_project.namespace['full_path'] if hasattr(forked_project.namespace, '__getitem__') else forked_project.namespace.full_path
+                },
+                # Keep raw info for backward compatibility
                 "gitlab_project_id": forked_project.id,
                 "gitlab_project_path": forked_project.path_with_namespace,
                 "http_url_to_repo": forked_project.http_url_to_repo,
-                "ssh_url_to_repo": forked_project.ssh_url_to_repo,
-                "web_url": forked_project.web_url
+                "ssh_url_to_repo": forked_project.ssh_url_to_repo
             }
             
             # Store repository info in course member properties (primary storage)
@@ -368,9 +377,23 @@ async def create_student_repository(
                     ).first()
                     
                     if submission_group:
-                        # Store the SAME repository info in each submission group
+                        # Store repository info in the expected format for submission groups
                         submission_group.properties = submission_group.properties or {}
-                        submission_group.properties['gitlab_repository'] = repository_info
+                        
+                        # Get the course content to determine the assignment directory
+                        course_content = submission_group.course_content
+                        assignment_directory = course_content.path if course_content else None
+                        
+                        # Store in the GitLabConfig format expected by SubmissionGroupProperties
+                        submission_group.properties['gitlab'] = {
+                            "url": repository_info['gitlab']['url'],
+                            "full_path": repository_info['gitlab']['full_path'],
+                            "directory": str(assignment_directory) if assignment_directory else None,
+                            "web_url": repository_info['gitlab']['web_url'],
+                            "group_id": repository_info['gitlab']['group_id'],
+                            "namespace_id": repository_info['gitlab']['namespace_id'],
+                            "namespace_path": repository_info['gitlab']['namespace_path']
+                        }
                         
                         # Mark properties as modified so SQLAlchemy detects the change
                         from sqlalchemy.orm.attributes import flag_modified
@@ -432,11 +455,20 @@ async def create_student_repository(
                             logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
                         
                         repository_info = {
+                            "gitlab": {
+                                "url": gitlab_url,
+                                "full_path": existing_project.path_with_namespace,
+                                "directory": None,  # Will be set per assignment
+                                "web_url": existing_project.web_url,
+                                "group_id": existing_project.id,
+                                "namespace_id": gitlab_namespace_id,
+                                "namespace_path": existing_project.namespace['full_path'] if hasattr(existing_project.namespace, '__getitem__') else existing_project.namespace.full_path
+                            },
+                            # Keep raw info for backward compatibility
                             "gitlab_project_id": existing_project.id,
                             "gitlab_project_path": existing_project.path_with_namespace,
                             "http_url_to_repo": existing_project.http_url_to_repo,
-                            "ssh_url_to_repo": existing_project.ssh_url_to_repo,
-                            "web_url": existing_project.web_url
+                            "ssh_url_to_repo": existing_project.ssh_url_to_repo
                         }
                         
                         # Store in course member properties
@@ -458,7 +490,21 @@ async def create_student_repository(
                                 ).first()
                                 if submission_group:
                                     submission_group.properties = submission_group.properties or {}
-                                    submission_group.properties['gitlab_repository'] = repository_info
+                                    
+                                    # Get the course content to determine the assignment directory
+                                    course_content = submission_group.course_content
+                                    assignment_directory = course_content.path if course_content else None
+                                    
+                                    # Store in the GitLabConfig format expected by SubmissionGroupProperties
+                                    submission_group.properties['gitlab'] = {
+                                        "url": repository_info['gitlab']['url'],
+                                        "full_path": repository_info['gitlab']['full_path'],
+                                        "directory": str(assignment_directory) if assignment_directory else None,
+                                        "web_url": repository_info['gitlab']['web_url'],
+                                        "group_id": repository_info['gitlab']['group_id'],
+                                        "namespace_id": repository_info['gitlab']['namespace_id'],
+                                        "namespace_path": repository_info['gitlab']['namespace_path']
+                                    }
                                     
                                     # Mark properties as modified so SQLAlchemy detects the change
                                     from sqlalchemy.orm.attributes import flag_modified

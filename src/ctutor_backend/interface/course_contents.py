@@ -315,12 +315,35 @@ def post_create(course_content: CourseContent, db: Session):
         if course_member.properties:
             logger.info(f"CourseMember {course_member.id} properties: {course_member.properties}")
             if 'gitlab_repository' in course_member.properties:
-                # Initialize properties if needed and copy repository info
+                # Initialize properties if needed
                 if not submission_group.properties:
                     submission_group.properties = {}
-                submission_group.properties['gitlab_repository'] = course_member.properties['gitlab_repository']
                 
-                logger.info(f"Copying gitlab_repository info to submission group for student {course_member.id}")
+                repo_info = course_member.properties['gitlab_repository']
+                
+                # Check if it's in the new format with nested gitlab key
+                if 'gitlab' in repo_info:
+                    # Store in the GitLabConfig format expected by SubmissionGroupProperties
+                    submission_group.properties['gitlab'] = {
+                        "url": repo_info['gitlab']['url'],
+                        "full_path": repo_info['gitlab']['full_path'],
+                        "directory": str(course_content.path),  # Assignment path
+                        "web_url": repo_info['gitlab']['web_url'],
+                        "group_id": repo_info['gitlab']['group_id'],
+                        "namespace_id": repo_info['gitlab']['namespace_id'],
+                        "namespace_path": repo_info['gitlab']['namespace_path']
+                    }
+                else:
+                    # Old format - create gitlab structure from raw data
+                    logger.warning(f"Old repository format for {course_member.id}, needs migration")
+                    # Try to construct the gitlab config from old format
+                    submission_group.properties['gitlab'] = {
+                        "full_path": repo_info.get('gitlab_project_path', ''),
+                        "directory": str(course_content.path),
+                        "web_url": repo_info.get('web_url', '')
+                    }
+                
+                logger.info(f"Copying gitlab info to submission group for student {course_member.id}")
             else:
                 logger.info(f"No gitlab_repository in properties for student {course_member.id}")
         else:

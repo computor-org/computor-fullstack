@@ -325,7 +325,8 @@ async def student_list_submission_groups(
         if params.is_graded is None or params.is_graded:
             grading_query = db.query(
                 CourseSubmissionGroupGrading,
-                User.full_name.label('grader_name')
+                User.given_name,
+                User.family_name
             ).join(
                 CourseMember,
                 CourseSubmissionGroupGrading.graded_by_course_member_id == CourseMember.id
@@ -339,7 +340,11 @@ async def student_list_submission_groups(
             ).first()
             
             if grading_query:
-                grading, grader_name = grading_query
+                grading, given_name, family_name = grading_query
+                # Construct grader name from given_name and family_name
+                grader_name = None
+                if given_name or family_name:
+                    grader_name = f"{given_name or ''} {family_name or ''}".strip()
                 latest_grading = SubmissionGroupGradingStudent(
                     id=str(grading.id),
                     grading=grading.grading,

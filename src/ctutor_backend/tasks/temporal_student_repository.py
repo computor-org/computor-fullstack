@@ -270,7 +270,33 @@ async def create_student_repository(
         
         # Find the student-template project
         try:
-            student_template_project = gitlab.projects.get(student_template_path.replace('/', '%2F'))
+            # Extract project name and namespace from path
+            path_parts = student_template_path.split('/')
+            if len(path_parts) < 2:
+                raise ValueError(f"Invalid student template path: {student_template_path}")
+            
+            project_name = path_parts[-1]  # Last part is the project name
+            
+            # Get the course group ID to search in the correct namespace
+            course_group_id = gitlab_props.get('group_id')
+            if not course_group_id:
+                raise ValueError(f"Course {course_id} missing gitlab.group_id")
+            
+            # Search for the project in the course namespace
+            projects = gitlab.projects.list(
+                search=project_name,
+                namespace_id=course_group_id
+            )
+            
+            student_template_project = None
+            for project in projects:
+                if project.path == project_name:
+                    student_template_project = gitlab.projects.get(project.id)
+                    break
+            
+            if not student_template_project:
+                raise ValueError(f"Student template project '{project_name}' not found in namespace {course_group_id}")
+            
             student_template_id = student_template_project.id
         except Exception as e:
             raise ValueError(f"Could not find student-template project at {student_template_path}: {e}")
@@ -515,7 +541,33 @@ async def create_team_repository(
         
         # Find the student-template project
         try:
-            student_template_project = gitlab.projects.get(student_template_path.replace('/', '%2F'))
+            # Extract project name and namespace from path
+            path_parts = student_template_path.split('/')
+            if len(path_parts) < 2:
+                raise ValueError(f"Invalid student template path: {student_template_path}")
+            
+            project_name = path_parts[-1]  # Last part is the project name
+            
+            # Get the course group ID to search in the correct namespace
+            course_group_id = gitlab_props.get('group_id')
+            if not course_group_id:
+                raise ValueError(f"Course {course_id} missing gitlab.group_id")
+            
+            # Search for the project in the course namespace
+            projects = gitlab.projects.list(
+                search=project_name,
+                namespace_id=course_group_id
+            )
+            
+            student_template_project = None
+            for project in projects:
+                if project.path == project_name:
+                    student_template_project = gitlab.projects.get(project.id)
+                    break
+            
+            if not student_template_project:
+                raise ValueError(f"Student template project '{project_name}' not found in namespace {course_group_id}")
+            
             student_template_id = student_template_project.id
         except Exception as e:
             raise ValueError(f"Could not find student-template project at {student_template_path}: {e}")

@@ -179,17 +179,79 @@ async def create_student_repository(
         gitlab_namespace_id = gitlab_props.get('students_group', {}).get('group_id')
         
         if not gitlab_namespace_id:
-            raise ValueError(f"Course {course_id} missing gitlab.students_group.group_id")
-        
-        # Initialize GitLab client to find student-template project
-        # Get GitLab configuration from environment variables
-        gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
-        gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
-        
-        if not gitlab_url or not gitlab_token:
-            raise ValueError("GitLab URL and token must be configured via environment variables")
-        
-        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
+            # Try to create the students group if it's missing
+            logger.warning(f"Course {course_id} missing students group, attempting to create it")
+            
+            # Get the course's main GitLab group
+            course_group_id = gitlab_props.get('group_id')
+            if not course_group_id:
+                raise ValueError(f"Course {course_id} has no GitLab group configured")
+            
+            # Initialize GitLab client early to create the students group
+            gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
+            gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
+            
+            if not gitlab_url or not gitlab_token:
+                raise ValueError("GitLab URL and token must be configured via environment variables")
+            
+            gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
+            
+            try:
+                # Create students group
+                parent_group = gitlab.groups.get(course_group_id)
+                students_path = "students"
+                
+                # Check if it already exists
+                students_group = None
+                for subgroup in parent_group.subgroups.list(all=True):
+                    if subgroup.path == students_path:
+                        students_group = gitlab.groups.get(subgroup.id)
+                        break
+                
+                if not students_group:
+                    # Create new students group
+                    group_data = {
+                        'name': 'Students',
+                        'path': students_path,
+                        'parent_id': course_group_id,
+                        'description': f'Students group for {course.title}',
+                        'visibility': 'private'
+                    }
+                    students_group = gitlab.groups.create(group_data)
+                    logger.info(f"Created missing students group: {students_group.full_path}")
+                
+                # Update course properties with students group info
+                if not course.properties:
+                    course.properties = {}
+                if "gitlab" not in course.properties:
+                    course.properties["gitlab"] = {}
+                    
+                course.properties["gitlab"]["students_group"] = {
+                    "group_id": students_group.id,
+                    "full_path": students_group.full_path,
+                    "web_url": f"{gitlab_url}/groups/{students_group.full_path}"
+                }
+                
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(course, "properties")
+                db.commit()
+                
+                gitlab_namespace_id = students_group.id
+                logger.info(f"Successfully created and configured students group for course {course_id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create students group: {e}")
+                raise ValueError(f"Course {course_id} missing students group and unable to create it: {e}")
+        else:
+            # Initialize GitLab client normally if students group exists
+            # Get GitLab configuration from environment variables
+            gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
+            gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
+            
+            if not gitlab_url or not gitlab_token:
+                raise ValueError("GitLab URL and token must be configured via environment variables")
+            
+            gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
         
         # Get student-template project path from course properties
         student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')

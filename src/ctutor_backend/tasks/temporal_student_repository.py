@@ -333,7 +333,9 @@ async def update_submission_groups(
                 "web_url": repository_info['gitlab']['web_url'],
                 "group_id": repository_info['gitlab']['group_id'],
                 "namespace_id": repository_info['gitlab']['namespace_id'],
-                "namespace_path": repository_info['gitlab']['namespace_path']
+                "namespace_path": repository_info['gitlab']['namespace_path'],
+                "http_url_to_repo": repository_info.get('http_url_to_repo'),  # Add clone URL
+                "ssh_url_to_repo": repository_info.get('ssh_url_to_repo')  # Add SSH URL too
             }
             
             flag_modified(submission_group, "properties")

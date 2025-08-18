@@ -355,15 +355,34 @@ async def student_list_submission_groups(
         
         # Build repository info if available
         repository = None
-        if sg.properties and sg.properties.get('gitlab'):
-            gitlab_info = sg.properties['gitlab']
-            repository = SubmissionGroupRepository(
-                provider="gitlab",
-                url=gitlab_info.get('url', ''),
-                full_path=gitlab_info.get('full_path', ''),
-                clone_url=gitlab_info.get('clone_url'),
-                web_url=gitlab_info.get('web_url')
-            )
+        if sg.properties:
+            # Check for gitlab info in properties
+            gitlab_info = sg.properties.get('gitlab', {})
+            
+            # Also check for http_url_to_repo at the root level (backward compatibility)
+            http_url = sg.properties.get('http_url_to_repo')
+            
+            if gitlab_info.get('full_path'):
+                # Get clone URL - try multiple possible sources
+                clone_url = (
+                    gitlab_info.get('clone_url') or 
+                    gitlab_info.get('http_url_to_repo') or
+                    http_url
+                )
+                
+                if not clone_url and gitlab_info.get('url') and gitlab_info.get('full_path'):
+                    # Construct clone URL from base URL and path
+                    base_url = gitlab_info.get('url', '').rstrip('/')
+                    full_path = gitlab_info.get('full_path', '')
+                    clone_url = f"{base_url}/{full_path}.git"
+                
+                repository = SubmissionGroupRepository(
+                    provider="gitlab",
+                    url=gitlab_info.get('url', ''),
+                    full_path=gitlab_info.get('full_path', ''),
+                    clone_url=clone_url,
+                    web_url=gitlab_info.get('web_url')
+                )
         
         # Create response object
         response.append(SubmissionGroupStudent(

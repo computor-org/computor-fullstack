@@ -97,7 +97,11 @@ def post_create(course_member: CourseMember, db: Session):
     if course_member.user.user_type != "user":
         return
     
-    # Get all individual submittable course contents
+    # Only create submission groups for students
+    if course_member.course_role_id != "_student":
+        return
+    
+    # Get all individual submittable course contents (max_group_size == 1)
     course_contents = (
         db.query(
             CourseContent.id,
@@ -110,12 +114,13 @@ def post_create(course_member: CourseMember, db: Session):
         .filter(
             CourseContent.course_id == course_member.course_id,
             CourseContentKind.submittable == True,
-            CourseContent.max_group_size == 1
+            CourseContent.max_group_size == 1  # Only individual assignments
         ).all()
     )
 
     submission_group_ids = []
     
+    # Create submission groups for existing individual course contents
     for id, course_id, max_test_runs, max_submissions, max_group_size in course_contents:
         submission_group = CourseSubmissionGroup(
             course_id=course_id,
@@ -141,22 +146,22 @@ def post_create(course_member: CourseMember, db: Session):
         
         submission_group_ids.append(str(submission_group.id))
     
-    # Trigger Temporal workflow to create student repository
-    if submission_group_ids:
-        try:
-            # Run async operation in sync context
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(
-                trigger_student_repository_creation(
-                    course_member_id=str(course_member.id),
-                    course_id=str(course_member.course_id),
-                    submission_group_ids=submission_group_ids
-                )
+    # ALWAYS trigger Temporal workflow to create student repository
+    # Repository should be created even if no course content exists yet
+    try:
+        # Run async operation in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(
+            trigger_student_repository_creation(
+                course_member_id=str(course_member.id),
+                course_id=str(course_member.course_id),
+                submission_group_ids=submission_group_ids  # Can be empty list
             )
-        except Exception as e:
-            logger.error(f"Failed to trigger student repository creation: {e}")
-            # Don't fail the course member creation if repository creation fails
+        )
+    except Exception as e:
+        logger.error(f"Failed to trigger student repository creation: {e}")
+        # Don't fail the course member creation if repository creation fails
 
 
 async def trigger_student_repository_creation(

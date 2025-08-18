@@ -208,8 +208,8 @@ async def create_student_repository(
         user = course_member.user
         username = user.email.split('@')[0] if user.email else f"user_{user.id}"
         
-        # Generate repository name and path
-        repo_name = f"{username}-{course.slug}"
+        # Generate repository name and path (just the username)
+        repo_name = username
         repo_path = repo_name.lower().replace(' ', '-').replace('_', '-')
         
         logger.info(f"Forking student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
@@ -418,9 +418,8 @@ async def create_team_repository(
                 
         team_name = "-".join(team_name_parts) if team_name_parts else f"team-{submission_group_id[:8]}"
         
-        # Generate repository name and path
-        content_path = submission_group.course_content.path.replace('.', '-')
-        repo_name = f"team-{content_path}-{team_name}"
+        # Generate repository name and path (just team-{team_name})
+        repo_name = f"team-{team_name}"
         repo_path = repo_name.lower().replace(' ', '-').replace('_', '-')[:63]  # GitLab path limit
         
         logger.info(f"Creating team repository {repo_path} for {len(team_members)} members")

@@ -25,6 +25,123 @@ from ..settings import settings
 logger = logging.getLogger(__name__)
 
 
+async def fork_project_with_polling(
+    gitlab: Gitlab,
+    source_project_id: int,
+    dest_path: str,
+    dest_name: str,
+    namespace_id: int,
+    max_attempts: int = 10,
+    poll_interval: int = 5,
+    initial_wait: int = 2
+) -> Any:
+    """
+    Fork a GitLab project and poll for completion.
+    
+    Args:
+        gitlab: GitLab client instance
+        source_project_id: ID of the project to fork
+        dest_path: Path for the forked project
+        dest_name: Name for the forked project
+        namespace_id: GitLab namespace ID where to create the fork
+        max_attempts: Maximum number of polling attempts
+        poll_interval: Seconds between polling attempts
+        initial_wait: Initial wait before starting to poll
+        
+    Returns:
+        The forked GitLab project object
+        
+    Raises:
+        ValueError: If the fork is not found after max_attempts
+    """
+    import asyncio
+    
+    # Initiate the fork
+    gitlab_fork_project(
+        gitlab=gitlab,
+        fork_id=source_project_id,
+        dest_path=dest_path,
+        dest_name=dest_name,
+        namespace_id=namespace_id
+    )
+    
+    # Initial wait before polling
+    await asyncio.sleep(initial_wait)
+    
+    # Poll for fork completion
+    forked_project = None
+    for attempt in range(max_attempts):
+        # Find the forked project
+        projects = gitlab.groups.get(namespace_id).projects.list(search=dest_path)
+        for project in projects:
+            if project.path == dest_path:
+                forked_project = gitlab.projects.get(project.id)
+                break
+        
+        if forked_project:
+            logger.info(f"Fork completed after {attempt + 1} attempt(s)")
+            return forked_project
+            
+        if attempt < max_attempts - 1:
+            logger.info(f"Fork not ready yet, waiting {poll_interval} seconds (attempt {attempt + 1}/{max_attempts})")
+            await asyncio.sleep(poll_interval)
+            
+    raise ValueError(f"Forked project {dest_path} not found after {max_attempts} attempts")
+
+
+async def add_members_to_project(
+    gitlab: Gitlab,
+    project,
+    member_ids: list[str],
+    db: Session,
+    access_level: int = 40
+) -> None:
+    """
+    Add course members as maintainers to a GitLab project.
+    
+    Args:
+        gitlab: GitLab client instance
+        project: GitLab project object
+        member_ids: List of course member IDs to add
+        db: Database session
+        access_level: GitLab access level (40 = Maintainer)
+    """
+    for member_id in member_ids:
+        member = db.query(CourseMember).filter(CourseMember.id == member_id).first()
+        if not member or not member.user:
+            continue
+            
+        gitlab_user_id = None
+        member_props = member.properties or {}
+        
+        # Get or find GitLab user ID
+        if member_props.get('gitlab_user_id'):
+            gitlab_user_id = member_props['gitlab_user_id']
+        elif member.user.email:
+            # Try to find by email
+            try:
+                users = gitlab.users.list(search=member.user.email)
+                if users:
+                    gitlab_user_id = users[0].id
+                    # Store for future use
+                    member.properties = member_props
+                    member.properties['gitlab_user_id'] = gitlab_user_id
+                    db.add(member)
+                    db.commit()
+            except Exception as e:
+                logger.warning(f"Could not find GitLab user for {member.user.email}: {e}")
+        
+        if gitlab_user_id:
+            try:
+                project.members.create({
+                    'user_id': gitlab_user_id,
+                    'access_level': access_level
+                })
+                logger.info(f"Added user {gitlab_user_id} as maintainer to project {project.id}")
+            except Exception as e:
+                logger.warning(f"Could not add member {gitlab_user_id} to project: {e}")
+
+
 @activity.defn(name="create_student_repository")
 async def create_student_repository(
     course_member_id: str,
@@ -97,44 +214,15 @@ async def create_student_repository(
         
         logger.info(f"Forking student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
         
-        # Fork the student-template repository
+        # Fork the student-template repository with polling
         try:
-            gitlab_fork_project(
+            forked_project = await fork_project_with_polling(
                 gitlab=gitlab,
-                fork_id=student_template_id,
+                source_project_id=student_template_id,
                 dest_path=repo_path,
                 dest_name=repo_name,
                 namespace_id=gitlab_namespace_id
             )
-            
-            # Get the newly created project
-            # Poll for fork completion since GitLab processes forks asynchronously
-            import asyncio
-            await asyncio.sleep(2)  # Initial wait before polling
-            
-            # Poll up to 10 times with 5 second intervals
-            forked_project = None
-            max_attempts = 10
-            poll_interval = 5
-            
-            for attempt in range(max_attempts):
-                # Find the forked project
-                projects = gitlab.groups.get(gitlab_namespace_id).projects.list(search=repo_path)
-                for project in projects:
-                    if project.path == repo_path:
-                        forked_project = gitlab.projects.get(project.id)
-                        break
-                
-                if forked_project:
-                    logger.info(f"Fork completed after {attempt + 1} attempt(s)")
-                    break
-                    
-                if attempt < max_attempts - 1:
-                    logger.info(f"Fork not ready yet, waiting {poll_interval} seconds (attempt {attempt + 1}/{max_attempts})")
-                    await asyncio.sleep(poll_interval)
-                    
-            if not forked_project:
-                raise ValueError(f"Forked project {repo_path} not found after {max_attempts} attempts")
                 
             # Unprotect branches to allow student pushes
             try:
@@ -148,35 +236,12 @@ async def create_student_repository(
                 logger.warning(f"Could not unprotect master branch: {e}")
                 
             # Add student as maintainer of the repository
-            try:
-                # Get student's GitLab user ID (should be stored in course member properties)
-                course_member_props = course_member.properties or {}
-                gitlab_user_id = course_member_props.get('gitlab_user_id')
-                
-                if not gitlab_user_id:
-                    # Try to find user by email
-                    users = gitlab.users.list(search=user.email)
-                    if users:
-                        gitlab_user_id = users[0].id
-                        # Store for future use
-                        course_member.properties = course_member_props
-                        course_member.properties['gitlab_user_id'] = gitlab_user_id
-                        db.add(course_member)
-                        db.commit()
-                
-                if gitlab_user_id:
-                    # Add as maintainer (access level 40)
-                    forked_project.members.create({
-                        'user_id': gitlab_user_id,
-                        'access_level': 40  # Maintainer access
-                    })
-                    logger.info(f"Added user {gitlab_user_id} as maintainer to project {forked_project.id}")
-                else:
-                    logger.warning(f"Could not find GitLab user for {user.email}")
-                    
-            except Exception as e:
-                logger.error(f"Failed to add student as maintainer: {e}")
-                # Don't fail the whole operation if we can't add maintainer rights
+            await add_members_to_project(
+                gitlab=gitlab,
+                project=forked_project,
+                member_ids=[course_member_id],
+                db=db
+            )
                 
             # Update submission group with repository information
             submission_group = db.query(CourseSubmissionGroup).filter(
@@ -360,66 +425,26 @@ async def create_team_repository(
         
         logger.info(f"Creating team repository {repo_path} for {len(team_members)} members")
         
-        # Fork the student-template repository
-        gitlab_fork_project(
+        # Fork the student-template repository with polling
+        team_project = await fork_project_with_polling(
             gitlab=gitlab,
-            fork_id=student_template_id,
+            source_project_id=student_template_id,
             dest_path=repo_path,
             dest_name=repo_name,
             namespace_id=gitlab_namespace_id
         )
-        
-        # Get the newly created project
-        import asyncio
-        await asyncio.sleep(2)
-        
-        projects = gitlab.groups.get(gitlab_namespace_id).projects.list(search=repo_path)
-        team_project = None
-        for project in projects:
-            if project.path == repo_path:
-                team_project = gitlab.projects.get(project.id)
-                break
-                
-        if not team_project:
-            raise ValueError(f"Team project {repo_path} not found after creation")
             
         # Unprotect branches
         gitlab_unprotect_branches(gitlab, team_project.id, "main")
         gitlab_unprotect_branches(gitlab, team_project.id, "master")
         
         # Add team members as maintainers
-        for member_id in team_members:
-            member = db.query(CourseMember).filter(CourseMember.id == member_id).first()
-            if member:
-                gitlab_user_id = None
-                member_props = member.properties or {}
-                
-                # Get or find GitLab user ID
-                if member_props.get('gitlab_user_id'):
-                    gitlab_user_id = member_props['gitlab_user_id']
-                elif member.user and member.user.email:
-                    # Try to find by email
-                    try:
-                        users = gitlab.users.list(search=member.user.email)
-                        if users:
-                            gitlab_user_id = users[0].id
-                            # Store for future use
-                            member.properties = member_props
-                            member.properties['gitlab_user_id'] = gitlab_user_id
-                            db.add(member)
-                            db.commit()
-                    except Exception as e:
-                        logger.warning(f"Could not find GitLab user for {member.user.email}: {e}")
-                
-                if gitlab_user_id:
-                    try:
-                        team_project.members.create({
-                            'user_id': gitlab_user_id,
-                            'access_level': 40  # Maintainer access for all team members
-                        })
-                        logger.info(f"Added team member {gitlab_user_id} as maintainer")
-                    except Exception as e:
-                        logger.warning(f"Could not add member {gitlab_user_id} to project: {e}")
+        await add_members_to_project(
+            gitlab=gitlab,
+            project=team_project,
+            member_ids=team_members,
+            db=db
+        )
                     
         # Update submission group with repository information
         repository_info = {

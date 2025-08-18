@@ -142,6 +142,166 @@ async def add_members_to_project(
                 logger.warning(f"Could not add member {gitlab_user_id} to project: {e}")
 
 
+def get_gitlab_client(organization: Organization) -> Gitlab:
+    """
+    Get a configured GitLab client from organization settings.
+    
+    Args:
+        organization: The organization with GitLab configuration
+        
+    Returns:
+        Configured GitLab client
+        
+    Raises:
+        ValueError: If GitLab configuration is missing or invalid
+    """
+    org_properties = organization.properties or {}
+    gitlab_config = org_properties.get('gitlab', {})
+    gitlab_url = gitlab_config.get('url')
+    gitlab_token_encrypted = gitlab_config.get('token')
+    
+    if not gitlab_url or not gitlab_token_encrypted:
+        raise ValueError(f"Organization {organization.id} missing GitLab configuration")
+    
+    gitlab_token = decrypt_api_key(gitlab_token_encrypted)
+    return Gitlab(gitlab_url, private_token=gitlab_token)
+
+
+def get_course_gitlab_config(course: Course) -> Dict[str, Any]:
+    """
+    Extract GitLab configuration from course properties.
+    
+    Args:
+        course: The course object
+        
+    Returns:
+        GitLab configuration dictionary
+        
+    Raises:
+        ValueError: If required GitLab configuration is missing
+    """
+    course_properties = course.properties or {}
+    gitlab_props = course_properties.get('gitlab', {})
+    
+    # Required fields
+    students_group_id = gitlab_props.get('students_group', {}).get('group_id')
+    if not students_group_id:
+        raise ValueError(f"Course {course.id} missing gitlab.students_group.group_id")
+    
+    # Get template project ID (should be stored directly)
+    template_project_id = gitlab_props.get('projects', {}).get('student_template', {}).get('project_id')
+    if not template_project_id:
+        # Fallback to full_path for backward compatibility
+        template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
+        if not template_path:
+            raise ValueError(f"Course {course.id} missing student-template project configuration")
+        template_project_id = None  # Will need to look it up
+    
+    return {
+        'students_group_id': students_group_id,
+        'template_project_id': template_project_id,
+        'template_path': gitlab_props.get('projects', {}).get('student_template', {}).get('full_path'),
+        'group_id': gitlab_props.get('group_id')
+    }
+
+
+async def find_existing_repository(
+    gitlab: Gitlab,
+    namespace_id: int,
+    repo_path: str
+) -> Optional[Any]:
+    """
+    Check if a repository already exists in the namespace.
+    
+    Args:
+        gitlab: GitLab client
+        namespace_id: The namespace/group ID to search in
+        repo_path: The repository path to look for
+        
+    Returns:
+        The existing project if found, None otherwise
+    """
+    try:
+        # Try to get the namespace group
+        namespace_group = gitlab.groups.get(namespace_id)
+        
+        # Method 1: Direct path access
+        full_path = f"{namespace_group.full_path}/{repo_path}"
+        try:
+            project = gitlab.projects.get(full_path.replace('/', '%2F'))
+            logger.info(f"Found existing repository: {project.path_with_namespace}")
+            return project
+        except:
+            pass
+        
+        # Method 2: List projects in namespace
+        for project in namespace_group.projects.list(all=True):
+            if project.path == repo_path:
+                return gitlab.projects.get(project.id)
+                
+    except Exception as e:
+        logger.warning(f"Error checking for existing repository: {e}")
+    
+    return None
+
+
+async def update_submission_groups(
+    db: Session,
+    submission_group_ids: list[str],
+    repository_info: Dict[str, Any]
+) -> list[str]:
+    """
+    Update submission groups with repository information.
+    
+    Args:
+        db: Database session
+        submission_group_ids: List of submission group IDs to update
+        repository_info: Repository information to store
+        
+    Returns:
+        List of updated submission group IDs
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+    
+    updated_groups = []
+    
+    if not submission_group_ids:
+        logger.info("No submission groups to update")
+        return updated_groups
+    
+    for sg_id in submission_group_ids:
+        submission_group = db.query(CourseSubmissionGroup).filter(
+            CourseSubmissionGroup.id == sg_id
+        ).first()
+        
+        if submission_group:
+            # Get assignment directory from course content
+            course_content = submission_group.course_content
+            assignment_directory = course_content.path if course_content else None
+            
+            # Update properties
+            submission_group.properties = submission_group.properties or {}
+            submission_group.properties['gitlab'] = {
+                "url": repository_info['gitlab']['url'],
+                "full_path": repository_info['gitlab']['full_path'],
+                "directory": str(assignment_directory) if assignment_directory else None,
+                "web_url": repository_info['gitlab']['web_url'],
+                "group_id": repository_info['gitlab']['group_id'],
+                "namespace_id": repository_info['gitlab']['namespace_id'],
+                "namespace_path": repository_info['gitlab']['namespace_path']
+            }
+            
+            flag_modified(submission_group, "properties")
+            db.add(submission_group)
+            updated_groups.append(sg_id)
+            logger.info(f"Updated submission group {sg_id}")
+        else:
+            logger.warning(f"Submission group {sg_id} not found")
+    
+    db.commit()
+    return updated_groups
+
+
 @activity.defn(name="create_student_repository")
 async def create_student_repository(
     course_member_id: str,
@@ -163,7 +323,7 @@ async def create_student_repository(
     db = next(get_db())
     
     try:
-        # Get course member and course information
+        # Get course member and validate
         course_member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
         if not course_member:
             raise ValueError(f"Course member {course_member_id} not found")
@@ -172,176 +332,46 @@ async def create_student_repository(
         if not course:
             raise ValueError(f"Course {course_id} not found")
         
-        # Get the organization to access GitLab credentials
         organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
         if not organization:
             raise ValueError(f"Organization for course {course_id} not found")
         
-        # Get GitLab credentials from organization
-        org_properties = organization.properties or {}
-        gitlab_config = org_properties.get('gitlab', {})
-        gitlab_url = gitlab_config.get('url')
-        gitlab_token_encrypted = gitlab_config.get('token')
+        # Get GitLab client and course configuration
+        gitlab = get_gitlab_client(organization)
+        gitlab_config = get_course_gitlab_config(course)
+        gitlab_url = organization.properties.get('gitlab', {}).get('url')
         
-        if not gitlab_url or not gitlab_token_encrypted:
-            raise ValueError(f"Organization {organization.id} missing GitLab configuration")
+        # Get student-template project ID
+        student_template_id = gitlab_config.get('template_project_id')
         
-        # Decrypt the GitLab token
-        gitlab_token = decrypt_api_key(gitlab_token_encrypted)
-        
-        # Initialize GitLab client with organization's credentials
-        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
+        # If not stored as ID, look it up from path (backward compatibility)
+        if not student_template_id:
+            template_path = gitlab_config.get('template_path')
+            if not template_path:
+                raise ValueError(f"Course {course_id} missing student-template project configuration")
             
-        # Get GitLab properties from course
-        course_properties = course.properties or {}
-        gitlab_props = course_properties.get('gitlab', {})
-        gitlab_namespace_id = gitlab_props.get('students_group', {}).get('group_id')
-        
-        if not gitlab_namespace_id:
-            # Try to create the students group if it's missing
-            logger.warning(f"Course {course_id} missing students group, attempting to create it")
-            
-            # Get the course's main GitLab group
-            course_group_id = gitlab_props.get('group_id')
-            if not course_group_id:
-                raise ValueError(f"Course {course_id} has no GitLab group configured")
-            
+            # Simple lookup: get project by full path
             try:
-                # Create students group
-                parent_group = gitlab.groups.get(course_group_id)
-                students_path = "students"
-                
-                # Check if it already exists
-                students_group = None
-                for subgroup in parent_group.subgroups.list(all=True):
-                    if subgroup.path == students_path:
-                        students_group = gitlab.groups.get(subgroup.id)
-                        break
-                
-                if not students_group:
-                    # Create new students group
-                    group_data = {
-                        'name': 'Students',
-                        'path': students_path,
-                        'parent_id': course_group_id,
-                        'description': f'Students group for {course.title}',
-                        'visibility': 'private'
-                    }
-                    students_group = gitlab.groups.create(group_data)
-                    logger.info(f"Created missing students group: {students_group.full_path}")
-                
-                # Update course properties with students group info
-                if not course.properties:
-                    course.properties = {}
-                if "gitlab" not in course.properties:
-                    course.properties["gitlab"] = {}
-                    
-                course.properties["gitlab"]["students_group"] = {
-                    "group_id": students_group.id,
-                    "full_path": students_group.full_path,
-                    "web_url": f"{gitlab_url}/groups/{students_group.full_path}"
-                }
-                
-                from sqlalchemy.orm.attributes import flag_modified
-                flag_modified(course, "properties")
-                db.commit()
-                
-                gitlab_namespace_id = students_group.id
-                logger.info(f"Successfully created and configured students group for course {course_id}")
-                
+                template_project = gitlab.projects.get(template_path.replace('/', '%2F'))
+                student_template_id = template_project.id
             except Exception as e:
-                logger.error(f"Failed to create students group: {e}")
-                raise ValueError(f"Course {course_id} missing students group and unable to create it: {e}")
-        
-        # Get student-template project path from course properties
-        student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
-        if not student_template_path:
-            # Fallback to URL parsing
-            student_template_url = gitlab_props.get('student_template_url')
-            if student_template_url:
-                # Extract path from URL: http://localhost:8084/itpcp/progphys/python.2026/student-template
-                import re
-                match = re.search(r'/([^/]+/[^/]+/[^/]+/student-template)$', student_template_url)
-                if match:
-                    student_template_path = match.group(1)
-        
-        if not student_template_path:
-            raise ValueError(f"Course {course_id} missing student-template project path")
-        
-        # Find the student-template project
-        try:
-            # Extract project name and namespace from path
-            path_parts = student_template_path.split('/')
-            if len(path_parts) < 2:
-                raise ValueError(f"Invalid student template path: {student_template_path}")
-            
-            project_name = path_parts[-1]  # Last part is the project name
-            
-            # Get the course group ID to search in the correct namespace
-            course_group_id = gitlab_props.get('group_id')
-            if not course_group_id:
-                raise ValueError(f"Course {course_id} missing gitlab.group_id")
-            
-            # Search for the project in the course namespace
-            projects = gitlab.projects.list(
-                search=project_name,
-                namespace_id=course_group_id
-            )
-            
-            student_template_project = None
-            for project in projects:
-                if project.path == project_name:
-                    student_template_project = gitlab.projects.get(project.id)
-                    break
-            
-            if not student_template_project:
-                raise ValueError(f"Student template project '{project_name}' not found in namespace {course_group_id}")
-            
-            student_template_id = student_template_project.id
-        except Exception as e:
-            raise ValueError(f"Could not find student-template project at {student_template_path}: {e}")
+                raise ValueError(f"Could not find student-template project at {template_path}: {e}")
             
         # Get user information for repository naming
         user = course_member.user
         username = user.email.split('@')[0] if user.email else f"user_{user.id}"
         
-        # Generate repository name and path (just the username)
+        # Generate repository name and path
         repo_name = username
         repo_path = repo_name.lower().replace(' ', '-').replace('_', '-')
         
+        # Get the students group namespace
+        gitlab_namespace_id = gitlab_config['students_group_id']
+        
         logger.info(f"Checking for existing repository {repo_path} in namespace {gitlab_namespace_id}")
         
-        # First check if repository already exists - be VERY thorough
-        existing_project = None
-        
-        # Method 1: Try to get the project directly by full path
-        try:
-            namespace_group = gitlab.groups.get(gitlab_namespace_id)
-            full_path = f"{namespace_group.full_path}/{repo_path}"
-            logger.info(f"Checking for project at path: {full_path}")
-            
-            # Try direct access with full path
-            try:
-                existing_project = gitlab.projects.get(full_path.replace('/', '%2F'))
-                logger.info(f"Found existing repository by direct path: {existing_project.path_with_namespace}")
-            except Exception as e1:
-                logger.info(f"Project not found by direct path: {e1}")
-        except Exception as e:
-            logger.warning(f"Error getting namespace group: {e}")
-        
-        # Method 2: List all projects in the namespace and check
-        if not existing_project:
-            try:
-                namespace_group = gitlab.groups.get(gitlab_namespace_id)
-                all_projects = namespace_group.projects.list(all=True)
-                logger.info(f"Searching {len(all_projects)} projects in namespace")
-                for project in all_projects:
-                    if project.path == repo_path:
-                        existing_project = gitlab.projects.get(project.id)
-                        logger.info(f"Found existing repository in namespace: {existing_project.path_with_namespace}")
-                        break
-            except Exception as e:
-                logger.warning(f"Error listing namespace projects: {e}")
+        # Check if repository already exists
+        existing_project = await find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
         
         # If repository exists, use it; otherwise fork
         if existing_project:
@@ -359,8 +389,8 @@ async def create_student_repository(
             except Exception as e:
                 logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
         else:
-            # Fork the student-template repository with polling
-            logger.info(f"No existing repository found, attempting to fork student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
+            # Fork the student-template repository
+            logger.info(f"Forking template {student_template_id} to {repo_path}")
             try:
                 forked_project = await fork_project_with_polling(
                     gitlab=gitlab,
@@ -370,50 +400,21 @@ async def create_student_repository(
                     namespace_id=gitlab_namespace_id
                 )
             except Exception as fork_error:
-                # If fork fails with "already taken", the repository exists
+                # If fork fails with "already taken", try to find the existing repo
                 if "has already been taken" in str(fork_error):
-                    logger.warning(f"Fork failed with 'already taken' - repository definitely exists, searching again...")
-                    
-                    # The repository MUST exist, let's find it
-                    namespace_group = gitlab.groups.get(gitlab_namespace_id)
-                    
-                    # Try getting by full path one more time
-                    full_path = f"{namespace_group.full_path}/{repo_path}"
-                    try:
-                        forked_project = gitlab.projects.get(full_path.replace('/', '%2F'))
-                        logger.info(f"Found existing repository after fork failure: {forked_project.path_with_namespace}")
-                    except:
-                        # Search ALL projects in the namespace
-                        all_projects = namespace_group.projects.list(all=True, per_page=100)
-                        found = False
-                        for project in all_projects:
-                            logger.debug(f"Checking project: {project.path} == {repo_path}?")
-                            if project.path == repo_path:
-                                forked_project = gitlab.projects.get(project.id)
-                                logger.info(f"Found existing repository in exhaustive search: {forked_project.path_with_namespace}")
-                                found = True
-                                break
-                        
-                        if not found:
-                            # This should not happen - the project exists but we can't find it
-                            logger.error(f"Repository {repo_path} exists (409 error) but cannot be found!")
-                            logger.error(f"Namespace: {namespace_group.full_path}, Projects checked: {len(all_projects)}")
-                            # Create a detailed error message
-                            raise ValueError(f"Repository {repo_path} exists in namespace {namespace_group.full_path} but cannot be accessed. This might be a permissions issue.")
+                    logger.warning(f"Repository already exists, searching for it...")
+                    forked_project = await find_existing_repository(gitlab, gitlab_namespace_id, repo_path)
+                    if not forked_project:
+                        raise ValueError(f"Repository {repo_path} exists but cannot be accessed")
                 else:
-                    # Some other error, re-raise it
                     raise fork_error
                 
             # Unprotect branches to allow student pushes
-            try:
-                gitlab_unprotect_branches(gitlab, forked_project.id, "main")
-            except Exception as e:
-                logger.warning(f"Could not unprotect main branch: {e}")
-                
-            try:
-                gitlab_unprotect_branches(gitlab, forked_project.id, "master")
-            except Exception as e:
-                logger.warning(f"Could not unprotect master branch: {e}")
+            for branch in ["main", "master"]:
+                try:
+                    gitlab_unprotect_branches(gitlab, forked_project.id, branch)
+                except Exception as e:
+                    logger.debug(f"Could not unprotect {branch} branch: {e}")
                 
             # Add student as maintainer of the repository
             await add_members_to_project(
@@ -422,91 +423,46 @@ async def create_student_repository(
                 member_ids=[course_member_id],
                 db=db
             )
-                
-            # Prepare repository information in the expected GitLabConfig format
-            repository_info = {
-                "gitlab": {
-                    "url": gitlab_url,  # GitLab instance URL
-                    "full_path": forked_project.path_with_namespace,
-                    "directory": None,  # Will be set per assignment
-                    "web_url": forked_project.web_url,
-                    "group_id": forked_project.id,  # Project ID
-                    "namespace_id": gitlab_namespace_id,
-                    "namespace_path": forked_project.namespace['full_path'] if hasattr(forked_project.namespace, '__getitem__') else forked_project.namespace.full_path
-                },
-                # Keep raw info for backward compatibility
-                "gitlab_project_id": forked_project.id,
-                "gitlab_project_path": forked_project.path_with_namespace,
-                "http_url_to_repo": forked_project.http_url_to_repo,
-                "ssh_url_to_repo": forked_project.ssh_url_to_repo
-            }
-            
-            # Store repository info in course member properties (primary storage)
-            course_member.properties = course_member.properties or {}
-            course_member.properties['gitlab_repository'] = repository_info
-            
-            # Mark properties as modified so SQLAlchemy detects the change
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(course_member, "properties")
-            db.add(course_member)
-            db.commit()
-            
-            # Update ALL submission groups with the SAME repository information
-            updated_submission_groups = []
-            logger.info(f"Received submission_group_ids: {submission_group_ids}")
-            logger.info(f"Updating {len(submission_group_ids)} submission groups with repository info")
-            if submission_group_ids:
-                for submission_group_id in submission_group_ids:
-                    logger.info(f"Processing submission group {submission_group_id}")
-                    submission_group = db.query(CourseSubmissionGroup).filter(
-                        CourseSubmissionGroup.id == submission_group_id
-                    ).first()
-                    
-                    if submission_group:
-                        # Store repository info in the expected format for submission groups
-                        submission_group.properties = submission_group.properties or {}
-                        logger.info(f"Current properties: {submission_group.properties}")
-                        
-                        # Get the course content to determine the assignment directory
-                        course_content = submission_group.course_content
-                        assignment_directory = course_content.path if course_content else None
-                        logger.info(f"Assignment directory: {assignment_directory}")
-                        
-                        # Store in the GitLabConfig format expected by SubmissionGroupProperties
-                        submission_group.properties['gitlab'] = {
-                            "url": repository_info['gitlab']['url'],
-                            "full_path": repository_info['gitlab']['full_path'],
-                            "directory": str(assignment_directory) if assignment_directory else None,
-                            "web_url": repository_info['gitlab']['web_url'],
-                            "group_id": repository_info['gitlab']['group_id'],
-                            "namespace_id": repository_info['gitlab']['namespace_id'],
-                            "namespace_path": repository_info['gitlab']['namespace_path']
-                        }
-                        logger.info(f"New properties: {submission_group.properties}")
-                        
-                        # Mark properties as modified so SQLAlchemy detects the change
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(submission_group, "properties")
-                        db.add(submission_group)
-                        updated_submission_groups.append(submission_group_id)
-                        logger.info(f"Updated submission group {submission_group_id} with repository info")
-                    else:
-                        logger.warning(f"Submission group {submission_group_id} not found")
-                
-                db.commit()
-                logger.info(f"Committed {len(updated_submission_groups)} submission group updates")
-            else:
-                logger.info("No submission groups to update (student joined before course content exists)")
-            
-            logger.info(f"Successfully created student repository {repo_path} for {username}")
-            logger.info(f"Updated {len(updated_submission_groups)} submission groups with repository info")
-            
-            return {
-                "success": True,
-                "repository": repository_info,
-                "course_member_id": course_member_id,
-                "submission_groups_updated": updated_submission_groups
-            }
+        
+        # Prepare repository information
+        repository_info = {
+            "gitlab": {
+                "url": gitlab_url,
+                "full_path": forked_project.path_with_namespace,
+                "directory": None,  # Will be set per assignment
+                "web_url": forked_project.web_url,
+                "group_id": forked_project.id,
+                "namespace_id": gitlab_namespace_id,
+                "namespace_path": forked_project.namespace['full_path'] if hasattr(forked_project.namespace, '__getitem__') else forked_project.namespace.full_path
+            },
+            # Keep for backward compatibility
+            "gitlab_project_id": forked_project.id,
+            "gitlab_project_path": forked_project.path_with_namespace,
+            "http_url_to_repo": forked_project.http_url_to_repo,
+            "ssh_url_to_repo": forked_project.ssh_url_to_repo
+        }
+        
+        # Store repository info in course member properties
+        from sqlalchemy.orm.attributes import flag_modified
+        course_member.properties = course_member.properties or {}
+        course_member.properties['gitlab_repository'] = repository_info
+        flag_modified(course_member, "properties")
+        db.add(course_member)
+        db.commit()
+        
+        # Update submission groups
+        updated_submission_groups = await update_submission_groups(
+            db, submission_group_ids, repository_info
+        )
+        
+        logger.info(f"Successfully created/configured repository {repo_path} for {username}")
+        
+        return {
+            "success": True,
+            "repository": repository_info,
+            "course_member_id": course_member_id,
+            "submission_groups_updated": updated_submission_groups
+        }
             
     except Exception as e:
         logger.error(f"Failed to create student repository: {e}")

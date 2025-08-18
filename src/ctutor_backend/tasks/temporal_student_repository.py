@@ -558,15 +558,16 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                     results.append(result)
                     
             return WorkflowResult(
-                success=True,
-                message=f"Created {len(results)} repositories",
-                data={"repositories": results}
+                status="success",
+                result={"message": f"Created {len(results)} repositories", "repositories": results},
+                metadata={"repository_count": len(results)}
             )
             
         except Exception as e:
             logger.error(f"Student repository creation workflow failed: {e}")
             return WorkflowResult(
-                success=False,
-                message=str(e),
-                error=str(e)
+                status="failed",
+                result=None,
+                error=str(e),
+                metadata={"error_details": str(e)}
             )

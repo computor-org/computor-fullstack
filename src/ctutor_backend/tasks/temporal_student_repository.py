@@ -167,12 +167,13 @@ def get_gitlab_client(organization: Organization) -> Gitlab:
     return Gitlab(gitlab_url, private_token=gitlab_token)
 
 
-def get_course_gitlab_config(course: Course) -> Dict[str, Any]:
+def get_course_gitlab_config(course: Course, gitlab: Optional[Gitlab] = None) -> Dict[str, Any]:
     """
     Extract GitLab configuration from course properties.
     
     Args:
         course: The course object
+        gitlab: Optional GitLab client for finding missing groups
         
     Returns:
         GitLab configuration dictionary
@@ -183,10 +184,44 @@ def get_course_gitlab_config(course: Course) -> Dict[str, Any]:
     course_properties = course.properties or {}
     gitlab_props = course_properties.get('gitlab', {})
     
-    # Required fields
+    # Get students group ID with fallbacks
     students_group_id = gitlab_props.get('students_group', {}).get('group_id')
+    
+    # If missing, try to find it in GitLab
+    if not students_group_id and gitlab:
+        course_group_id = gitlab_props.get('group_id')
+        if course_group_id:
+            try:
+                # Look for students subgroup
+                parent_group = gitlab.groups.get(course_group_id)
+                for subgroup in parent_group.subgroups.list(all=True):
+                    if subgroup.path == 'students':
+                        students_group_id = subgroup.id
+                        logger.warning(f"Found students group {subgroup.id} not stored in course properties")
+                        
+                        # Update course properties for future use
+                        from sqlalchemy.orm import Session
+                        from sqlalchemy.orm.attributes import flag_modified
+                        db = Session.object_session(course)
+                        if db:
+                            if not course.properties:
+                                course.properties = {}
+                            if "gitlab" not in course.properties:
+                                course.properties["gitlab"] = {}
+                            course.properties["gitlab"]["students_group"] = {
+                                "group_id": students_group_id,
+                                "full_path": subgroup.full_path
+                            }
+                            flag_modified(course, "properties")
+                            db.add(course)
+                            db.commit()
+                            logger.info(f"Updated course {course.id} with students group info")
+                        break
+            except Exception as e:
+                logger.warning(f"Could not search for students group: {e}")
+    
     if not students_group_id:
-        raise ValueError(f"Course {course.id} missing gitlab.students_group.group_id")
+        raise ValueError(f"Course {course.id} missing gitlab.students_group.group_id and could not find students subgroup")
     
     # Get template project ID (should be stored directly)
     template_project_id = gitlab_props.get('projects', {}).get('student_template', {}).get('project_id')
@@ -194,13 +229,23 @@ def get_course_gitlab_config(course: Course) -> Dict[str, Any]:
         # Fallback to full_path for backward compatibility
         template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
         if not template_path:
-            raise ValueError(f"Course {course.id} missing student-template project configuration")
+            # Last resort: check for student_template_url
+            template_url = gitlab_props.get('student_template_url')
+            if template_url:
+                # Extract path from URL
+                import re
+                match = re.search(r'/([^/]+/[^/]+/[^/]+/student-template)$', template_url)
+                if match:
+                    template_path = match.group(1)
+            
+            if not template_path:
+                raise ValueError(f"Course {course.id} missing student-template project configuration")
         template_project_id = None  # Will need to look it up
     
     return {
         'students_group_id': students_group_id,
         'template_project_id': template_project_id,
-        'template_path': gitlab_props.get('projects', {}).get('student_template', {}).get('full_path'),
+        'template_path': gitlab_props.get('projects', {}).get('student_template', {}).get('full_path') or template_path,
         'group_id': gitlab_props.get('group_id')
     }
 
@@ -338,7 +383,7 @@ async def create_student_repository(
         
         # Get GitLab client and course configuration
         gitlab = get_gitlab_client(organization)
-        gitlab_config = get_course_gitlab_config(course)
+        gitlab_config = get_course_gitlab_config(course, gitlab)
         gitlab_url = organization.properties.get('gitlab', {}).get('url')
         
         # Get student-template project ID

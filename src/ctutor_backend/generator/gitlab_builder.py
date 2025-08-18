@@ -919,7 +919,9 @@ class GitLabBuilder:
         """Validate if GitLab group exists and matches expected path."""
         try:
             group = self.gitlab.groups.get(group_id)
-            return group.full_path == expected_path
+            # Check if the group's path (not full_path) matches the expected path
+            # This handles cases where the group is under a parent
+            return group.path == expected_path
         except GitlabGetError:
             return False
         except Exception as e:

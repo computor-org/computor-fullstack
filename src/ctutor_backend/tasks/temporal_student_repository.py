@@ -108,20 +108,33 @@ async def create_student_repository(
             )
             
             # Get the newly created project
-            # Wait a moment for GitLab to process the fork
+            # Poll for fork completion since GitLab processes forks asynchronously
             import asyncio
-            await asyncio.sleep(2)
+            await asyncio.sleep(2)  # Initial wait before polling
             
-            # Find the forked project
-            projects = gitlab.groups.get(gitlab_namespace_id).projects.list(search=repo_path)
+            # Poll up to 10 times with 5 second intervals
             forked_project = None
-            for project in projects:
-                if project.path == repo_path:
-                    forked_project = gitlab.projects.get(project.id)
+            max_attempts = 10
+            poll_interval = 5
+            
+            for attempt in range(max_attempts):
+                # Find the forked project
+                projects = gitlab.groups.get(gitlab_namespace_id).projects.list(search=repo_path)
+                for project in projects:
+                    if project.path == repo_path:
+                        forked_project = gitlab.projects.get(project.id)
+                        break
+                
+                if forked_project:
+                    logger.info(f"Fork completed after {attempt + 1} attempt(s)")
                     break
                     
+                if attempt < max_attempts - 1:
+                    logger.info(f"Fork not ready yet, waiting {poll_interval} seconds (attempt {attempt + 1}/{max_attempts})")
+                    await asyncio.sleep(poll_interval)
+                    
             if not forked_project:
-                raise ValueError(f"Forked project {repo_path} not found after creation")
+                raise ValueError(f"Forked project {repo_path} not found after {max_attempts} attempts")
                 
             # Unprotect branches to allow student pushes
             try:

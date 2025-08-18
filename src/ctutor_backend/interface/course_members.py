@@ -11,6 +11,7 @@ from temporalio.client import Client as TemporalClient
 from ctutor_backend.settings import settings
 import asyncio
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -188,9 +189,14 @@ async def trigger_student_repository_creation(
     Trigger the Temporal workflow to create student repositories.
     """
     try:
+        # Get Temporal configuration from environment variables
+        temporal_host = os.environ.get('TEMPORAL_HOST', 'localhost')
+        temporal_port = int(os.environ.get('TEMPORAL_PORT', '7233'))
+        temporal_namespace = os.environ.get('TEMPORAL_NAMESPACE', 'default')
+        
         client = await TemporalClient.connect(
-            f"{settings.temporal_host}:{settings.temporal_port}",
-            namespace=settings.temporal_namespace
+            f"{temporal_host}:{temporal_port}",
+            namespace=temporal_namespace
         )
         
         workflow_id = f"student-repo-{course_member_id}-{course_id}"

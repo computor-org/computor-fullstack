@@ -149,16 +149,31 @@ def post_create(course_member: CourseMember, db: Session):
     # ALWAYS trigger Temporal workflow to create student repository
     # Repository should be created even if no course content exists yet
     try:
-        # Run async operation in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(
-            trigger_student_repository_creation(
-                course_member_id=str(course_member.id),
-                course_id=str(course_member.course_id),
-                submission_group_ids=submission_group_ids  # Can be empty list
+        # Check if there's already a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # If we're in an async context, create a task
+            asyncio.create_task(
+                trigger_student_repository_creation(
+                    course_member_id=str(course_member.id),
+                    course_id=str(course_member.course_id),
+                    submission_group_ids=submission_group_ids  # Can be empty list
+                )
             )
-        )
+        except RuntimeError:
+            # No running loop, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(
+                    trigger_student_repository_creation(
+                        course_member_id=str(course_member.id),
+                        course_id=str(course_member.course_id),
+                        submission_group_ids=submission_group_ids  # Can be empty list
+                    )
+                )
+            finally:
+                loop.close()
     except Exception as e:
         logger.error(f"Failed to trigger student repository creation: {e}")
         # Don't fail the course member creation if repository creation fails

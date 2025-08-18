@@ -44,7 +44,11 @@ async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_t
         response = response_type.model_validate(db_item,from_attributes=True)
 
         if post_create != None:
-            post_create(db_item, db)
+            import asyncio
+            if asyncio.iscoroutinefunction(post_create):
+                await post_create(db_item, db)
+            else:
+                post_create(db_item, db)
 
         return response
     except exc.IntegrityError as e:

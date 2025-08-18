@@ -7,11 +7,7 @@ from ctutor_backend.interface.users import UserList
 from ctutor_backend.model import CourseMember
 from ctutor_backend.model import CourseContent, CourseContentKind, CourseContentType, CourseSubmissionGroup, CourseSubmissionGroupMember
 from ctutor_backend.model import User
-from temporalio.client import Client as TemporalClient
-from ctutor_backend.settings import settings
-import asyncio
 import logging
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +89,7 @@ def course_member_search(db: Session, query, params: Optional[CourseMemberQuery]
   
     return query.order_by(UserA.family_name)
 
-def post_create(course_member: CourseMember, db: Session):
+async def post_create(course_member: CourseMember, db: Session):
 
     if course_member.user.user_type != "user":
         return
@@ -101,6 +97,20 @@ def post_create(course_member: CourseMember, db: Session):
     # Only create submission groups for students
     if course_member.course_role_id != "_student":
         return
+    
+    # First, let's see what CourseContents exist
+    all_course_contents = db.query(CourseContent).filter(
+        CourseContent.course_id == course_member.course_id
+    ).all()
+    logger.info(f"Total CourseContents in course: {len(all_course_contents)}")
+    for cc in all_course_contents:
+        # Check if the type and kind exist
+        cc_type = db.query(CourseContentType).filter(CourseContentType.id == cc.course_content_type_id).first()
+        if cc_type:
+            cc_kind = db.query(CourseContentKind).filter(CourseContentKind.id == cc_type.course_content_kind_id).first()
+            logger.info(f"  - CourseContent {cc.id}: max_group_size={cc.max_group_size}, type={cc_type.id}, kind={cc_kind.id if cc_kind else 'None'}, submittable={cc_kind.submittable if cc_kind else 'N/A'}")
+        else:
+            logger.info(f"  - CourseContent {cc.id}: max_group_size={cc.max_group_size}, type_id={cc.course_content_type_id} (TYPE NOT FOUND)")
     
     # Get all individual submittable course contents (max_group_size == 1)
     course_contents = (
@@ -158,74 +168,27 @@ def post_create(course_member: CourseMember, db: Session):
     # ALWAYS trigger Temporal workflow to create student repository
     # Repository should be created even if no course content exists yet
     try:
-        # Check if there's already a running event loop
-        try:
-            loop = asyncio.get_running_loop()
-            # If we're in an async context, create a task
-            asyncio.create_task(
-                trigger_student_repository_creation(
-                    course_member_id=str(course_member.id),
-                    course_id=str(course_member.course_id),
-                    submission_group_ids=submission_group_ids  # Can be empty list
-                )
-            )
-        except RuntimeError:
-            # No running loop, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(
-                    trigger_student_repository_creation(
-                        course_member_id=str(course_member.id),
-                        course_id=str(course_member.course_id),
-                        submission_group_ids=submission_group_ids  # Can be empty list
-                    )
-                )
-            finally:
-                loop.close()
-    except Exception as e:
-        logger.error(f"Failed to trigger student repository creation: {e}")
-        # Don't fail the course member creation if repository creation fails
-
-
-async def trigger_student_repository_creation(
-    course_member_id: str,
-    course_id: str,
-    submission_group_ids: list[str]
-):
-    """
-    Trigger the Temporal workflow to create student repositories.
-    """
-    try:
-        # Get Temporal configuration from environment variables
-        temporal_host = os.environ.get('TEMPORAL_HOST', 'localhost')
-        temporal_port = int(os.environ.get('TEMPORAL_PORT', '7233'))
-        temporal_namespace = os.environ.get('TEMPORAL_NAMESPACE', 'default')
+        # Import at runtime to avoid circular dependency
+        from ctutor_backend.tasks import get_task_executor, TaskSubmission
         
-        client = await TemporalClient.connect(
-            f"{temporal_host}:{temporal_port}",
-            namespace=temporal_namespace
-        )
+        task_executor = get_task_executor()
         
-        workflow_id = f"student-repo-{course_member_id}-{course_id}"
-        
-        await client.start_workflow(
-            "StudentRepositoryCreationWorkflow",
-            {
-                "course_member_id": course_member_id,
-                "course_id": course_id,
+        task_submission = TaskSubmission(
+            task_name="StudentRepositoryCreationWorkflow",
+            parameters={
+                "course_member_id": str(course_member.id),
+                "course_id": str(course_member.course_id),
                 "submission_group_ids": submission_group_ids,
                 "is_team": False
             },
-            id=workflow_id,
-            task_queue="computor-tasks"
+            queue="computor-tasks"
         )
         
+        workflow_id = await task_executor.submit_task(task_submission)
         logger.info(f"Started student repository creation workflow: {workflow_id}")
-        
     except Exception as e:
-        logger.error(f"Failed to start Temporal workflow: {e}")
-        raise e
+        logger.error(f"Failed to trigger student repository creation: {e}")
+        # Don't fail the course member creation if repository creation fails
 
 class CourseMemberInterface(EntityInterface):
     create = CourseMemberCreate

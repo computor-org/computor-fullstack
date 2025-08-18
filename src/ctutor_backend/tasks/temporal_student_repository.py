@@ -311,19 +311,37 @@ async def create_student_repository(
         
         logger.info(f"Checking for existing repository {repo_path} in namespace {gitlab_namespace_id}")
         
-        # First check if repository already exists
+        # First check if repository already exists - be VERY thorough
         existing_project = None
+        
+        # Method 1: Try to get the project directly by full path
         try:
-            # Search for existing project
             namespace_group = gitlab.groups.get(gitlab_namespace_id)
-            projects = namespace_group.projects.list(search=repo_path)
-            for project in projects:
-                if project.path == repo_path:
-                    existing_project = gitlab.projects.get(project.id)
-                    logger.info(f"Found existing repository: {existing_project.path_with_namespace}")
-                    break
+            full_path = f"{namespace_group.full_path}/{repo_path}"
+            logger.info(f"Checking for project at path: {full_path}")
+            
+            # Try direct access with full path
+            try:
+                existing_project = gitlab.projects.get(full_path.replace('/', '%2F'))
+                logger.info(f"Found existing repository by direct path: {existing_project.path_with_namespace}")
+            except Exception as e1:
+                logger.info(f"Project not found by direct path: {e1}")
         except Exception as e:
-            logger.debug(f"Error checking for existing project: {e}")
+            logger.warning(f"Error getting namespace group: {e}")
+        
+        # Method 2: List all projects in the namespace and check
+        if not existing_project:
+            try:
+                namespace_group = gitlab.groups.get(gitlab_namespace_id)
+                all_projects = namespace_group.projects.list(all=True)
+                logger.info(f"Searching {len(all_projects)} projects in namespace")
+                for project in all_projects:
+                    if project.path == repo_path:
+                        existing_project = gitlab.projects.get(project.id)
+                        logger.info(f"Found existing repository in namespace: {existing_project.path_with_namespace}")
+                        break
+            except Exception as e:
+                logger.warning(f"Error listing namespace projects: {e}")
         
         # If repository exists, use it; otherwise fork
         if existing_project:
@@ -342,14 +360,49 @@ async def create_student_repository(
                 logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
         else:
             # Fork the student-template repository with polling
-            logger.info(f"Forking student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
-            forked_project = await fork_project_with_polling(
-                gitlab=gitlab,
-                source_project_id=student_template_id,
-                dest_path=repo_path,
-                dest_name=repo_name,
-                namespace_id=gitlab_namespace_id
-            )
+            logger.info(f"No existing repository found, attempting to fork student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
+            try:
+                forked_project = await fork_project_with_polling(
+                    gitlab=gitlab,
+                    source_project_id=student_template_id,
+                    dest_path=repo_path,
+                    dest_name=repo_name,
+                    namespace_id=gitlab_namespace_id
+                )
+            except Exception as fork_error:
+                # If fork fails with "already taken", the repository exists
+                if "has already been taken" in str(fork_error):
+                    logger.warning(f"Fork failed with 'already taken' - repository definitely exists, searching again...")
+                    
+                    # The repository MUST exist, let's find it
+                    namespace_group = gitlab.groups.get(gitlab_namespace_id)
+                    
+                    # Try getting by full path one more time
+                    full_path = f"{namespace_group.full_path}/{repo_path}"
+                    try:
+                        forked_project = gitlab.projects.get(full_path.replace('/', '%2F'))
+                        logger.info(f"Found existing repository after fork failure: {forked_project.path_with_namespace}")
+                    except:
+                        # Search ALL projects in the namespace
+                        all_projects = namespace_group.projects.list(all=True, per_page=100)
+                        found = False
+                        for project in all_projects:
+                            logger.debug(f"Checking project: {project.path} == {repo_path}?")
+                            if project.path == repo_path:
+                                forked_project = gitlab.projects.get(project.id)
+                                logger.info(f"Found existing repository in exhaustive search: {forked_project.path_with_namespace}")
+                                found = True
+                                break
+                        
+                        if not found:
+                            # This should not happen - the project exists but we can't find it
+                            logger.error(f"Repository {repo_path} exists (409 error) but cannot be found!")
+                            logger.error(f"Namespace: {namespace_group.full_path}, Projects checked: {len(all_projects)}")
+                            # Create a detailed error message
+                            raise ValueError(f"Repository {repo_path} exists in namespace {namespace_group.full_path} but cannot be accessed. This might be a permissions issue.")
+                else:
+                    # Some other error, re-raise it
+                    raise fork_error
                 
             # Unprotect branches to allow student pushes
             try:
@@ -400,8 +453,11 @@ async def create_student_repository(
             
             # Update ALL submission groups with the SAME repository information
             updated_submission_groups = []
+            logger.info(f"Received submission_group_ids: {submission_group_ids}")
+            logger.info(f"Updating {len(submission_group_ids)} submission groups with repository info")
             if submission_group_ids:
                 for submission_group_id in submission_group_ids:
+                    logger.info(f"Processing submission group {submission_group_id}")
                     submission_group = db.query(CourseSubmissionGroup).filter(
                         CourseSubmissionGroup.id == submission_group_id
                     ).first()
@@ -409,10 +465,12 @@ async def create_student_repository(
                     if submission_group:
                         # Store repository info in the expected format for submission groups
                         submission_group.properties = submission_group.properties or {}
+                        logger.info(f"Current properties: {submission_group.properties}")
                         
                         # Get the course content to determine the assignment directory
                         course_content = submission_group.course_content
                         assignment_directory = course_content.path if course_content else None
+                        logger.info(f"Assignment directory: {assignment_directory}")
                         
                         # Store in the GitLabConfig format expected by SubmissionGroupProperties
                         submission_group.properties['gitlab'] = {
@@ -424,6 +482,7 @@ async def create_student_repository(
                             "namespace_id": repository_info['gitlab']['namespace_id'],
                             "namespace_path": repository_info['gitlab']['namespace_path']
                         }
+                        logger.info(f"New properties: {submission_group.properties}")
                         
                         # Mark properties as modified so SQLAlchemy detects the change
                         from sqlalchemy.orm.attributes import flag_modified
@@ -431,8 +490,13 @@ async def create_student_repository(
                         db.add(submission_group)
                         updated_submission_groups.append(submission_group_id)
                         logger.info(f"Updated submission group {submission_group_id} with repository info")
+                    else:
+                        logger.warning(f"Submission group {submission_group_id} not found")
                 
                 db.commit()
+                logger.info(f"Committed {len(updated_submission_groups)} submission group updates")
+            else:
+                logger.info("No submission groups to update (student joined before course content exists)")
             
             logger.info(f"Successfully created student repository {repo_path} for {username}")
             logger.info(f"Updated {len(updated_submission_groups)} submission groups with repository info")

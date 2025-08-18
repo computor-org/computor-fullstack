@@ -121,6 +121,8 @@ def post_create(course_member: CourseMember, db: Session):
 
     submission_group_ids = []
     
+    logger.info(f"Found {len(course_contents)} submittable individual course contents for course {course_member.course_id}")
+    
     # Create submission groups for existing individual course contents
     for id, course_id, max_test_runs, max_submissions, max_group_size in course_contents:
         submission_group = CourseSubmissionGroup(
@@ -146,6 +148,12 @@ def post_create(course_member: CourseMember, db: Session):
         db.refresh(submission_group_member)
         
         submission_group_ids.append(str(submission_group.id))
+        logger.info(f"Created submission group {submission_group.id} for course content {id}")
+    
+    if submission_group_ids:
+        logger.info(f"Created {len(submission_group_ids)} submission groups for student {course_member.id}")
+    else:
+        logger.info(f"No submission groups created for student {course_member.id} (no submittable individual course contents exist yet)")
     
     # ALWAYS trigger Temporal workflow to create student repository
     # Repository should be created even if no course content exists yet

@@ -254,10 +254,15 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
     return query
 
 def post_create(course_content: CourseContent, db: Session):
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"post_create called for CourseContent {course_content.id} in course {course_content.course_id}")
     
     # Only create submission groups for individual assignments (max_group_size == 1)
     # Team assignments (max_group_size > 1) are handled differently
     if course_content.max_group_size != 1:
+        logger.info(f"Skipping submission group creation: max_group_size={course_content.max_group_size} (not individual)")
         return
     
     # Check if this course content type is submittable
@@ -266,6 +271,7 @@ def post_create(course_content: CourseContent, db: Session):
     ).first()
     
     if not course_content_type:
+        logger.warning(f"CourseContentType {course_content.course_content_type_id} not found")
         return
         
     course_content_kind = db.query(CourseContentKind).filter(
@@ -273,6 +279,7 @@ def post_create(course_content: CourseContent, db: Session):
     ).first()
     
     if not course_content_kind or not course_content_kind.submittable:
+        logger.info(f"Skipping submission group creation: not submittable (kind={course_content_kind})")
         return
     
     # Get all student course members (not tutors, lecturers, etc.)
@@ -286,10 +293,14 @@ def post_create(course_content: CourseContent, db: Session):
         )).all()
     )
 
+    logger.info(f"Found {len(course_members)} students in course {course_content.course_id}")
+
+    submission_groups_created = 0
     for course_member_id in course_members:
         # Get the full course member object to access properties
         course_member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
         if not course_member:
+            logger.warning(f"Could not find CourseMember {course_member_id}")
             continue
             
         submission_group = CourseSubmissionGroup(
@@ -305,6 +316,7 @@ def post_create(course_content: CourseContent, db: Session):
             submission_group.properties = {
                 'gitlab_repository': course_member.properties['gitlab_repository']
             }
+            logger.info(f"Copying gitlab_repository info to submission group for student {course_member.id}")
         
         db.add(submission_group)
         db.commit()
@@ -312,12 +324,18 @@ def post_create(course_content: CourseContent, db: Session):
         
         submission_group_member = CourseSubmissionGroupMember(
             course_submission_group_id = submission_group.id,
-            course_member_id = course_member_id
+            course_member_id = course_member.id,  # Use the course_member object's id
+            course_id = course_content.course_id  # Add course_id for consistency
         )
 
         db.add(submission_group_member)
         db.commit()
         db.refresh(submission_group_member)
+        
+        submission_groups_created += 1
+        logger.info(f"Created submission group {submission_group.id} and member for student {course_member.id}")
+    
+    logger.info(f"Created {submission_groups_created} submission groups for CourseContent {course_content.id}")
 
 def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Session):
     """Handle path updates for course content descendants after parent is updated"""

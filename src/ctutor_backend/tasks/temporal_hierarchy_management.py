@@ -441,7 +441,7 @@ async def create_course_content_types_activity(
                     color=content_type_config.get("color", "green"),
                     properties=content_type_config.get("properties", {}),
                     course_id=course_id,
-                    course_content_kind_id=content_type_config["course_content_kind_id"],
+                    course_content_kind_id=content_type_config.get("kind", content_type_config.get("course_content_kind_id")),
                     created_by=user_id,
                     updated_by=user_id
                 )

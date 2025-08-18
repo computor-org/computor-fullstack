@@ -4,6 +4,7 @@ This workflow handles forking the student-template repository when students join
 """
 import logging
 import json
+import os
 from datetime import timedelta
 from typing import Dict, Any, Optional
 from uuid import UUID
@@ -146,15 +147,16 @@ async def add_members_to_project(
 async def create_student_repository(
     course_member_id: str,
     course_id: str,
-    submission_group_id: Optional[str] = None
+    submission_group_ids: list[str] = None
 ) -> Dict[str, Any]:
     """
-    Create a student repository by forking the student-template.
+    Create a single student repository by forking the student-template.
+    Updates all submission groups with the same repository information.
     
     Args:
         course_member_id: ID of the course member (student)
         course_id: ID of the course
-        submission_group_id: ID of the submission group (optional)
+        submission_group_ids: List of submission group IDs to update with repository info
         
     Returns:
         Dict containing repository information
@@ -180,7 +182,14 @@ async def create_student_repository(
             raise ValueError(f"Course {course_id} missing gitlab.students_group.group_id")
         
         # Initialize GitLab client to find student-template project
-        gitlab = Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
+        # Get GitLab configuration from environment variables
+        gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
+        gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
+        
+        if not gitlab_url or not gitlab_token:
+            raise ValueError("GitLab URL and token must be configured via environment variables")
+        
+        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
         
         # Get student-template project path from course properties
         student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
@@ -252,32 +261,37 @@ async def create_student_repository(
                 "web_url": forked_project.web_url
             }
             
-            # Update submission group with repository information (if provided)
-            if submission_group_id:
-                submission_group = db.query(CourseSubmissionGroup).filter(
-                    CourseSubmissionGroup.id == submission_group_id
-                ).first()
-                
-                if submission_group:
-                    # Store repository info in properties
-                    submission_group.properties = submission_group.properties or {}
-                    submission_group.properties.update(repository_info)
-                    db.commit()
-            
-            # Store repository info in course member properties as well
+            # Store repository info in course member properties (primary storage)
             course_member.properties = course_member.properties or {}
-            if 'gitlab_repository' not in course_member.properties:
-                course_member.properties['gitlab_repository'] = {}
-            course_member.properties['gitlab_repository'].update(repository_info)
+            course_member.properties['gitlab_repository'] = repository_info
             db.commit()
             
+            # Update ALL submission groups with the SAME repository information
+            updated_submission_groups = []
+            if submission_group_ids:
+                for submission_group_id in submission_group_ids:
+                    submission_group = db.query(CourseSubmissionGroup).filter(
+                        CourseSubmissionGroup.id == submission_group_id
+                    ).first()
+                    
+                    if submission_group:
+                        # Store the SAME repository info in each submission group
+                        submission_group.properties = submission_group.properties or {}
+                        submission_group.properties['gitlab_repository'] = repository_info
+                        db.add(submission_group)
+                        updated_submission_groups.append(submission_group_id)
+                        logger.info(f"Updated submission group {submission_group_id} with repository info")
+                
+                db.commit()
+            
             logger.info(f"Successfully created student repository {repo_path} for {username}")
+            logger.info(f"Updated {len(updated_submission_groups)} submission groups with repository info")
             
             return {
                 "success": True,
                 "repository": repository_info,
                 "course_member_id": course_member_id,
-                "submission_group_id": submission_group_id
+                "submission_groups_updated": updated_submission_groups
             }
                 
         except GitlabCreateError as e:
@@ -321,27 +335,37 @@ async def create_student_repository(
                             logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
                         
                         repository_info = {
-                            "gitlab_project_id": project.id,
-                            "gitlab_project_path": project.path_with_namespace,
-                            "http_url_to_repo": project.http_url_to_repo,
-                            "ssh_url_to_repo": project.ssh_url_to_repo,
-                            "web_url": project.web_url
+                            "gitlab_project_id": existing_project.id,
+                            "gitlab_project_path": existing_project.path_with_namespace,
+                            "http_url_to_repo": existing_project.http_url_to_repo,
+                            "ssh_url_to_repo": existing_project.ssh_url_to_repo,
+                            "web_url": existing_project.web_url
                         }
                         
-                        # Update submission group
-                        submission_group = db.query(CourseSubmissionGroup).filter(
-                            CourseSubmissionGroup.id == submission_group_id
-                        ).first()
-                        if submission_group:
-                            submission_group.properties = submission_group.properties or {}
-                            submission_group.properties.update(repository_info)
+                        # Store in course member properties
+                        course_member.properties = course_member.properties or {}
+                        course_member.properties['gitlab_repository'] = repository_info
+                        db.commit()
+                        
+                        # Update ALL submission groups
+                        updated_submission_groups = []
+                        if submission_group_ids:
+                            for submission_group_id in submission_group_ids:
+                                submission_group = db.query(CourseSubmissionGroup).filter(
+                                    CourseSubmissionGroup.id == submission_group_id
+                                ).first()
+                                if submission_group:
+                                    submission_group.properties = submission_group.properties or {}
+                                    submission_group.properties['gitlab_repository'] = repository_info
+                                    db.add(submission_group)
+                                    updated_submission_groups.append(submission_group_id)
                             db.commit()
                             
                         return {
                             "success": True,
                             "repository": repository_info,
                             "course_member_id": course_member_id,
-                            "submission_group_id": submission_group_id,
+                            "submission_groups_updated": updated_submission_groups,
                             "existing": True
                         }
             raise e
@@ -393,7 +417,14 @@ async def create_team_repository(
             raise ValueError(f"Course {course_id} missing gitlab.students_group.group_id")
         
         # Initialize GitLab client to find student-template project
-        gitlab = Gitlab(settings.gitlab_url, private_token=settings.gitlab_token)
+        # Get GitLab configuration from environment variables
+        gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
+        gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
+        
+        if not gitlab_url or not gitlab_token:
+            raise ValueError("GitLab URL and token must be configured via environment variables")
+        
+        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
         
         # Get student-template project path from course properties
         student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
@@ -536,26 +567,14 @@ class StudentRepositoryCreationWorkflow(BaseWorkflow):
                     )
                     results.append(result)
             else:
-                # Create individual student repository
-                if submission_group_ids:
-                    # If there are submission groups, create repository for each
-                    for submission_group_id in submission_group_ids:
-                        result = await workflow.execute_activity(
-                            create_student_repository,
-                            args=[course_member_id, course_id, submission_group_id],
-                            retry_policy=retry_policy,
-                            start_to_close_timeout=timedelta(minutes=5)
-                        )
-                        results.append(result)
-                else:
-                    # No submission groups yet, but still create the repository
-                    result = await workflow.execute_activity(
-                        create_student_repository,
-                        args=[course_member_id, course_id, None],  # No submission group
-                        retry_policy=retry_policy,
-                        start_to_close_timeout=timedelta(minutes=5)
-                    )
-                    results.append(result)
+                # Create ONE student repository (not one per submission group!)
+                result = await workflow.execute_activity(
+                    create_student_repository,
+                    args=[course_member_id, course_id, submission_group_ids],  # Pass ALL submission group IDs
+                    retry_policy=retry_policy,
+                    start_to_close_timeout=timedelta(minutes=5)
+                )
+                results.append(result)
                     
             return WorkflowResult(
                 status="success",

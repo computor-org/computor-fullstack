@@ -206,7 +206,7 @@ class CourseContentTypeConfig(BaseDeployment):
     description: Optional[str] = Field(None, description="Description of the content type")
     color: Optional[str] = Field("green", description="Display color (hex, rgb, hsl, or named color)")
     properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional properties")
-    course_content_kind_id: str = Field(description="ID of the course content kind (e.g., 'assignment', 'unit')")
+    kind: str = Field(description="ID of the course content kind (e.g., 'assignment', 'unit')")
 
 
 class CourseProjects(BaseDeployment):
@@ -395,21 +395,21 @@ EXAMPLE_DEPLOYMENT = ComputorDeploymentConfig(
                                     title="Homework Assignment",
                                     description="Weekly homework assignments",
                                     color="blue",
-                                    course_content_kind_id="assignment"
+                                    kind="assignment"
                                 ),
                                 CourseContentTypeConfig(
                                     slug="exam",
                                     title="Exam",
                                     description="Course examinations",
                                     color="red",
-                                    course_content_kind_id="assignment"
+                                    kind="assignment"
                                 ),
                                 CourseContentTypeConfig(
                                     slug="lecture",
                                     title="Lecture Material",
                                     description="Lecture notes and materials",
                                     color="green",
-                                    course_content_kind_id="unit"
+                                    kind="unit"
                                 )
                             ]
                         )

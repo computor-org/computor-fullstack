@@ -395,10 +395,35 @@ async def create_student_repository(
             if not template_path:
                 raise ValueError(f"Course {course_id} missing student-template project configuration")
             
-            # Simple lookup: get project by full path
+            # Look up project by searching in the course namespace
             try:
-                template_project = gitlab.projects.get(template_path.replace('/', '%2F'))
-                student_template_id = template_project.id
+                # Extract the project name from the full path
+                project_name = template_path.split('/')[-1]  # 'student-template'
+                course_group_id = gitlab_config.get('group_id')
+                
+                if not course_group_id:
+                    raise ValueError(f"Course {course_id} missing gitlab.group_id")
+                
+                # Search for the project in the course namespace
+                projects = gitlab.projects.list(
+                    search=project_name,
+                    search_namespaces=True,
+                    owned=True,
+                    all=True
+                )
+                
+                # Find the exact match by full path
+                student_template_project = None
+                for project in projects:
+                    if project.path_with_namespace == template_path:
+                        student_template_project = project
+                        break
+                
+                if not student_template_project:
+                    raise ValueError(f"Student template project not found at path: {template_path}")
+                
+                student_template_id = student_template_project.id
+                logger.info(f"Found student-template project with ID {student_template_id} at {template_path}")
             except Exception as e:
                 raise ValueError(f"Could not find student-template project at {template_path}: {e}")
             

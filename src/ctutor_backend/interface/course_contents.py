@@ -312,11 +312,19 @@ def post_create(course_content: CourseContent, db: Session):
         )
         
         # Copy repository info from course member if it exists
-        if course_member.properties and 'gitlab_repository' in course_member.properties:
-            submission_group.properties = {
-                'gitlab_repository': course_member.properties['gitlab_repository']
-            }
-            logger.info(f"Copying gitlab_repository info to submission group for student {course_member.id}")
+        if course_member.properties:
+            logger.info(f"CourseMember {course_member.id} properties: {course_member.properties}")
+            if 'gitlab_repository' in course_member.properties:
+                # Initialize properties if needed and copy repository info
+                if not submission_group.properties:
+                    submission_group.properties = {}
+                submission_group.properties['gitlab_repository'] = course_member.properties['gitlab_repository']
+                
+                logger.info(f"Copying gitlab_repository info to submission group for student {course_member.id}")
+            else:
+                logger.info(f"No gitlab_repository in properties for student {course_member.id}")
+        else:
+            logger.info(f"No properties for student {course_member.id}")
         
         db.add(submission_group)
         db.commit()

@@ -352,6 +352,11 @@ async def create_student_repository(
             # Store repository info in course member properties (primary storage)
             course_member.properties = course_member.properties or {}
             course_member.properties['gitlab_repository'] = repository_info
+            
+            # Mark properties as modified so SQLAlchemy detects the change
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(course_member, "properties")
+            db.add(course_member)
             db.commit()
             
             # Update ALL submission groups with the SAME repository information
@@ -366,6 +371,10 @@ async def create_student_repository(
                         # Store the SAME repository info in each submission group
                         submission_group.properties = submission_group.properties or {}
                         submission_group.properties['gitlab_repository'] = repository_info
+                        
+                        # Mark properties as modified so SQLAlchemy detects the change
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(submission_group, "properties")
                         db.add(submission_group)
                         updated_submission_groups.append(submission_group_id)
                         logger.info(f"Updated submission group {submission_group_id} with repository info")
@@ -433,6 +442,11 @@ async def create_student_repository(
                         # Store in course member properties
                         course_member.properties = course_member.properties or {}
                         course_member.properties['gitlab_repository'] = repository_info
+                        
+                        # Mark properties as modified so SQLAlchemy detects the change
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(course_member, "properties")
+                        db.add(course_member)
                         db.commit()
                         
                         # Update ALL submission groups
@@ -445,6 +459,10 @@ async def create_student_repository(
                                 if submission_group:
                                     submission_group.properties = submission_group.properties or {}
                                     submission_group.properties['gitlab_repository'] = repository_info
+                                    
+                                    # Mark properties as modified so SQLAlchemy detects the change
+                                    from sqlalchemy.orm.attributes import flag_modified
+                                    flag_modified(submission_group, "properties")
                                     db.add(submission_group)
                                     updated_submission_groups.append(submission_group_id)
                             db.commit()

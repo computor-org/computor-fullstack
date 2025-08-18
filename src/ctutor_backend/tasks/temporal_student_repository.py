@@ -4,7 +4,6 @@ This workflow handles forking the student-template repository when students join
 """
 import logging
 import json
-import os
 from datetime import timedelta
 from typing import Dict, Any, Optional
 from uuid import UUID
@@ -20,8 +19,8 @@ from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember
 from ..model.organization import Organization
+from ..interface.tokens import decrypt_api_key
 from ..gitlab_utils import gitlab_fork_project, gitlab_unprotect_branches
-from ..settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +171,26 @@ async def create_student_repository(
         course = db.query(Course).filter(Course.id == course_id).first()
         if not course:
             raise ValueError(f"Course {course_id} not found")
+        
+        # Get the organization to access GitLab credentials
+        organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
+        if not organization:
+            raise ValueError(f"Organization for course {course_id} not found")
+        
+        # Get GitLab credentials from organization
+        org_properties = organization.properties or {}
+        gitlab_config = org_properties.get('gitlab', {})
+        gitlab_url = gitlab_config.get('url')
+        gitlab_token_encrypted = gitlab_config.get('token')
+        
+        if not gitlab_url or not gitlab_token_encrypted:
+            raise ValueError(f"Organization {organization.id} missing GitLab configuration")
+        
+        # Decrypt the GitLab token
+        gitlab_token = decrypt_api_key(gitlab_token_encrypted)
+        
+        # Initialize GitLab client with organization's credentials
+        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
             
         # Get GitLab properties from course
         course_properties = course.properties or {}
@@ -186,15 +205,6 @@ async def create_student_repository(
             course_group_id = gitlab_props.get('group_id')
             if not course_group_id:
                 raise ValueError(f"Course {course_id} has no GitLab group configured")
-            
-            # Initialize GitLab client early to create the students group
-            gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
-            gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
-            
-            if not gitlab_url or not gitlab_token:
-                raise ValueError("GitLab URL and token must be configured via environment variables")
-            
-            gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
             
             try:
                 # Create students group
@@ -242,16 +252,6 @@ async def create_student_repository(
             except Exception as e:
                 logger.error(f"Failed to create students group: {e}")
                 raise ValueError(f"Course {course_id} missing students group and unable to create it: {e}")
-        else:
-            # Initialize GitLab client normally if students group exists
-            # Get GitLab configuration from environment variables
-            gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
-            gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
-            
-            if not gitlab_url or not gitlab_token:
-                raise ValueError("GitLab URL and token must be configured via environment variables")
-            
-            gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
         
         # Get student-template project path from course properties
         student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')
@@ -469,6 +469,26 @@ async def create_team_repository(
         ).first()
         if not submission_group:
             raise ValueError(f"Submission group {submission_group_id} not found")
+        
+        # Get the organization to access GitLab credentials
+        organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
+        if not organization:
+            raise ValueError(f"Organization for course {course_id} not found")
+        
+        # Get GitLab credentials from organization
+        org_properties = organization.properties or {}
+        gitlab_config = org_properties.get('gitlab', {})
+        gitlab_url = gitlab_config.get('url')
+        gitlab_token_encrypted = gitlab_config.get('token')
+        
+        if not gitlab_url or not gitlab_token_encrypted:
+            raise ValueError(f"Organization {organization.id} missing GitLab configuration")
+        
+        # Decrypt the GitLab token
+        gitlab_token = decrypt_api_key(gitlab_token_encrypted)
+        
+        # Initialize GitLab client with organization's credentials
+        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
             
         # Get GitLab properties
         course_properties = course.properties or {}
@@ -477,16 +497,6 @@ async def create_team_repository(
         
         if not gitlab_namespace_id:
             raise ValueError(f"Course {course_id} missing gitlab.students_group.group_id")
-        
-        # Initialize GitLab client to find student-template project
-        # Get GitLab configuration from environment variables
-        gitlab_url = os.environ.get('GITLAB_URL') or os.environ.get('TEST_GITLAB_URL')
-        gitlab_token = os.environ.get('GITLAB_TOKEN') or os.environ.get('TEST_GITLAB_TOKEN')
-        
-        if not gitlab_url or not gitlab_token:
-            raise ValueError("GitLab URL and token must be configured via environment variables")
-        
-        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
         
         # Get student-template project path from course properties
         student_template_path = gitlab_props.get('projects', {}).get('student_template', {}).get('full_path')

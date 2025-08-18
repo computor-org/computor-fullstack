@@ -286,7 +286,12 @@ def post_create(course_content: CourseContent, db: Session):
         )).all()
     )
 
-    for course_member in course_members:
+    for course_member_id in course_members:
+        # Get the full course member object to access properties
+        course_member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
+        if not course_member:
+            continue
+            
         submission_group = CourseSubmissionGroup(
             course_id=course_content.course_id,
             course_content_id=course_content.id,
@@ -295,13 +300,19 @@ def post_create(course_content: CourseContent, db: Session):
             max_submissions=course_content.max_submissions
         )
         
+        # Copy repository info from course member if it exists
+        if course_member.properties and 'gitlab_repository' in course_member.properties:
+            submission_group.properties = {
+                'gitlab_repository': course_member.properties['gitlab_repository']
+            }
+        
         db.add(submission_group)
         db.commit()
         db.refresh(submission_group)
         
         submission_group_member = CourseSubmissionGroupMember(
             course_submission_group_id = submission_group.id,
-            course_member_id = course_member
+            course_member_id = course_member_id
         )
 
         db.add(submission_group_member)

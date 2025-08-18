@@ -94,9 +94,9 @@ async def post_create(course_member: CourseMember, db: Session):
     if course_member.user.user_type != "user":
         return
     
-    # Only create submission groups for students
-    if course_member.course_role_id != "_student":
-        return
+    # # Only create submission groups for students
+    # if course_member.course_role_id != "_student":
+    #     return
     
     # First, let's see what CourseContents exist
     all_course_contents = db.query(CourseContent).filter(

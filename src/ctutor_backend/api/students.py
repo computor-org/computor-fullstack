@@ -293,7 +293,8 @@ async def student_list_submission_groups(
             CourseSubmissionGroupMember,
             User.id.label('user_id'),
             User.username,
-            User.full_name
+            User.given_name,
+            User.family_name
         ).join(
             CourseMember,
             CourseSubmissionGroupMember.course_member_id == CourseMember.id
@@ -306,12 +307,17 @@ async def student_list_submission_groups(
         
         members = []
         for member_row in members_query.all():
+            # Construct full name from given_name and family_name
+            full_name = None
+            if member_row.given_name or member_row.family_name:
+                full_name = f"{member_row.given_name or ''} {member_row.family_name or ''}".strip()
+            
             members.append(SubmissionGroupMemberBasic(
                 id=str(member_row[0].id),
                 user_id=str(member_row.user_id),
                 course_member_id=str(member_row[0].course_member_id),
                 username=member_row.username,
-                full_name=member_row.full_name
+                full_name=full_name
             ))
         
         # Get latest grading

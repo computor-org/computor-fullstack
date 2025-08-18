@@ -12,7 +12,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session
 from gitlab import Gitlab
-from gitlab.exceptions import GitlabCreateError, GitlabGetError
+from gitlab.exceptions import GitlabGetError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
@@ -309,10 +309,40 @@ async def create_student_repository(
         repo_name = username
         repo_path = repo_name.lower().replace(' ', '-').replace('_', '-')
         
-        logger.info(f"Forking student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
+        logger.info(f"Checking for existing repository {repo_path} in namespace {gitlab_namespace_id}")
         
-        # Fork the student-template repository with polling
+        # First check if repository already exists
+        existing_project = None
         try:
+            # Search for existing project
+            namespace_group = gitlab.groups.get(gitlab_namespace_id)
+            projects = namespace_group.projects.list(search=repo_path)
+            for project in projects:
+                if project.path == repo_path:
+                    existing_project = gitlab.projects.get(project.id)
+                    logger.info(f"Found existing repository: {existing_project.path_with_namespace}")
+                    break
+        except Exception as e:
+            logger.debug(f"Error checking for existing project: {e}")
+        
+        # If repository exists, use it; otherwise fork
+        if existing_project:
+            forked_project = existing_project
+            logger.info(f"Using existing repository {repo_path} for {username}")
+            
+            # Ensure student is maintainer even for existing repo
+            try:
+                await add_members_to_project(
+                    gitlab=gitlab,
+                    project=forked_project,
+                    member_ids=[course_member_id],
+                    db=db
+                )
+            except Exception as e:
+                logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
+        else:
+            # Fork the student-template repository with polling
+            logger.info(f"Forking student-template {student_template_id} to {repo_path} in namespace {gitlab_namespace_id}")
             forked_project = await fork_project_with_polling(
                 gitlab=gitlab,
                 source_project_id=student_template_id,
@@ -413,114 +443,6 @@ async def create_student_repository(
                 "course_member_id": course_member_id,
                 "submission_groups_updated": updated_submission_groups
             }
-                
-        except GitlabCreateError as e:
-            if "has already been taken" in str(e):
-                logger.warning(f"Repository {repo_path} already exists")
-                # Try to find existing repository
-                projects = gitlab.groups.get(gitlab_namespace_id).projects.list(search=repo_path)
-                for project in projects:
-                    if project.path == repo_path:
-                        existing_project = gitlab.projects.get(project.id)
-                        
-                        # Ensure student is maintainer even for existing repo
-                        try:
-                            course_member_props = course_member.properties or {}
-                            gitlab_user_id = course_member_props.get('gitlab_user_id')
-                            
-                            if not gitlab_user_id:
-                                users = gitlab.users.list(search=user.email)
-                                if users:
-                                    gitlab_user_id = users[0].id
-                                    course_member.properties = course_member_props
-                                    course_member.properties['gitlab_user_id'] = gitlab_user_id
-                                    db.add(course_member)
-                                    db.commit()
-                            
-                            if gitlab_user_id:
-                                # Check if already a member
-                                try:
-                                    member = existing_project.members.get(gitlab_user_id)
-                                    if member.access_level < 40:
-                                        # Upgrade to maintainer
-                                        member.access_level = 40
-                                        member.save()
-                                except:
-                                    # Not a member yet, add as maintainer
-                                    existing_project.members.create({
-                                        'user_id': gitlab_user_id,
-                                        'access_level': 40
-                                    })
-                        except Exception as e:
-                            logger.warning(f"Could not ensure maintainer rights for existing repo: {e}")
-                        
-                        repository_info = {
-                            "gitlab": {
-                                "url": gitlab_url,
-                                "full_path": existing_project.path_with_namespace,
-                                "directory": None,  # Will be set per assignment
-                                "web_url": existing_project.web_url,
-                                "group_id": existing_project.id,
-                                "namespace_id": gitlab_namespace_id,
-                                "namespace_path": existing_project.namespace['full_path'] if hasattr(existing_project.namespace, '__getitem__') else existing_project.namespace.full_path
-                            },
-                            # Keep raw info for backward compatibility
-                            "gitlab_project_id": existing_project.id,
-                            "gitlab_project_path": existing_project.path_with_namespace,
-                            "http_url_to_repo": existing_project.http_url_to_repo,
-                            "ssh_url_to_repo": existing_project.ssh_url_to_repo
-                        }
-                        
-                        # Store in course member properties
-                        course_member.properties = course_member.properties or {}
-                        course_member.properties['gitlab_repository'] = repository_info
-                        
-                        # Mark properties as modified so SQLAlchemy detects the change
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(course_member, "properties")
-                        db.add(course_member)
-                        db.commit()
-                        
-                        # Update ALL submission groups
-                        updated_submission_groups = []
-                        if submission_group_ids:
-                            for submission_group_id in submission_group_ids:
-                                submission_group = db.query(CourseSubmissionGroup).filter(
-                                    CourseSubmissionGroup.id == submission_group_id
-                                ).first()
-                                if submission_group:
-                                    submission_group.properties = submission_group.properties or {}
-                                    
-                                    # Get the course content to determine the assignment directory
-                                    course_content = submission_group.course_content
-                                    assignment_directory = course_content.path if course_content else None
-                                    
-                                    # Store in the GitLabConfig format expected by SubmissionGroupProperties
-                                    submission_group.properties['gitlab'] = {
-                                        "url": repository_info['gitlab']['url'],
-                                        "full_path": repository_info['gitlab']['full_path'],
-                                        "directory": str(assignment_directory) if assignment_directory else None,
-                                        "web_url": repository_info['gitlab']['web_url'],
-                                        "group_id": repository_info['gitlab']['group_id'],
-                                        "namespace_id": repository_info['gitlab']['namespace_id'],
-                                        "namespace_path": repository_info['gitlab']['namespace_path']
-                                    }
-                                    
-                                    # Mark properties as modified so SQLAlchemy detects the change
-                                    from sqlalchemy.orm.attributes import flag_modified
-                                    flag_modified(submission_group, "properties")
-                                    db.add(submission_group)
-                                    updated_submission_groups.append(submission_group_id)
-                            db.commit()
-                            
-                        return {
-                            "success": True,
-                            "repository": repository_info,
-                            "course_member_id": course_member_id,
-                            "submission_groups_updated": updated_submission_groups,
-                            "existing": True
-                        }
-            raise e
             
     except Exception as e:
         logger.error(f"Failed to create student repository: {e}")

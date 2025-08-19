@@ -121,6 +121,7 @@ class SubmissionGroupStudent(BaseModel):
     course_content_id: str
     course_content_title: Optional[str] = None
     course_content_path: Optional[str] = None
+    example_identifier: Optional[str] = None  # The example.identifier for directory structure
     max_group_size: int
     current_group_size: int = 1
     members: List[SubmissionGroupMemberBasic] = []

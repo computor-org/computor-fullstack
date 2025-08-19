@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-13T17:59:27.574075
+ * Generated on: 2025-08-18T21:27:50.169064
 
  * Category: Common
 
@@ -654,6 +654,7 @@ export interface SubmissionGroupStudent {
   course_content_id: string;
   course_content_title?: string | null;
   course_content_path?: string | null;
+  example_identifier?: string | null;
   max_group_size: number;
   current_group_size?: number;
   members?: SubmissionGroupMemberBasic[];
@@ -1087,7 +1088,7 @@ export interface CourseContentTypeConfig {
   /** Additional properties */
   properties?: Record<string, any> | null;
   /** ID of the course content kind (e.g., 'assignment', 'unit') */
-  course_content_kind_id: string;
+  kind: string;
 }
 
 /**

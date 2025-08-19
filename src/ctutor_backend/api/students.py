@@ -2,7 +2,7 @@ import json
 from uuid import UUID
 from typing import Annotated
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import APIRouter, Depends
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.mappers import course_member_course_content_result_mapper
@@ -26,6 +26,7 @@ from ctutor_backend.model.course import (
     Course, CourseContent, CourseMember, CourseSubmissionGroup, 
     CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 )
+from ctutor_backend.model.example import Example
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 from sqlalchemy import func
@@ -283,8 +284,10 @@ async def student_list_submission_groups(
     
     response = []
     for sg in submission_groups:
-        # Get course content info
-        course_content = db.query(CourseContent).filter(
+        # Get course content info with example relationship
+        course_content = db.query(CourseContent).options(
+            joinedload(CourseContent.example)
+        ).filter(
             CourseContent.id == sg.course_content_id
         ).first()
         
@@ -384,6 +387,11 @@ async def student_list_submission_groups(
                     web_url=gitlab_info.get('web_url')
                 )
         
+        # Get example identifier if course content has an example
+        example_identifier = None
+        if course_content and course_content.example:
+            example_identifier = str(course_content.example.identifier)
+        
         # Create response object
         response.append(SubmissionGroupStudent(
             id=str(sg.id),
@@ -391,6 +399,7 @@ async def student_list_submission_groups(
             course_content_id=str(sg.course_content_id),
             course_content_title=course_content.title if course_content else None,
             course_content_path=str(course_content.path) if course_content else None,
+            example_identifier=example_identifier,
             max_group_size=sg.max_group_size,
             current_group_size=len(members),
             members=members,

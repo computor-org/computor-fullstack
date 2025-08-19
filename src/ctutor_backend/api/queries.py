@@ -106,7 +106,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     results_count_sub = results_count_subquery(user_id,None,course_content_id,db)
     latest_grading_sub = latest_grading_subquery(db)
 
-    # Query specific course content only if student has submission group for it
+    # Query specific course content including those without submission groups
     course_contents_result = db.query(
             CourseContent,
             results_count_sub.c.total_results_count,
@@ -119,10 +119,13 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         .select_from(User) \
         .filter(User.id == user_id) \
         .join(CourseMember, CourseMember.user_id == User.id) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-        .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .join(CourseContent, (CourseContent.id == CourseSubmissionGroup.course_content_id) & (CourseContent.id == course_content_id)) \
+        .join(Course, Course.id == CourseMember.course_id) \
+        .join(CourseContent, (CourseContent.course_id == Course.id) & (CourseContent.id == course_content_id)) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
+        .outerjoin(CourseSubmissionGroup, CourseSubmissionGroup.course_content_id == CourseContent.id) \
+        .outerjoin(CourseSubmissionGroupMember, 
+                   (CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) &
+                   (CourseSubmissionGroupMember.course_member_id == CourseMember.id)) \
         .outerjoin(
             latest_result_sub,
             CourseContent.id == latest_result_sub.c.course_content_id
@@ -151,7 +154,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     results_count_sub = results_count_subquery(user_id,None,None,db)
     latest_grading_sub = latest_grading_subquery(db)
 
-    # Query only course contents where the student has a submission group
+    # Query ALL course contents where the user is a member, including those without submission groups
     query = db.query(
             CourseContent,
             results_count_sub.c.total_results_count,
@@ -160,14 +163,17 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading
-        ) \
+        ).distinct(CourseContent.id) \
         .select_from(User) \
         .filter(User.id == user_id) \
         .join(CourseMember, CourseMember.user_id == User.id) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-        .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .join(CourseContent, CourseContent.id == CourseSubmissionGroup.course_content_id) \
+        .join(Course, Course.id == CourseMember.course_id) \
+        .join(CourseContent, CourseContent.course_id == Course.id) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
+        .outerjoin(CourseSubmissionGroup, CourseSubmissionGroup.course_content_id == CourseContent.id) \
+        .outerjoin(CourseSubmissionGroupMember, 
+                   (CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) &
+                   (CourseSubmissionGroupMember.course_member_id == CourseMember.id)) \
         .outerjoin(
             latest_result_sub,
             CourseContent.id == latest_result_sub.c.course_content_id

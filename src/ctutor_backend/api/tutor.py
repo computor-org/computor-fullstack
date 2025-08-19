@@ -23,7 +23,7 @@ from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCours
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember
-from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery
+from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery, CourseContentStudentUpdate, ResultStudentList, SubmissionGroupStudentList
 from ctutor_backend.model.result import Result
 from ctutor_backend.redis_cache import get_redis_client
@@ -82,13 +82,16 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
 
     latest_result_sub = latest_result_subquery(None,course_member_id,course_content_id,db)
     results_count_sub = results_count_subquery(None,course_member_id,course_content_id,db)
+    latest_grading_sub = latest_grading_subquery(db)
 
     query = db.query(
             CourseContent,
             results_count_sub.c.total_results_count,
             Result,
             CourseSubmissionGroup,
-            results_count_sub.c.submitted_count
+            results_count_sub.c.submitted_count,
+            latest_grading_sub.c.status,
+            latest_grading_sub.c.grading
         ) \
         .select_from(CourseContent) \
         .filter(CourseContent.id == course_content_id) \
@@ -109,9 +112,13 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         .outerjoin(
             results_count_sub,
             CourseContent.id == results_count_sub.c.course_content_id
+        ).outerjoin(
+            latest_grading_sub,
+            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
+            (latest_grading_sub.c.rn == 1)
         ).first()
 
-    course_content, result_count, result, course_submission_group, submitted_count = query
+    course_content, result_count, result, course_submission_group, submitted_count, submission_status, submission_grading = query
 
     entity = course_member_update.model_dump(exclude_unset=True)
     
@@ -132,7 +139,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
             course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
             position=course_content.position,
             max_group_size=course_content.max_group_size,
-            directory=course_content.properties["gitlab"]["directory"],
+            directory=course_content.properties.get("gitlab", {}).get("directory") if course_content.properties else None,
             color=course_content.course_content_type.color,
             #submitted=True if submitted_count != None and submitted_count > 0 else False,
             result_count=result_count if result_count != None else 0,
@@ -147,8 +154,8 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
             ) if result != None and result.test_system_id != None else None,
             submission=SubmissionGroupStudentList(
                 id=course_submission_group.id,
-                status=course_submission_group.status,
-                grading=course_submission_group.grading,
+                status=submission_status,
+                grading=submission_grading,
                 count=submitted_count if submitted_count != None else 0,
                 max_submissions=course_submission_group.max_submissions
             )
@@ -169,9 +176,9 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
                 organization_id=course.organization_id,
                 path=course.path,
                 repository=CourseTutorRepository(
-                    provider_url=course.properties["gitlab"]["url"],
-                    full_path_reference=f'{course.properties["gitlab"]["full_path"]}/reference'
-                )
+                    provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
+                    full_path_reference=f'{course.properties.get("gitlab", {}).get("full_path", "")}/reference' if course.properties and course.properties.get("gitlab", {}).get("full_path") else None
+                ) if course.properties and course.properties.get("gitlab") else None
             )
 
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
@@ -191,9 +198,9 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
             organization_id=course.organization_id,
             path=course.path,
             repository=CourseTutorRepository(
-                provider_url=course.properties["gitlab"]["url"],
-                full_path_reference=f'{course.properties["gitlab"]["full_path"]}/reference'
-            )
+                provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
+                full_path_reference=f'{course.properties.get("gitlab", {}).get("full_path", "")}/reference' if course.properties and course.properties.get("gitlab", {}).get("full_path") else None
+            ) if course.properties and course.properties.get("gitlab") else None
         ))
 
     return response_list

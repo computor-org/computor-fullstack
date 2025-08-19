@@ -63,8 +63,10 @@ def submission_group_search(db: Session, query, params: Optional[SubmissionGroup
         query = query.filter(CourseSubmissionGroup.course_id == params.course_id)
     if params.course_content_id != None:
         query = query.filter(CourseSubmissionGroup.course_content_id == params.course_content_id)
-    if params.status != None:
-        query = query.filter(CourseSubmissionGroup.status == params.status)
+    # Note: status has been moved to CourseSubmissionGroupGrading
+    # This filter needs to be rewritten to join with the grading table
+    # if params.status != None:
+    #     query = query.filter(CourseSubmissionGroup.status == params.status)
         
     return query
 

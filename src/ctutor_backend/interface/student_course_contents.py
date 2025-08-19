@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
@@ -11,12 +11,53 @@ from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
 from ..custom_types import Ltree
 
+class SubmissionGroupRepository(BaseModel):
+    """Repository information for a submission group"""
+    provider: str = "gitlab"  # gitlab, github, etc.
+    url: str                  # Base URL
+    full_path: str            # Organization/project path
+    clone_url: Optional[str] = None  # Full clone URL
+    web_url: Optional[str] = None    # Web interface URL
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class SubmissionGroupMemberBasic(BaseModel):
+    """Basic member information"""
+    id: str
+    user_id: str
+    course_member_id: str
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class SubmissionGroupGradingStudent(BaseModel):
+    """Student's view of grading"""
+    id: str
+    grading: float  # 0.0 to 1.0
+    status: Optional[str] = None  # corrected, correction_necessary, etc.
+    graded_by: Optional[str] = None  # Name of grader
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class SubmissionGroupStudentList(BaseModel):
+    """Enhanced submission group data for course contents"""
     id: Optional[str] = None
-    status: Optional[str] = None
-    grading: Optional[float] = None
-    count: int
-    max_submissions: Optional[int] = None
+    course_content_title: Optional[str] = None
+    course_content_path: Optional[str] = None
+    example_identifier: Optional[str] = None  # The example.identifier for directory structure
+    max_group_size: Optional[int] = None
+    current_group_size: int = 1
+    members: List[SubmissionGroupMemberBasic] = []
+    repository: Optional[SubmissionGroupRepository] = None
+    latest_grading: Optional[SubmissionGroupGradingStudent] = None
+    status: Optional[str] = None  # Backward compatibility
+    grading: Optional[float] = None  # Backward compatibility
+    count: int = 0  # Backward compatibility - submission count
+    max_submissions: Optional[int] = None  # Backward compatibility
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class ResultStudentList(BaseModel):
     execution_backend_id: Optional[str] = None
@@ -71,12 +112,12 @@ class CourseContentStudentList(BaseModel):
     result_count: int
     max_test_runs: Optional[int] = None
 
-    directory: str
+    directory: Optional[str] = None
     color: str
 
     result: Optional[ResultStudentList] = None
 
-    submission:  Optional[SubmissionGroupStudentList] = None
+    submission_group:  Optional[SubmissionGroupStudentList] = None
     
     @field_validator('path', mode='before')
     @classmethod

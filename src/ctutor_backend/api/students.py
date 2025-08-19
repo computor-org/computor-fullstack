@@ -1,4 +1,5 @@
 import json
+import logging
 from uuid import UUID
 from typing import Annotated
 from pydantic import BaseModel
@@ -32,6 +33,7 @@ from aiocache import BaseCache
 from sqlalchemy import func
 
 student_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 async def student_get_course_content_cached(course_content_id: str, permissions: Principal, cache: BaseCache, db: Session):
 
@@ -102,7 +104,7 @@ def student_get_course_content(course_content_id: UUID | str, permissions: Annot
 
     course_contents_result = user_course_content_query(permissions.get_user_id_or_throw(),course_content_id,db)
  
-    return course_member_course_content_result_mapper(course_contents_result)
+    return course_member_course_content_result_mapper(course_contents_result, db)
 
 @student_router.get("/course-contents", response_model=list[CourseContentStudentList])
 def student_list_course_contents(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
@@ -114,7 +116,7 @@ def student_list_course_contents(permissions: Annotated[Principal, Depends(get_c
     response_list: list[CourseContentStudentList] = []
 
     for course_contents_result in course_contents_results:
-        response_list.append(course_member_course_content_result_mapper(course_contents_result))
+        response_list.append(course_member_course_content_result_mapper(course_contents_result, db))
 
     return response_list
 
@@ -137,9 +139,9 @@ async def student_list_courses(permissions: Annotated[Principal, Depends(get_cur
             course_content_types=course.course_content_types,
             path=course.path,
             repository=CourseStudentRepository(
-                provider_url=course.properties["gitlab"]["url"],
-                full_path=course.properties["gitlab"]["full_path"]
-            )
+                provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
+                full_path=course.properties.get("gitlab", {}).get("full_path") if course.properties else None
+            ) if course.properties and course.properties.get("gitlab") else None
         ))
 
     return response_list
@@ -157,9 +159,9 @@ async def student_get_course(course_id: UUID | str,permissions: Annotated[Princi
         course_content_types=course.course_content_types,
         path=course.path,
         repository=CourseStudentRepository(
-            provider_url=course.properties["gitlab"]["url"],
-            full_path=course.properties["gitlab"]["full_path"]
-        )
+            provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
+            full_path=course.properties.get("gitlab", {}).get("full_path") if course.properties else None
+        ) if course.properties and course.properties.get("gitlab") else None
     )
 
 @student_router.get("/course-contents/{course_content_id}/messages", response_model=list[dict])
@@ -257,6 +259,7 @@ async def student_list_submission_groups(
     Includes repository information and latest grading.
     """
     user_id = permissions.get_user_id_or_throw()
+    logger.debug(f"Fetching submission groups for user {user_id}")
     
     # Base query for submission groups where the user is a member
     query = db.query(CourseSubmissionGroup).join(
@@ -281,6 +284,7 @@ async def student_list_submission_groups(
             query = query.filter(CourseSubmissionGroup.properties['gitlab'] == None)
     
     submission_groups = query.all()
+    logger.debug(f"Found {len(submission_groups)} submission groups for user {user_id}")
     
     response = []
     for sg in submission_groups:
@@ -290,6 +294,10 @@ async def student_list_submission_groups(
         ).filter(
             CourseContent.id == sg.course_content_id
         ).first()
+        
+        if not course_content:
+            logger.warning(f"Course content not found for submission group {sg.id}, course_content_id: {sg.course_content_id}")
+            continue
         
         # Get all members
         members_query = db.query(
@@ -391,6 +399,24 @@ async def student_list_submission_groups(
         example_identifier = None
         if course_content and course_content.example:
             example_identifier = str(course_content.example.identifier)
+            logger.debug(f"Example identifier found for submission group {sg.id}: {example_identifier}")
+        else:
+            logger.debug(f"No example found for submission group {sg.id}, course_content_id: {sg.course_content_id}")
+        
+        # Get course_content_path
+        course_content_path = None
+        if course_content and course_content.path:
+            path = str(course_content.path)
+            # Paths can have 2 parts (like "unit_1.assignment_1") or 3 parts (like "1.basics.hello-world")
+            path_parts = path.split('.')
+            if len(path_parts) < 2:
+                logger.warning(f"Course content path has fewer than 2 parts for submission group {sg.id}: {path}")
+            course_content_path = path
+        
+        # Validate repository clone URL if present
+        if repository and repository.clone_url:
+            if not (repository.clone_url.startswith('http://') or repository.clone_url.startswith('https://')):
+                logger.warning(f"Invalid repository clone URL for submission group {sg.id}: {repository.clone_url}")
         
         # Create response object
         response.append(SubmissionGroupStudent(
@@ -398,7 +424,7 @@ async def student_list_submission_groups(
             course_id=str(sg.course_id),
             course_content_id=str(sg.course_content_id),
             course_content_title=course_content.title if course_content else None,
-            course_content_path=str(course_content.path) if course_content else None,
+            course_content_path=course_content_path,
             example_identifier=example_identifier,
             max_group_size=sg.max_group_size,
             current_group_size=len(members),

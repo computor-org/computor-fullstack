@@ -288,7 +288,6 @@ def post_create(course_content: CourseContent, db: Session):
         .join(User, User.id == CourseMember.user_id)
         .filter(
             CourseMember.course_id == course_content.course_id,
-            CourseMember.course_role_id == "_student",  # Only students
             User.user_type == "user"
         )).all()
     )

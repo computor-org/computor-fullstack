@@ -24,7 +24,7 @@ from ctutor_backend.api.api_builder import CrudRouter
 # from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseMember, CourseMemberComment, CourseRole
-from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.auth import User
@@ -96,24 +96,41 @@ async def get_protocol(permissions: Annotated[Principal, Depends(get_current_per
 
     protocol["results"] = json_result
 
+    # Get latest grading for each submission group
+    latest_grading_sub = (
+        db.query(
+            CourseSubmissionGroupGrading.course_submission_group_id,
+            CourseSubmissionGroupGrading.grading.label("latest_grading"),
+            CourseSubmissionGroupGrading.status.label("latest_status"),
+            func.row_number().over(
+                partition_by=CourseSubmissionGroupGrading.course_submission_group_id,
+                order_by=CourseSubmissionGroupGrading.created_at.desc()
+            ).label('rn')
+        )
+    ).subquery()
+
     latest_result_sub = (
         db.query(
             Result.course_content_id,
             Result.result.label("latest_result"),
-            CourseSubmissionGroup.grading.label("latest_grading"),
-            CourseSubmissionGroup.status.label("latest_status"),
+            latest_grading_sub.c.latest_grading,
+            latest_grading_sub.c.latest_status,
             func.max(Result.created_at).label("latest_result_date")
         )
         .select_from(Result)
         .join(CourseSubmissionGroup, Result.course_submission_group_id == CourseSubmissionGroup.id)
         .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id)
+        .outerjoin(
+            latest_grading_sub,
+            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
+            (latest_grading_sub.c.rn == 1)
+        )
         .filter(CourseSubmissionGroupMember.course_member_id == course_member_id)
         .group_by(
             Result.course_content_id,
             Result.result,
-            Result.result.label("latest_result"),
-            CourseSubmissionGroup.grading.label("latest_grading"),
-            CourseSubmissionGroup.status.label("latest_status")
+            latest_grading_sub.c.latest_grading,
+            latest_grading_sub.c.latest_status
         )
     ).subquery()
 
@@ -133,7 +150,7 @@ async def get_protocol(permissions: Annotated[Principal, Depends(get_current_per
     assignments = db.query(
             CourseContent.path,
             CourseContent.title,
-            CourseContent.properties["gitlab"]["directory"],
+            CourseContent.properties.op('#>>')(['{gitlab,directory}']),
             results_count_sub.c.total_results_count,
             results_count_sub.c.submitted_count,
             latest_result_sub.c.latest_result,

@@ -163,7 +163,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
             latest_grading_sub.c.grading
-        ).distinct(CourseContent.id) \
+        ) \
         .select_from(User) \
         .filter(User.id == user_id) \
         .join(CourseMember, CourseMember.user_id == User.id) \

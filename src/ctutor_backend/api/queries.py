@@ -106,6 +106,17 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     results_count_sub = results_count_subquery(user_id,None,course_content_id,db)
     latest_grading_sub = latest_grading_subquery(db)
 
+    # Subquery to get only the user's submission groups
+    user_submission_groups = db.query(CourseSubmissionGroup.id).join(
+        CourseSubmissionGroupMember,
+        CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
+    ).join(
+        CourseMember,
+        CourseSubmissionGroupMember.course_member_id == CourseMember.id
+    ).filter(
+        CourseMember.user_id == user_id
+    ).subquery()
+
     # Query specific course content including those without submission groups
     course_contents_result = db.query(
             CourseContent,
@@ -122,7 +133,9 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         .join(Course, Course.id == CourseMember.course_id) \
         .join(CourseContent, (CourseContent.course_id == Course.id) & (CourseContent.id == course_content_id)) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
-        .outerjoin(CourseSubmissionGroup, CourseSubmissionGroup.course_content_id == CourseContent.id) \
+        .outerjoin(CourseSubmissionGroup, 
+                   (CourseSubmissionGroup.course_content_id == CourseContent.id) &
+                   (CourseSubmissionGroup.id.in_(user_submission_groups))) \
         .outerjoin(CourseSubmissionGroupMember, 
                    (CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) &
                    (CourseSubmissionGroupMember.course_member_id == CourseMember.id)) \
@@ -141,7 +154,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
             latest_grading_sub,
             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
             (latest_grading_sub.c.rn == 1)
-        ).first()
+        ).distinct().first()
         
     if course_contents_result == None:
         raise NotFoundException()
@@ -153,6 +166,17 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_result_sub = latest_result_subquery(user_id,None,None,db)
     results_count_sub = results_count_subquery(user_id,None,None,db)
     latest_grading_sub = latest_grading_subquery(db)
+
+    # Subquery to get only the user's submission groups
+    user_submission_groups = db.query(CourseSubmissionGroup.id).join(
+        CourseSubmissionGroupMember,
+        CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
+    ).join(
+        CourseMember,
+        CourseSubmissionGroupMember.course_member_id == CourseMember.id
+    ).filter(
+        CourseMember.user_id == user_id
+    ).subquery()
 
     # Query ALL course contents where the user is a member, including those without submission groups
     query = db.query(
@@ -170,7 +194,9 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         .join(Course, Course.id == CourseMember.course_id) \
         .join(CourseContent, CourseContent.course_id == Course.id) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
-        .outerjoin(CourseSubmissionGroup, CourseSubmissionGroup.course_content_id == CourseContent.id) \
+        .outerjoin(CourseSubmissionGroup, 
+                   (CourseSubmissionGroup.course_content_id == CourseContent.id) &
+                   (CourseSubmissionGroup.id.in_(user_submission_groups))) \
         .outerjoin(CourseSubmissionGroupMember, 
                    (CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) &
                    (CourseSubmissionGroupMember.course_member_id == CourseMember.id)) \
@@ -189,7 +215,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             latest_grading_sub,
             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
             (latest_grading_sub.c.rn == 1)
-        )
+        ).distinct()
 
     return query
 

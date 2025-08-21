@@ -164,7 +164,12 @@ def get_gitlab_client(organization: Organization) -> Gitlab:
         raise ValueError(f"Organization {organization.id} missing GitLab configuration")
     
     gitlab_token = decrypt_api_key(gitlab_token_encrypted)
-    return Gitlab(gitlab_url, private_token=gitlab_token)
+    
+    # Transform URL for Docker environment if needed
+    from ..utils.docker_utils import transform_localhost_url
+    api_url = transform_localhost_url(gitlab_url)
+    
+    return Gitlab(api_url, private_token=gitlab_token)
 
 
 def get_course_gitlab_config(course: Course, gitlab: Optional[Gitlab] = None) -> Dict[str, Any]:
@@ -591,8 +596,12 @@ async def create_team_repository(
         # Decrypt the GitLab token
         gitlab_token = decrypt_api_key(gitlab_token_encrypted)
         
+        # Transform URL for Docker environment if needed
+        from ..utils.docker_utils import transform_localhost_url
+        api_url = transform_localhost_url(gitlab_url)
+        
         # Initialize GitLab client with organization's credentials
-        gitlab = Gitlab(gitlab_url, private_token=gitlab_token)
+        gitlab = Gitlab(api_url, private_token=gitlab_token)
             
         # Get GitLab properties
         course_properties = course.properties or {}

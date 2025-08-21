@@ -85,17 +85,21 @@ class GitLabBuilder:
             git_service: Optional GitService for repository operations
         """
         self.db = db_session
-        self.gitlab_url = gitlab_url
+        self.gitlab_url = gitlab_url  # Store original URL for database
         self.gitlab_token = gitlab_token
         self.git_service = git_service
         
-        # Initialize GitLab connection
-        self.gitlab = Gitlab(url=gitlab_url, private_token=gitlab_token, keep_base_url=True)
+        # Transform URL for Docker environment if needed (API calls only)
+        from ..utils.docker_utils import transform_localhost_url
+        api_url = transform_localhost_url(gitlab_url)
+        
+        # Initialize GitLab connection with transformed URL
+        self.gitlab = Gitlab(url=api_url, private_token=gitlab_token, keep_base_url=True)
         try:
             # For group tokens, gl.auth() doesn't work properly
             # Test with a simple API call instead
             self.gitlab.version()  # Test API access
-            logger.info(f"Successfully authenticated with GitLab at {gitlab_url}")
+            logger.info(f"Successfully authenticated with GitLab at {api_url}")
         except Exception as e:
             logger.error(f"Failed to authenticate with GitLab: {e}")
             raise

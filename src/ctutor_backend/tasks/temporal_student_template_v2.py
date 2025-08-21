@@ -17,7 +17,7 @@ from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session, joinedload
 
 from .temporal_base import BaseWorkflow, WorkflowResult
-from .temporal_hierarchy_management import transform_localhost_url
+from ..utils.docker_utils import transform_localhost_url
 from .registry import register_task
 from ..database import get_db
 from ..model.course import Course, CourseContent, CourseFamily

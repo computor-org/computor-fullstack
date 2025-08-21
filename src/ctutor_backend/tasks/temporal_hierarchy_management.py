@@ -14,7 +14,7 @@ from ..interface.deployments import ComputorDeploymentConfig, OrganizationConfig
 from ..database import get_db
 from ..model.organization import Organization
 from ..model.course import CourseFamily, Course
-from ..utils.docker_utils import transform_localhost_url
+# transform_localhost_url removed - transformation now done in GitLabBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,8 @@ async def create_organization_activity(
     logger.info(f"Org config: {org_config}")
     
     try:
-        # Transform localhost URLs for Docker environment
-        gitlab_url = transform_localhost_url(gitlab_url)
-        logger.info(f"Transformed GitLab URL: {gitlab_url}")
+        # Keep original URL for database storage
+        logger.info(f"Using GitLab URL: {gitlab_url}")
         
         # Convert dict to proper config objects
         gitlab_config = GitLabConfig(
@@ -180,9 +179,8 @@ async def create_course_family_activity(
             except Exception as e:
                 raise ValueError(f"Failed to decrypt GitLab token: {str(e)}")
                 
-            # Transform localhost URLs for Docker environment
-            gitlab_url = transform_localhost_url(gitlab_url)
-            logger.info(f"Transformed GitLab URL: {gitlab_url}")
+            # Keep original URL for database storage
+            logger.info(f"Using GitLab URL: {gitlab_url}")
             
             # Create course family config objects
             gitlab_config = GitLabConfig(
@@ -310,9 +308,8 @@ async def create_course_activity(
             except Exception as e:
                 raise ValueError(f"Failed to decrypt GitLab token: {str(e)}")
                 
-            # Transform localhost URLs for Docker environment
-            gitlab_url = transform_localhost_url(gitlab_url)
-            logger.info(f"Transformed GitLab URL: {gitlab_url}")
+            # Keep original URL for database storage
+            logger.info(f"Using GitLab URL: {gitlab_url}")
             
             # Create course config objects
             gitlab_config = GitLabConfig(

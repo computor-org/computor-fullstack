@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import UUID
-from sqlalchemy import func, case
+from sqlalchemy import func, case, select
 from sqlalchemy.orm import Session
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import CourseSubmissionGroupMember
@@ -107,13 +107,16 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     latest_grading_sub = latest_grading_subquery(db)
 
     # Subquery to get only the user's submission groups
-    user_submission_groups = db.query(CourseSubmissionGroup.id).join(
+    # Use select() explicitly to avoid SQLAlchemy warning
+    user_submission_groups = select(CourseSubmissionGroup.id).select_from(
+        CourseSubmissionGroup
+    ).join(
         CourseSubmissionGroupMember,
         CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
     ).join(
         CourseMember,
         CourseSubmissionGroupMember.course_member_id == CourseMember.id
-    ).filter(
+    ).where(
         CourseMember.user_id == user_id
     ).subquery()
 
@@ -135,7 +138,7 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
         .outerjoin(CourseSubmissionGroup, 
                    (CourseSubmissionGroup.course_content_id == CourseContent.id) &
-                   (CourseSubmissionGroup.id.in_(user_submission_groups))) \
+                   (CourseSubmissionGroup.id.in_(select(user_submission_groups.c.id)))) \
         .outerjoin(CourseSubmissionGroupMember, 
                    (CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) &
                    (CourseSubmissionGroupMember.course_member_id == CourseMember.id)) \
@@ -168,13 +171,16 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_grading_sub = latest_grading_subquery(db)
 
     # Subquery to get only the user's submission groups
-    user_submission_groups = db.query(CourseSubmissionGroup.id).join(
+    # Use select() explicitly to avoid SQLAlchemy warning
+    user_submission_groups = select(CourseSubmissionGroup.id).select_from(
+        CourseSubmissionGroup
+    ).join(
         CourseSubmissionGroupMember,
         CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
     ).join(
         CourseMember,
         CourseSubmissionGroupMember.course_member_id == CourseMember.id
-    ).filter(
+    ).where(
         CourseMember.user_id == user_id
     ).subquery()
 
@@ -196,7 +202,7 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
         .outerjoin(CourseSubmissionGroup, 
                    (CourseSubmissionGroup.course_content_id == CourseContent.id) &
-                   (CourseSubmissionGroup.id.in_(user_submission_groups))) \
+                   (CourseSubmissionGroup.id.in_(select(user_submission_groups.c.id)))) \
         .outerjoin(CourseSubmissionGroupMember, 
                    (CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) &
                    (CourseSubmissionGroupMember.course_member_id == CourseMember.id)) \

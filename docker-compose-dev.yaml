@@ -172,6 +172,7 @@ services:
     deploy:
       replicas: ${TEMPORAL_WORKER_REPLICAS:-1}
     environment:
+      - RUNNING_IN_DOCKER=true
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default

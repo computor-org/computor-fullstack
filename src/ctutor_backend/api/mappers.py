@@ -161,6 +161,19 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     submitted_count = query[4] if len(query) > 4 else None
     submission_status = query[5] if len(query) > 5 else None
     submission_grading = query[6] if len(query) > 6 else None
+    
+    # Get directory from example if available, otherwise from properties
+    directory = None
+    if course_content.example_id and db:
+        # Fetch the example to get the directory
+        from ctutor_backend.model.example import Example
+        example = db.query(Example).filter(Example.id == course_content.example_id).first()
+        if example:
+            directory = example.directory
+    
+    # Fallback to properties if no example directory found
+    if not directory and course_content.properties:
+        directory = course_content.properties.get("gitlab", {}).get("directory")
 
     return CourseContentStudentList(
             id=course_content.id,
@@ -172,7 +185,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
             position=course_content.position,
             max_group_size=course_content.max_group_size,
-            directory=course_content.properties.get("gitlab", {}).get("directory") if course_content.properties else None,
+            directory=directory,
             color=course_content.course_content_type.color,
             submitted=True if submitted_count != None and submitted_count > 0 else False,
             result_count=result_count if result_count != None else 0,

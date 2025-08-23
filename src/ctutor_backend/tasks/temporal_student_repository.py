@@ -325,16 +325,27 @@ async def update_submission_groups(
         ).first()
         
         if submission_group:
-            # Get assignment directory from course content
+            # Get assignment directory from course content's example
             course_content = submission_group.course_content
-            assignment_directory = course_content.path if course_content else None
+            assignment_directory = None
+            
+            # If course content has an example, use its directory
+            if course_content and course_content.example_id:
+                from ..model.example import Example
+                example = db.query(Example).filter(Example.id == course_content.example_id).first()
+                if example:
+                    assignment_directory = example.directory
+            
+            # Fallback to course content path if no example directory
+            if not assignment_directory and course_content:
+                assignment_directory = str(course_content.path) if course_content.path else None
             
             # Update properties
             submission_group.properties = submission_group.properties or {}
             submission_group.properties['gitlab'] = {
                 "url": repository_info['gitlab']['url'],
                 "full_path": repository_info['gitlab']['full_path'],
-                "directory": str(assignment_directory) if assignment_directory else None,
+                "directory": assignment_directory,
                 "web_url": repository_info['gitlab']['web_url'],
                 "group_id": repository_info['gitlab']['group_id'],
                 "namespace_id": repository_info['gitlab']['namespace_id'],
@@ -696,6 +707,21 @@ async def create_team_repository(
             db=db
         )
                     
+        # Get assignment directory from course content's example
+        course_content = submission_group.course_content
+        assignment_directory = None
+        
+        # If course content has an example, use its directory
+        if course_content and course_content.example_id:
+            from ..model.example import Example
+            example = db.query(Example).filter(Example.id == course_content.example_id).first()
+            if example:
+                assignment_directory = example.directory
+        
+        # Fallback to course content path if no example directory
+        if not assignment_directory and course_content:
+            assignment_directory = str(course_content.path) if course_content.path else None
+        
         # Update submission group with repository information
         repository_info = {
             "gitlab_project_id": team_project.id,
@@ -703,7 +729,18 @@ async def create_team_repository(
             "http_url_to_repo": team_project.http_url_to_repo,
             "ssh_url_to_repo": team_project.ssh_url_to_repo,
             "web_url": team_project.web_url,
-            "team_members": team_members
+            "team_members": team_members,
+            "gitlab": {
+                "url": gitlab_url,
+                "full_path": team_project.path_with_namespace,
+                "directory": assignment_directory,
+                "web_url": team_project.web_url,
+                "group_id": gitlab_namespace_id,
+                "namespace_id": gitlab_namespace_id,
+                "namespace_path": team_project.namespace['full_path'],
+                "http_url_to_repo": team_project.http_url_to_repo,
+                "ssh_url_to_repo": team_project.ssh_url_to_repo
+            }
         }
         
         submission_group.properties = submission_group.properties or {}

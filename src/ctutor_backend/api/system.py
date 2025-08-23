@@ -109,7 +109,7 @@ async def create_student(payload: ReleaseStudentsCreate, permissions: Annotated[
 
         p.course_group_id = course_group_id
       else:
-        if p.role in ["_study_assistant","_maintainer","_owner"]:
+        if p.role in ["_tutor","_maintainer","_owner"]:
           p.course_group_id = None
         else:
           raise BadRequestException(detail=f"Student must be in a course group")   

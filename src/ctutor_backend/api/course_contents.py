@@ -28,7 +28,7 @@ class CourseContentFileQuery(BaseModel):
 @course_content_router.router.get("/files/{course_content_id}", response_model=dict)
 async def get_course_content_meta(permissions: Annotated[Principal, Depends(get_current_permissions)], course_content_id: UUID | str, file_query: CourseContentFileQuery = Depends(), db: Session = Depends(get_db)):
 
-    if check_course_permissions(permissions,CourseContent,"_study_assistant",db).filter(CourseContent.id == course_content_id).first() == None:
+    if check_course_permissions(permissions,CourseContent,"_tutor",db).filter(CourseContent.id == course_content_id).first() == None:
         raise NotFoundException()
 
     course_content_dir = await get_path_course_content(course_content_id,db)

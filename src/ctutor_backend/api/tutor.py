@@ -50,7 +50,7 @@ tutor_router = APIRouter()
 @tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentList)
 def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
     
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
     course_contents_result = course_member_course_content_query(course_member_id,course_content_id,db)
@@ -60,7 +60,7 @@ def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: U
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
     query = course_member_course_content_list_query(course_member_id,db)
@@ -77,7 +77,7 @@ def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annota
 @tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentList)
 def tutor_update_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, course_member_update: CourseContentStudentUpdate, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
     
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
     latest_result_sub = latest_result_subquery(None,course_member_id,course_content_id,db)
@@ -164,7 +164,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
 async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
-    course = check_course_permissions(permissions,Course,"_study_assistant",db).filter(Course.id == course_id).first()
+    course = check_course_permissions(permissions,Course,"_tutor",db).filter(Course.id == course_id).first()
 
     if course == None:
         raise NotFoundException()
@@ -184,7 +184,7 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
 def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseStudentQuery = Depends(), db: Session = Depends(get_db)):
 
-    query = check_course_permissions(permissions,Course,"_study_assistant",db)
+    query = check_course_permissions(permissions,Course,"_tutor",db)
 
     courses = CourseStudentInterface.search(db,query,params).all()
 
@@ -208,7 +208,7 @@ def tutor_list_courses(permissions: Annotated[Principal, Depends(get_current_per
 @tutor_router.get("/courses/{course_id}/current", response_model=CourseMemberGet)
 async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
-    course_member = check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(Course.id == course_id, CourseMember.user_id == permissions.get_user_id_or_throw()).first()
+    course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(Course.id == course_id, CourseMember.user_id == permissions.get_user_id_or_throw()).first()
 
     if course_member == None:
         raise NotFoundException()
@@ -218,7 +218,7 @@ async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Princi
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
 def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
-    course_member = check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first()
+    course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first()
 
     course_contents_results = course_member_course_content_list_query(course_member_id,db).all()
 
@@ -249,7 +249,7 @@ def tutor_list_course_members(permissions: Annotated[Principal, Depends(get_curr
     subquery = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
         .join(CourseMember, CourseMember.user_id == User.id) \
             .join(Course, Course.id == CourseMember.course_id) \
-                .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_study_assistant")))).all()
+                .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
 
     query = course_course_member_list_query(db)
 
@@ -320,7 +320,7 @@ async def tutor_list_course_content_messages(
     if auth_headers.type != GLPAuthConfig:
         raise BadRequestException(details="GitLab messages are restricted to GLPAT authenticated users")
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise NotFoundException()
 
     course_member_properties, course_content_id, course_content_path = await tutor_course_content_messages_cached(course_content_id,course_member_id,cache,db)
@@ -353,7 +353,7 @@ async def tutor_post_course_content_messages(
     if auth_headers.type != GLPAuthConfig:
         raise BadRequestException(details="GitLab messages are restricted to GLPAT authenticated users")
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise NotFoundException()
 
     user_id = db.query(User.id).join(CourseMember,CourseMember.user_id == User.id).filter(CourseMember.id == course_member_id).scalar()
@@ -414,7 +414,7 @@ async def tutor_list_course_member_comments(course_member_id: UUID | str,  permi
             for c in comments
         ]
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise NotFoundException()
     
     transmitter_id = db.query(CourseMember.id).select_from(CourseMember) \
@@ -449,7 +449,7 @@ async def tutor_post_course_member_comments(
         # TODO: change transmitter_id to nullable, null is admin
         raise BadRequestException(detail="[admin] is not permitted.")
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise NotFoundException()
 
     transmitter_id = db.query(CourseMember.id).select_from(CourseMember) \
@@ -497,7 +497,7 @@ async def tutor_update_course_member_comment(
         # TODO: change transmitter_id to nullable, null is admin
         raise BadRequestException(detail="[admin] is not permitted.")
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise NotFoundException()
 
     transmitter = db.query(CourseMember).select_from(CourseMember) \
@@ -549,7 +549,7 @@ async def tutor_delete_course_member_comment(
         # TODO: change transmitter_id to nullable, null is admin
         raise BadRequestException(detail="[admin] is not permitted.")
 
-    if check_course_permissions(permissions,CourseMember,"_study_assistant",db).filter(CourseMember.id == course_member_id).first() == None:
+    if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise NotFoundException()
 
     transmitter = db.query(CourseMember).select_from(CourseMember) \

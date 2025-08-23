@@ -261,7 +261,7 @@ def post_create(course_content: CourseContent, db: Session):
     
     # Only create submission groups for individual assignments (max_group_size == 1)
     # Team assignments (max_group_size > 1) are handled differently
-    if course_content.max_group_size != 1:
+    if course_content.max_group_size != 1 and course_content.max_group_size != None:
         logger.info(f"Skipping submission group creation: max_group_size={course_content.max_group_size} (not individual)")
         return
     
@@ -305,7 +305,7 @@ def post_create(course_content: CourseContent, db: Session):
         submission_group = CourseSubmissionGroup(
             course_id=course_content.course_id,
             course_content_id=course_content.id,
-            max_group_size=course_content.max_group_size,
+            max_group_size=course_content.max_group_size or 1,
             max_test_runs=course_content.max_test_runs,
             max_submissions=course_content.max_submissions
         )

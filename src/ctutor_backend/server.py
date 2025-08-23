@@ -271,7 +271,7 @@ app.include_router(
 
 app.include_router(
     lecturer_router,
-    prefix="/lecturer",
+    prefix="/lecturers",
     tags=["lecturers"],
     dependencies=[Depends(get_current_permissions),Depends(get_redis_client)]
 )

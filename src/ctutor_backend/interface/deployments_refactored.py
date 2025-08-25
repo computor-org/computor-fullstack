@@ -192,11 +192,21 @@ class GitHubConfig(BaseDeployment):
 # Course Structure Configuration Classes
 
 class ExecutionBackendConfig(BaseDeployment):
-    """Execution backend configuration for courses."""
+    """Full execution backend configuration for defining backends at root level."""
     slug: str = Field(description="Unique identifier for the backend")
-    type: str = Field(description="Type of execution backend (e.g., python, matlab)")
-    version: Optional[str] = Field(None, description="Backend version")
-    settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Backend-specific settings")
+    type: str = Field(description="Type of execution backend (e.g., temporal, prefect)")
+    properties: Optional[Dict[str, Any]] = Field(
+        default_factory=dict, 
+        description="Backend-specific properties (e.g., task_queue, namespace, timeout settings)"
+    )
+    
+class ExecutionBackendReference(BaseDeployment):
+    """Reference to an execution backend by slug for linking to courses."""
+    slug: str = Field(description="Slug of the execution backend to link")
+    properties: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Course-specific overrides for this backend (optional)"
+    )
 
 
 class CourseContentTypeConfig(BaseDeployment):
@@ -242,9 +252,9 @@ class CourseConfig(BaseDeployment):
     path: str = Field(description="Course path/slug")
     description: Optional[str] = Field(None, description="Course description")
     projects: Optional[CourseProjects] = Field(None, description="Course project structure")
-    execution_backends: Optional[List[ExecutionBackendConfig]] = Field(
+    execution_backends: Optional[List[ExecutionBackendReference]] = Field(
         default_factory=list, 
-        description="Available execution backends for this course"
+        description="References to execution backends to link to this course (by slug)"
     )
     content_types: Optional[List[CourseContentTypeConfig]] = Field(
         default_factory=list,
@@ -282,6 +292,12 @@ class ComputorDeploymentConfig(BaseDeployment):
     
     Supports deploying multiple organizations, each with multiple course families and courses.
     """
+    # Execution backends to be created/ensured exist (root level definition)
+    execution_backends: List[ExecutionBackendConfig] = Field(
+        default_factory=list,
+        description="List of execution backends to create or ensure exist in the system"
+    )
+    
     # Hierarchical structure - list of organizations with nested course families and courses
     organizations: List[HierarchicalOrganizationConfig] = Field(
         description="List of organizations with nested course families and courses"

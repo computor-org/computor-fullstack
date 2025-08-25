@@ -24,7 +24,6 @@ from .temporal_examples import (
 )
 from .temporal_student_testing import (
     StudentTestingWorkflow,
-    SubmissionProcessingWorkflow,
     clone_repository_activity,
     execute_tests_activity,
     commit_test_results_activity
@@ -86,7 +85,6 @@ class TemporalWorker:
             ExampleDataProcessingWorkflow,
             ExampleErrorHandlingWorkflow,
             StudentTestingWorkflow,
-            SubmissionProcessingWorkflow,
             ReleaseStudentsWorkflow,
             ReleaseCourseWorkflow,
             CreateOrganizationWorkflow,

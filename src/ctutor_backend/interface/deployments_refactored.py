@@ -253,7 +253,7 @@ class CourseConfig(BaseDeployment):
     description: Optional[str] = Field(None, description="Course description")
     projects: Optional[CourseProjects] = Field(None, description="Course project structure")
     execution_backends: Optional[List[ExecutionBackendReference]] = Field(
-        default_factory=list, 
+        None,  # Changed from default_factory=list to None to make it truly optional
         description="References to execution backends to link to this course (by slug)"
     )
     content_types: Optional[List[CourseContentTypeConfig]] = Field(
@@ -293,8 +293,8 @@ class ComputorDeploymentConfig(BaseDeployment):
     Supports deploying multiple organizations, each with multiple course families and courses.
     """
     # Execution backends to be created/ensured exist (root level definition)
-    execution_backends: List[ExecutionBackendConfig] = Field(
-        default_factory=list,
+    execution_backends: Optional[List[ExecutionBackendConfig]] = Field(
+        None,  # Made optional to prevent validation errors when not provided
         description="List of execution backends to create or ensure exist in the system"
     )
     

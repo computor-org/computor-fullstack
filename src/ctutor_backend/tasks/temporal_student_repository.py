@@ -533,7 +533,7 @@ async def create_student_repository(
         # Store repository info in course member properties
         from sqlalchemy.orm.attributes import flag_modified
         course_member.properties = course_member.properties or {}
-        course_member.properties['gitlab_repository'] = repository_info
+        course_member.properties['gitlab'] = repository_info
         flag_modified(course_member, "properties")
         db.add(course_member)
         db.commit()

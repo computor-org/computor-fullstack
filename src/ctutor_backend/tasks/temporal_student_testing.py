@@ -14,7 +14,7 @@ from temporalio.common import RetryPolicy
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
-from ctutor_backend.interface.tests import TestJob, Submission
+from ctutor_backend.interface.tests import TestJob
 from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.results import ResultUpdate, ResultStatus
 from ctutor_backend.client.crud_client import CrudClient
@@ -165,17 +165,20 @@ class StudentTestingWorkflow(BaseWorkflow):
         return timedelta(minutes=30)
     
     @workflow.run
-    async def run(self, test_job: Dict[str, Any], execution_backend_properties: Dict[str, Any]) -> WorkflowResult:
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
         Execute student testing workflow.
         
         Args:
-            test_job: TestJob configuration as dict
-            execution_backend_properties: Backend configuration
+            parameters: Dict containing test_job and execution_backend_properties
             
         Returns:
             WorkflowResult with test results
         """
+        # Extract parameters
+        test_job = parameters.get("test_job", {})
+        execution_backend_properties = parameters.get("execution_backend_properties", {})
+        
         workflow.logger.info(f"Starting student testing for job {test_job.get('id')}")
         started_at = datetime.utcnow()
         
@@ -192,7 +195,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             workflow.logger.info("Cloning student repository")
             await workflow.execute_activity(
                 clone_repository_activity,
-                args=[job_config.module.dict(), student_path],
+                args=[job_config.module.model_dump(), student_path],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(maximum_attempts=3)
             )
@@ -201,7 +204,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             workflow.logger.info("Cloning reference repository")
             await workflow.execute_activity(
                 clone_repository_activity,
-                args=[job_config.reference.dict(), reference_path],
+                args=[job_config.reference.model_dump(), reference_path],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(maximum_attempts=3)
             )
@@ -262,62 +265,3 @@ class StudentTestingWorkflow(BaseWorkflow):
                 }
             )
 
-
-@register_task
-@workflow.defn(name="submission_processing", sandboxed=False)
-class SubmissionProcessingWorkflow(BaseWorkflow):
-    """Process student submissions."""
-    
-    @classmethod
-    def get_name(cls) -> str:
-        return "submission_processing"
-    
-    @classmethod
-    def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=10)
-    
-    @workflow.run
-    async def run(self, submission: Dict[str, Any], execution_backend_properties: Dict[str, Any]) -> WorkflowResult:
-        """
-        Process student submission.
-        
-        Args:
-            submission: Submission configuration as dict
-            execution_backend_properties: Backend configuration
-            
-        Returns:
-            WorkflowResult with submission processing results
-        """
-        workflow.logger.info(f"Processing submission {submission.get('id')}")
-        
-        try:
-            # Parse submission
-            submission_obj = Submission(**submission)
-            
-            # For now, just return a simple result
-            # In real implementation, this would handle git operations,
-            # create merge requests, etc.
-            
-            return WorkflowResult(
-                status="completed",
-                result={
-                    "submission_id": submission_obj.id,
-                    "status": "processed",
-                    "message": "Submission processed successfully"
-                },
-                metadata={
-                    "workflow_type": "submission_processing"
-                }
-            )
-            
-        except Exception as e:
-            workflow.logger.error(f"Submission processing failed: {str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=str(e),
-                metadata={
-                    "workflow_type": "submission_processing",
-                    "submission_id": submission.get("id")
-                }
-            )

@@ -1,17 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel
-from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.repositories import Repository
-
-class Submission(BaseModel):
-    submission: Repository
-    provider: str
-    full_path: str
-    token: str
-    assignment: CourseContentGet
-    module: Repository
-    result_id: str
-    user_id: str
 
 class TestJob(BaseModel):
     user_id: str

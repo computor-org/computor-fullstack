@@ -398,11 +398,9 @@ EXAMPLE_DEPLOYMENT = ComputorDeploymentConfig(
                                 documents="docs"
                             ),
                             execution_backends=[
-                                ExecutionBackendConfig(
+                                ExecutionBackendReference(
                                     slug="python-3.11",
-                                    type="python",
-                                    version="3.11",
-                                    settings={"timeout": 30}
+                                    properties={"timeout": 30}
                                 )
                             ],
                             content_types=[
@@ -459,11 +457,9 @@ EXAMPLE_MULTI_DEPLOYMENT = ComputorDeploymentConfig(
                             path="python-2025s",
                             description="Introduction to Python programming",
                             execution_backends=[
-                                ExecutionBackendConfig(
+                                ExecutionBackendReference(
                                     slug="python-3.11",
-                                    type="python",
-                                    version="3.11",
-                                    settings={"timeout": 30}
+                                    properties={"timeout": 30}
                                 )
                             ]
                         ),
@@ -472,11 +468,9 @@ EXAMPLE_MULTI_DEPLOYMENT = ComputorDeploymentConfig(
                             path="java-2025s",
                             description="Introduction to Java programming",
                             execution_backends=[
-                                ExecutionBackendConfig(
+                                ExecutionBackendReference(
                                     slug="java-17",
-                                    type="java",
-                                    version="17",
-                                    settings={"timeout": 45}
+                                    properties={"timeout": 45}
                                 )
                             ]
                         )
@@ -492,11 +486,9 @@ EXAMPLE_MULTI_DEPLOYMENT = ComputorDeploymentConfig(
                             path="stats-r-2025s",
                             description="Statistical analysis using R",
                             execution_backends=[
-                                ExecutionBackendConfig(
+                                ExecutionBackendReference(
                                     slug="r-4.3",
                                     type="r",
-                                    version="4.3",
-                                    settings={"timeout": 60}
                                 )
                             ]
                         )

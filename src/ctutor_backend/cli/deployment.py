@@ -17,6 +17,7 @@ from ..interface.deployments_refactored import (
     HierarchicalCourseConfig,
     GitLabConfig,
     ExecutionBackendConfig,
+    ExecutionBackendReference,
     CourseProjects,
     EXAMPLE_DEPLOYMENT,
     EXAMPLE_MULTI_DEPLOYMENT
@@ -31,6 +32,8 @@ from ..interface.course_members import CourseMemberCreate, CourseMemberInterface
 from ..interface.course_groups import CourseGroupInterface, CourseGroupQuery, CourseGroupCreate
 from ..interface.organizations import OrganizationInterface, OrganizationQuery
 from ..interface.course_families import CourseFamilyInterface, CourseFamilyQuery
+from ..interface.execution_backends import ExecutionBackendCreate, ExecutionBackendInterface, ExecutionBackendQuery
+from ..interface.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendInterface, CourseExecutionBackendQuery
 
 
 @click.group()
@@ -314,6 +317,159 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
             click.echo(f"    - {user_dep.display_name}")
 
 
+def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
+    """Deploy execution backends from configuration."""
+    
+    if not config.execution_backends:
+        return
+    
+    click.echo(f"\n⚙️  Deploying {len(config.execution_backends)} execution backends...")
+    
+    # Get API client
+    backend_client = get_crud_client(auth, ExecutionBackendInterface)
+    
+    for backend_config in config.execution_backends:
+        click.echo(f"\n  Processing backend: {backend_config.slug}")
+        
+        try:
+            # Check if backend already exists
+            existing_backends = backend_client.list(ExecutionBackendQuery(slug=backend_config.slug))
+            
+            if existing_backends:
+                backend = existing_backends[0]
+                click.echo(f"    ℹ️  Backend already exists: {backend.slug}")
+                
+                # Check if we need to update properties
+                if backend.type != backend_config.type or backend.properties != backend_config.properties:
+                    # Update backend
+                    backend_update = {
+                        'type': backend_config.type,
+                        'properties': backend_config.properties or {}
+                    }
+                    backend_client.update(str(backend.id), backend_update)
+                    click.echo(f"    ✅ Updated backend: {backend_config.slug}")
+            else:
+                # Create new backend
+                backend_create = ExecutionBackendCreate(
+                    slug=backend_config.slug,
+                    type=backend_config.type,
+                    properties=backend_config.properties or {}
+                )
+                backend = backend_client.create(backend_create)
+                click.echo(f"    ✅ Created backend: {backend_config.slug}")
+                
+        except Exception as e:
+            click.echo(f"    ❌ Failed to deploy backend {backend_config.slug}: {e}")
+
+
+def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
+    """Link execution backends to all deployed courses."""
+    
+    click.echo(f"\n🔗 Linking execution backends to courses...")
+    
+    # Get API clients
+    org_client = get_crud_client(auth, OrganizationInterface)
+    family_client = get_crud_client(auth, CourseFamilyInterface)
+    course_client = get_crud_client(auth, CourseInterface)
+    
+    # Process each organization
+    for org_config in config.organizations:
+        # Find the organization
+        orgs = org_client.list(OrganizationQuery(path=org_config.path))
+        if not orgs:
+            click.echo(f"  ⚠️  Organization not found: {org_config.path}")
+            continue
+        org = orgs[0]
+        
+        # Process each course family
+        for family_config in org_config.course_families:
+            # Find the course family
+            families = family_client.list(CourseFamilyQuery(
+                organization_id=str(org.id),
+                path=family_config.path
+            ))
+            if not families:
+                click.echo(f"  ⚠️  Course family not found: {family_config.path}")
+                continue
+            family = families[0]
+            
+            # Process each course
+            for course_config in family_config.courses:
+                if not course_config.execution_backends:
+                    continue
+                
+                # Find the course
+                courses = course_client.list(CourseQuery(
+                    course_family_id=str(family.id),
+                    path=course_config.path
+                ))
+                if not courses:
+                    click.echo(f"  ⚠️  Course not found: {course_config.path}")
+                    continue
+                course = courses[0]
+                
+                click.echo(f"  Course: {course_config.name} ({course_config.path})")
+                
+                # Link execution backends to this course
+                _link_execution_backends_to_course(
+                    str(course.id),
+                    course_config.execution_backends,
+                    auth
+                )
+
+
+def _link_execution_backends_to_course(course_id: str, execution_backends: list, auth: CLIAuthConfig):
+    """Link execution backends to a course."""
+    
+    if not execution_backends:
+        return
+    
+    # Get API clients
+    backend_client = get_crud_client(auth, ExecutionBackendInterface)
+    course_backend_client = get_crud_client(auth, CourseExecutionBackendInterface)
+    
+    for backend_ref in execution_backends:
+        try:
+            # Find the backend by slug
+            backends = backend_client.list(ExecutionBackendQuery(slug=backend_ref.slug))
+            
+            if not backends:
+                click.echo(f"      ⚠️  Backend not found: {backend_ref.slug}")
+                continue
+            
+            backend = backends[0]
+            
+            # Check if link already exists
+            existing_links = course_backend_client.list(CourseExecutionBackendQuery(
+                course_id=course_id,
+                execution_backend_id=str(backend.id)
+            ))
+            
+            if existing_links:
+                click.echo(f"      ℹ️  Backend already linked: {backend_ref.slug}")
+                
+                # Update properties if provided
+                if backend_ref.properties:
+                    link = existing_links[0]
+                    link_update = {
+                        'properties': backend_ref.properties
+                    }
+                    course_backend_client.update(str(link.id), link_update)
+                    click.echo(f"      ✅ Updated link properties for: {backend_ref.slug}")
+            else:
+                # Create new link
+                link_create = CourseExecutionBackendCreate(
+                    course_id=course_id,
+                    execution_backend_id=str(backend.id),
+                    properties=backend_ref.properties or {}
+                )
+                course_backend_client.create(link_create)
+                click.echo(f"      ✅ Linked backend: {backend_ref.slug}")
+                
+        except Exception as e:
+            click.echo(f"      ❌ Failed to link backend {backend_ref.slug}: {e}")
+
+
 @deployment.command()
 @click.argument('config_file', type=click.Path(exists=True))
 @click.option(
@@ -355,6 +511,14 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
             if counts.get('users', 0) > 0:
                 click.echo(f"       {counts['users']} users, {counts['course_members']} course memberships")
             
+            # Show execution backends to be created
+            if config.execution_backends:
+                click.echo(f"\nExecution Backends to create/update:")
+                for backend in config.execution_backends:
+                    click.echo(f"  - {backend.slug} (type: {backend.type})")
+                    if backend.properties:
+                        click.echo(f"    Properties: {backend.properties}")
+            
             # Show hierarchical structure
             for org_idx, org in enumerate(config.organizations):
                 click.echo(f"\nOrganization {org_idx + 1}: {org.name} ({org.path})")
@@ -367,7 +531,8 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                     for course_idx, course in enumerate(family.courses):
                         click.echo(f"    Course {course_idx + 1}: {course.name} ({course.path})")
                         if course.execution_backends:
-                            click.echo(f"      Backends: {', '.join(b.type + '-' + b.version for b in course.execution_backends)}")
+                            backend_refs = [ref.slug for ref in course.execution_backends]
+                            click.echo(f"      Backend references: {', '.join(backend_refs)}")
             
             # Show all paths that will be created
             paths = config.get_deployment_paths()
@@ -414,6 +579,10 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         click.echo("❌ No valid authentication method found", err=True)
         sys.exit(1)
     
+    # Deploy execution backends first (before hierarchy)
+    if config.execution_backends:
+        _deploy_execution_backends(config, auth)
+    
     # Deploy using API endpoint
     click.echo(f"\nStarting deployment via API...")
     
@@ -444,6 +613,9 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                         status_data = custom_client.get(f"system/hierarchy/status/{workflow_id}")
                         if status_data.get('status') == 'completed':
                             click.echo("\n✅ Deployment completed successfully!")
+                            
+                            # Link execution backends to courses
+                            _link_backends_to_deployed_courses(config, auth)
                             
                             # Deploy users if configured
                             if config.users:

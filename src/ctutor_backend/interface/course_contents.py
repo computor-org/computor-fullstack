@@ -313,12 +313,12 @@ def post_create(course_content: CourseContent, db: Session):
         # Copy repository info from course member if it exists
         if course_member.properties:
             logger.info(f"CourseMember {course_member.id} properties: {course_member.properties}")
-            if 'gitlab_repository' in course_member.properties:
+            if 'gitlab' in course_member.properties:
                 # Initialize properties if needed
                 if not submission_group.properties:
                     submission_group.properties = {}
                 
-                repo_info = course_member.properties['gitlab_repository']
+                repo_info = course_member.properties['gitlab']
                 
                 # Check if it's in the new format with nested gitlab key
                 if 'gitlab' in repo_info:
@@ -344,7 +344,7 @@ def post_create(course_content: CourseContent, db: Session):
                 
                 logger.info(f"Copying gitlab info to submission group for student {course_member.id}")
             else:
-                logger.info(f"No gitlab_repository in properties for student {course_member.id}")
+                logger.info(f"No gitlab in properties for student {course_member.id}")
         else:
             logger.info(f"No properties for student {course_member.id}")
         

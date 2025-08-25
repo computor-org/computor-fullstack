@@ -803,7 +803,37 @@ def upgrade() -> None:
         ORDER BY depth, depends_id;
         $$ LANGUAGE sql;
     """)
-
+    
+    # Insert default course_content_kinds
+    op.execute("""
+        INSERT INTO course_content_kind (id, title, description, has_ascendants, has_descendants, submittable)
+        VALUES 
+            ('assignment', 'Assignment', 'Programming assignments for students', true, false, true),
+            ('unit', 'Unit', 'Learning units and modules', true, true, false)
+        ON CONFLICT (id) DO NOTHING;
+    """)
+    
+    # Insert default system roles
+    op.execute("""
+        INSERT INTO role (id, title, description, builtin)
+        VALUES 
+            ('_admin', 'Administrator', 'Full system permissions.', true),
+            ('_user_manager', 'User Manager', 'Manage user accounts and permissions.', true),
+            ('_organization_manager', 'Organization Manager', 'Manage organizations and their members.', true)
+        ON CONFLICT (id) DO NOTHING;
+    """)
+    
+    # Insert default course roles
+    op.execute("""
+        INSERT INTO course_role (id, title, description, builtin)
+        VALUES 
+            ('_student', 'Student', 'Course participant with basic permissions.', true),
+            ('_tutor', 'Tutor', 'Course teaching assistant with elevated permissions.', true),
+            ('_lecturer', 'Lecturer', 'Course instructor with full course permissions.', true),
+            ('_maintainer', 'Maintainer', 'Course maintainer with administrative permissions.', true),
+            ('_owner', 'Owner', 'Course owner with full control.', true)
+        ON CONFLICT (id) DO NOTHING;
+    """)
 
 def downgrade() -> None:
     """Downgrade schema."""

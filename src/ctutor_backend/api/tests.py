@@ -39,7 +39,6 @@ async def create_test(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db)
 ):
-    print(test_create.model_dump_json(indent=1))
     """
     Create and execute a test for a course assignment.
     Tests are now executed via Temporal workflows.
@@ -122,7 +121,6 @@ async def create_test(
         raise BadRequestException(detail="Must provide course_content_id, course_content_path, or directory")
 
     if not query_result:
-        print("WTF")
         raise NotFoundException(detail="Assignment not found")
 
     # Extract query results
@@ -212,7 +210,6 @@ async def create_test(
 
     # Create new test execution
     # Build repository configurations for GitLab
-    print(course_member_properties.model_dump_json(indent=1))
     if course_member_properties.gitlab != None:
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path

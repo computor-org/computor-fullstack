@@ -219,10 +219,14 @@ services:
       - DEBUG_MODE=${DEBUG_MODE}
       - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
-      - PYTHONPATH=/home/worker/src
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
+      - TESTING_EXECUTABLE=/tmp/engine/catester/testing.py run
+      - RUNTIME_ENVIRONMENT=/tmp/engine/venv/bin/python
+      - PYTHON_TEST_ENGINE_URL=${PYTHON_TEST_ENGINE_URL}
+      - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
+      - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
     volumes:
       - ./src:/home/worker/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}

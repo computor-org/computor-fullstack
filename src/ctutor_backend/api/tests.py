@@ -263,20 +263,20 @@ async def create_test(
     # Validate course GitLab configuration
     if not course_properties.gitlab or not course_properties.gitlab.full_path:
         raise BadRequestException(detail="Course GitLab configuration is missing")
-    
+
+    # Get execution backend
+    execution_backend = db.query(ExecutionBackend) \
+        .filter(ExecutionBackend.id == execution_backend_id).first()
+
+    if not execution_backend:
+        raise BadRequestException(detail=f"Execution backend not found")
+
     if gitlab_config != None:
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path
         
-        # Use directory from submission group if available, then Example.directory, then assignment properties
-        if gitlab_config.get('directory'):
-            assignment_directory = gitlab_config['directory']
-        elif example and example.directory:
-            assignment_directory = example.directory
-        elif assignment_properties.gitlab and assignment_properties.gitlab.directory:
-            assignment_directory = assignment_properties.gitlab.directory
-        else:
-            raise BadRequestException(detail="No directory found for assignment")
+        # Use directory from example
+        assignment_directory = course_content.example.directory
         
         token = decrypt_api_key(organization_properties.gitlab.token)
         
@@ -310,18 +310,12 @@ async def create_test(
             course_member_id=str(course_member_id),
             course_content_id=str(assignment.id),
             execution_backend_id=str(execution_backend_id),
+            execution_backend_type=execution_backend.type,
             module=student_repository,
             reference=reference_repository
         )
     else:
         raise BadRequestException(detail="Only GitLab is currently supported")
-
-    # Get execution backend
-    execution_backend = db.query(ExecutionBackend) \
-        .filter(ExecutionBackend.id == execution_backend_id).first()
-
-    if not execution_backend:
-        raise BadRequestException(detail=f"Execution backend not found")
 
     # Generate a unique workflow ID that will be used for both database and Temporal
     import uuid

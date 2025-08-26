@@ -7,6 +7,7 @@ class TestJob(BaseModel):
     course_member_id: str
     course_content_id: str
     execution_backend_id: str
+    execution_backend_type: str
     module: Repository
     reference: Optional[Repository] = None
     test_number: int = -1

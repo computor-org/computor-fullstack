@@ -113,6 +113,7 @@ class TaskSubmission(BaseModel):
     task_name: str
     parameters: Dict[str, Any] = {}
     queue: str = "computor-tasks"  # Task queue name
+    workflow_id: Optional[str] = None  # Custom workflow ID (if not provided, will be auto-generated)
     delay: Optional[int] = None  # Delay in seconds before execution
     
     

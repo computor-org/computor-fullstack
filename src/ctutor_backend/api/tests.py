@@ -1,7 +1,10 @@
 from typing import Annotated
+import logging
 from fastapi import Depends, APIRouter
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 from ctutor_backend.api.auth import get_current_permissions
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.permissions import check_course_permissions
@@ -287,25 +290,11 @@ async def create_test(
     if not execution_backend:
         raise BadRequestException(detail=f"Execution backend not found")
 
-    # Start Temporal workflow for testing
-    if execution_backend.type == "temporal":
-        # Use task executor to submit the task
-        task_executor = get_task_executor()
-        
-        task_submission = TaskSubmission(
-            task_name="student_testing",
-            parameters={
-                "test_job": job.model_dump(),
-                "execution_backend_properties": execution_backend.properties
-            },
-            queue=execution_backend.properties.get("task_queue", "computor-tasks")
-        )
-        
-        test_system_id = await task_executor.submit_task(task_submission)
-    else:
-        raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported. Use 'temporal'.")
+    # Generate a unique workflow ID that will be used for both database and Temporal
+    import uuid
+    workflow_id = f"student-testing-{str(uuid.uuid4())}"
 
-    # Create result entry
+    # Create result entry with the pre-generated workflow ID
     result_create = Result(
         submit=test_create.submit or False,  # Store submit flag as boolean
         course_member_id=course_member_id,
@@ -313,17 +302,54 @@ async def create_test(
         course_content_id=assignment.id,
         course_content_type_id=course_content.course_content_type_id,  # Keep for now, can be removed later
         execution_backend_id=execution_backend.id,
-        test_system_id=test_system_id,
+        test_system_id=workflow_id,  # Use the pre-generated workflow ID
         result=0,
         result_json=None,
         properties=None,
-        status=ResultStatus.SCHEDULED,
+        status=ResultStatus.PENDING,  # Start as PENDING
         version_identifier=commit
     )
 
     db.add(result_create)
     db.commit()
     db.refresh(result_create)
+
+    # Start Temporal workflow for testing with our pre-generated workflow ID
+    try:
+        if execution_backend.type == "temporal":
+            # Use task executor to submit the task
+            task_executor = get_task_executor()
+            
+            task_submission = TaskSubmission(
+                task_name="student_testing",
+                workflow_id=workflow_id,  # Use our pre-generated workflow ID
+                parameters={
+                    "test_job": job.model_dump(),
+                    "execution_backend_properties": execution_backend.properties,
+                    "result_id": str(result_create.id)  # Pass the result ID to the workflow
+                },
+                queue=execution_backend.properties.get("task_queue", "computor-tasks")
+            )
+            
+            submitted_id = await task_executor.submit_task(task_submission)
+            
+            # Verify the workflow ID matches (should be the same)
+            if submitted_id != workflow_id:
+                logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
+            
+            # Update status to SCHEDULED now that task is submitted
+            result_create.status = ResultStatus.SCHEDULED
+            db.commit()
+            db.refresh(result_create)
+        else:
+            raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported. Use 'temporal'.")
+    except Exception as e:
+        # If task submission fails, update result status to FAILED
+        result_create.status = ResultStatus.FAILED
+        result_create.properties = {"error": str(e)}
+        db.commit()
+        db.refresh(result_create)
+        raise
 
     return TestRunResponse(
         id=str(result_create.id),

@@ -8,6 +8,7 @@ import tempfile
 import subprocess
 import asyncio
 import uuid
+import shutil
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
@@ -17,7 +18,7 @@ from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 from ctutor_backend.interface.tests import TestJob
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultUpdate, ResultStatus
+from ctutor_backend.interface.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate, ResultStatus
 from ctutor_backend.client.crud_client import CrudClient
 from ctutor_backend.utils.docker_utils import transform_localhost_url
 
@@ -51,6 +52,11 @@ async def clone_repository_activity(repo_data: Dict[str, Any], target_path: str)
     else:
         clone_url = transformed_url
     
+    # Clean up target directory if it exists (for retry scenarios)
+    if os.path.exists(target_path):
+        logger.warning(f"Target path {target_path} already exists, removing it for retry")
+        shutil.rmtree(target_path)
+    
     clone_cmd.extend([clone_url, target_path])
     
     # Execute clone
@@ -60,12 +66,12 @@ async def clone_repository_activity(repo_data: Dict[str, Any], target_path: str)
         raise Exception(f"Failed to clone repository: {result.stderr}")
     
     # Checkout specific commit if provided
-    if repo.hash:
-        checkout_cmd = ["git", "-C", target_path, "checkout", repo.hash]
+    if repo.commit:
+        checkout_cmd = ["git", "-C", target_path, "checkout", repo.commit]
         result = subprocess.run(checkout_cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
-            raise Exception(f"Failed to checkout commit {repo.hash}: {result.stderr}")
+            raise Exception(f"Failed to checkout commit {repo.commit}: {result.stderr}")
     
     return True
 
@@ -130,36 +136,33 @@ async def execute_tests_activity(
 
 @activity.defn(name="commit_test_results")
 async def commit_test_results_activity(
-    test_job_id: str,
-    results: Dict[str, Any],
+    result_id: str,
+    test_results: Dict[str, Any],
     api_config: Dict[str, Any]
 ) -> bool:
     """Commit test results to the API."""
     try:
         # Initialize API client
         client = CrudClient(
-            api_root_url=api_config.get("url", "http://localhost:8000"),
-            username=api_config.get("username", "admin"),
-            password=api_config.get("password", "admin")
+            url_base=transform_localhost_url(api_config.get("url", "http://localhost:8000")),
+            entity_interface=ResultInterface,
+            auth=(api_config.get("username", "admin"),api_config.get("password", "admin"))
         )
         
         # Create result update
         result_update = ResultUpdate(
-            status=ResultStatus.finished if results["failed"] == 0 else ResultStatus.error,
-            passed=results["passed"],
-            total=results["total"],
-            errors=results.get("failed", 0),
-            data=results.get("details", [])
+            status=ResultStatus.COMPLETED if test_results["failed"] == 0 else ResultStatus.FAILED,
+            result=0,
+            result_json=test_results
         )
         
-        # Submit to API
-        # Note: This would need actual API implementation
-        # For now, just return success
-        return True
+        # Update the result directly using the ID
+        response = client.update(result_id, result_update)
+
+        return isinstance(response,ResultGet)
         
     except Exception as e:
-        print(f"Failed to commit results: {str(e)}")
-        return False
+        return {"error": str(e), "success": False}
 
 
 # Workflows
@@ -190,6 +193,7 @@ class StudentTestingWorkflow(BaseWorkflow):
         # Extract parameters
         test_job = parameters.get("test_job", {})
         execution_backend_properties = parameters.get("execution_backend_properties", {})
+        result_id = parameters.get("result_id")  # Get the database result ID
         
         # Generate a unique job ID for this test run
         job_id = str(uuid.uuid4())
@@ -245,7 +249,7 @@ class StudentTestingWorkflow(BaseWorkflow):
                 
                 commit_success = await workflow.execute_activity(
                     commit_test_results_activity,
-                    args=[job_id, test_results, api_config],
+                    args=[result_id, test_results, api_config],
                     start_to_close_timeout=timedelta(minutes=2),
                     retry_policy=RetryPolicy(maximum_attempts=3)
                 )

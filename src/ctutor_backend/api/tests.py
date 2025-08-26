@@ -349,7 +349,7 @@ async def create_test(
 
     # Start Temporal workflow for testing with our pre-generated workflow ID
     try:
-        if execution_backend.type == "temporal":
+        if str(execution_backend.type).startswith("temporal:"):
             # Use task executor to submit the task
             task_executor = get_task_executor()
             

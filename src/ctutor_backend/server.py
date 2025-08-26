@@ -107,28 +107,6 @@ async def initialize_plugin_registry_with_config():
         except:
             pass
 
-async def init_execution_backend_api(db: Session):
-
-    execution_backends_raw = DeploymentFactory.read_deployment_from_file_raw("data/deployments/system-init.yaml")["execution_backends"]
-
-    for eb in execution_backends_raw:
-
-        execution_backend = ExecutionBackendConfig(**eb)
-
-        eb = db.query(ExecutionBackend).filter(ExecutionBackend.slug == execution_backend.slug).first()
-
-        if eb == None:
-
-            db.add(ExecutionBackend(
-                type=execution_backend.type,
-                slug=execution_backend.slug,
-                properties=execution_backend.settings
-            ))
-        else:
-            eb.properties=execution_backend.settings
-        
-        db.commit()
-
 async def init_admin_user(db: Session):
 
     username = os.environ.get("EXECUTION_BACKEND_API_USER")
@@ -174,7 +152,6 @@ async def startup_logic():
             shutil.rmtree(repo_dirs)
 
         await init_admin_user(db)
-        await init_execution_backend_api(db)
         await mirror_db_to_filesystem(db)
     
     # Initialize plugin registry with configuration

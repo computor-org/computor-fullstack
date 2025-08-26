@@ -240,6 +240,7 @@ services:
       args:
         MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
+    command: ["--queues=testing-matlab"]
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
     environment:
@@ -254,11 +255,11 @@ services:
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
-      - MATLAB_RUNTIME_PATH=${MATLAB_RUNTIME_PATH:-/opt/matlab/runtime}
+      #- MATLAB_RUNTIME_PATH=${MATLAB_RUNTIME_PATH:-/opt/matlab/runtime}
     volumes:
       - ./src:/home/worker/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-      - ${MATLAB_RUNTIME_PATH}:/opt/matlab/runtime:ro
+      #- ${MATLAB_RUNTIME_PATH}:/opt/matlab/runtime:ro
     depends_on:
       - temporal
       - postgres

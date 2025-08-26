@@ -7,6 +7,7 @@ import json
 import tempfile
 import subprocess
 import asyncio
+import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
@@ -18,26 +19,37 @@ from ctutor_backend.interface.tests import TestJob
 from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.results import ResultUpdate, ResultStatus
 from ctutor_backend.client.crud_client import CrudClient
+from ctutor_backend.utils.docker_utils import transform_localhost_url
 
 
 # Activities
 @activity.defn(name="clone_repository")
 async def clone_repository_activity(repo_data: Dict[str, Any], target_path: str) -> bool:
     """Clone a git repository to target path."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     repo = Repository(**repo_data)
+    
+    # Transform localhost URLs for Docker environment
+    original_url = repo.url
+    transformed_url = transform_localhost_url(repo.url)
+    
+    if original_url != transformed_url:
+        logger.info(f"Transformed URL from {original_url} to {transformed_url}")
     
     # Construct git clone command
     clone_cmd = ["git", "clone"]
     
     if repo.token:
         # Add token authentication to URL
-        url_parts = repo.url.split("://")
+        url_parts = transformed_url.split("://")
         if len(url_parts) == 2:
             clone_url = f"{url_parts[0]}://oauth2:{repo.token}@{url_parts[1]}"
         else:
-            clone_url = repo.url
+            clone_url = transformed_url
     else:
-        clone_url = repo.url
+        clone_url = transformed_url
     
     clone_cmd.extend([clone_url, target_path])
     
@@ -179,7 +191,10 @@ class StudentTestingWorkflow(BaseWorkflow):
         test_job = parameters.get("test_job", {})
         execution_backend_properties = parameters.get("execution_backend_properties", {})
         
-        workflow.logger.info(f"Starting student testing for job {test_job.get('id')}")
+        # Generate a unique job ID for this test run
+        job_id = str(uuid.uuid4())
+        
+        workflow.logger.info(f"Starting student testing for job {job_id}")
         started_at = datetime.utcnow()
         
         try:
@@ -187,7 +202,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             job_config = TestJob(**test_job)
             
             # Create temporary directory name (will be created in activity)
-            work_dir = f"/tmp/test-{job_config.id}"
+            work_dir = f"/tmp/test-{job_id}"
             student_path = os.path.join(work_dir, "student")
             reference_path = os.path.join(work_dir, "reference")
             
@@ -228,7 +243,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             
             commit_success = await workflow.execute_activity(
                 commit_test_results_activity,
-                args=[job_config.id, test_results, api_config],
+                args=[job_id, test_results, api_config],
                 start_to_close_timeout=timedelta(minutes=2),
                 retry_policy=RetryPolicy(maximum_attempts=3)
             )
@@ -238,7 +253,7 @@ class StudentTestingWorkflow(BaseWorkflow):
             return WorkflowResult(
                 status="completed",
                 result={
-                    "test_job_id": job_config.id,
+                    "test_job_id": job_id,
                     "test_results": test_results,
                     "api_commit_success": commit_success,
                     "started_at": started_at.isoformat(),
@@ -261,7 +276,7 @@ class StudentTestingWorkflow(BaseWorkflow):
                 error=str(e),
                 metadata={
                     "workflow_type": "student_testing",
-                    "test_job_id": test_job.get("id")
+                    "test_job_id": job_id
                 }
             )
 

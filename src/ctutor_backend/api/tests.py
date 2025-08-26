@@ -210,6 +210,19 @@ async def create_test(
 
     # Create new test execution
     # Build repository configurations for GitLab
+    if not course_member_properties.gitlab:
+        raise BadRequestException(
+            detail="Student does not have GitLab repository configured. Please ensure student has been added to GitLab."
+        )
+    
+    # Validate organization GitLab configuration
+    if not organization_properties.gitlab or not organization_properties.gitlab.url:
+        raise BadRequestException(detail="Organization GitLab configuration is missing")
+    
+    # Validate course GitLab configuration
+    if not course_properties.gitlab or not course_properties.gitlab.full_path:
+        raise BadRequestException(detail="Course GitLab configuration is missing")
+    
     if course_member_properties.gitlab != None:
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path
@@ -223,6 +236,13 @@ async def create_test(
             raise BadRequestException(detail="No directory found for assignment")
         
         token = decrypt_api_key(organization_properties.gitlab.token)
+        
+        # Validate that course member has GitLab repository set up
+        if not course_member_properties.gitlab.full_path:
+            raise BadRequestException(
+                detail="Student repository not yet created. Please ensure student has been added to GitLab."
+            )
+        
         full_path_module = course_member_properties.gitlab.full_path
         full_path_reference = f"{full_path_course}/assignments"
 

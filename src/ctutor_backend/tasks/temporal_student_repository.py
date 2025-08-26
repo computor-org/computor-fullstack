@@ -343,13 +343,13 @@ async def update_submission_groups(
             # Update properties
             submission_group.properties = submission_group.properties or {}
             submission_group.properties['gitlab'] = {
-                "url": repository_info['gitlab']['url'],
-                "full_path": repository_info['gitlab']['full_path'],
+                "url": repository_info['url'],
+                "full_path": repository_info['full_path'],
                 "directory": assignment_directory,
-                "web_url": repository_info['gitlab']['web_url'],
-                "group_id": repository_info['gitlab']['group_id'],
-                "namespace_id": repository_info['gitlab']['namespace_id'],
-                "namespace_path": repository_info['gitlab']['namespace_path'],
+                "web_url": repository_info['web_url'],
+                "group_id": repository_info['group_id'],
+                "namespace_id": repository_info['namespace_id'],
+                "namespace_path": repository_info['namespace_path'],
                 "http_url_to_repo": repository_info.get('http_url_to_repo'),  # Add clone URL
                 "ssh_url_to_repo": repository_info.get('ssh_url_to_repo')  # Add SSH URL too
             }
@@ -514,15 +514,13 @@ async def create_student_repository(
         
         # Prepare repository information
         repository_info = {
-            "gitlab": {
-                "url": gitlab_url,
-                "full_path": forked_project.path_with_namespace,
-                "directory": None,  # Will be set per assignment
-                "web_url": forked_project.web_url,
-                "group_id": forked_project.id,
-                "namespace_id": gitlab_namespace_id,
-                "namespace_path": forked_project.namespace['full_path'] if hasattr(forked_project.namespace, '__getitem__') else forked_project.namespace.full_path
-            },
+            "url": gitlab_url,
+            "full_path": forked_project.path_with_namespace,
+            "directory": None,  # Will be set per assignment
+            "web_url": forked_project.web_url,
+            "group_id": forked_project.id,
+            "namespace_id": gitlab_namespace_id,
+            "namespace_path": forked_project.namespace['full_path'] if hasattr(forked_project.namespace, '__getitem__') else forked_project.namespace.full_path,
             # Keep for backward compatibility
             "gitlab_project_id": forked_project.id,
             "gitlab_project_path": forked_project.path_with_namespace,

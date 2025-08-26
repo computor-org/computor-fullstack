@@ -90,7 +90,7 @@ async def execute_tests_activity(
     logger = logging.getLogger(__name__)
     
     # Import the testing backend system
-    from .testing_backends import execute_tests_with_backend
+    from ctutor_backend.testing import execute_tests_with_backend
     from ctutor_backend.interface.tests import TestJob
     
     # Parse the test job configuration

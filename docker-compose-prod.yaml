@@ -191,6 +191,74 @@ services:
 
 
 
+  # Python Testing Worker (for testing-python queue)
+  testing-worker-python:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker","--queues","testing-python"]
+    deploy:
+      replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-2}
+    environment:
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - TOKEN_SECRET=${TOKEN_SECRET}
+      - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
+      - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
+      - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+    depends_on:
+      - temporal
+
+  # MATLAB Testing Worker (for testing-matlab queue)
+  testing-worker-matlab:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker","--queues","testing-matlab"]
+    deploy:
+      replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
+    environment:
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - TOKEN_SECRET=${TOKEN_SECRET}
+      - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
+      - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
+      - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
+      - API_LOCAL_STORAGE_DIR=${API_LOCAL_STORAGE_DIR}
+      - MATLAB_RUNTIME_PATH=${MATLAB_RUNTIME_PATH:-/opt/matlab/runtime}
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
+      - ${MATLAB_RUNTIME_PATH}:/opt/matlab/runtime:ro
+    depends_on:
+      - temporal
+
   # MinIO Object Storage Service
   minio:
     image: minio/minio:latest

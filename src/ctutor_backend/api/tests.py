@@ -239,8 +239,8 @@ async def create_test(
             url=gitlab_path_reference,
             path=assignment_directory,
             token=token,
-            commit=assignment.version_identifier
-        )
+            commit="main"
+        ) # TODO
 
         job = TestJob(
             user_id=user_id,
@@ -258,7 +258,7 @@ async def create_test(
         .filter(ExecutionBackend.id == execution_backend_id).first()
 
     if not execution_backend:
-        raise BadRequestException(detail="Execution backend not found")
+        raise BadRequestException(detail=f"Execution backend not found")
 
     # Start Temporal workflow for testing
     if execution_backend.type == "temporal":

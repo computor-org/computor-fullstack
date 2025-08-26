@@ -192,7 +192,7 @@ services:
 
 
   # Python Testing Worker (for testing-python queue)
-  testing-worker-python:
+  temporal-worker-python:
     build:
       context: ./
       dockerfile: ./docker/api/Dockerfile
@@ -205,16 +205,7 @@ services:
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DEBUG_MODE=${DEBUG_MODE}
-      - TOKEN_SECRET=${TOKEN_SECRET}
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
@@ -225,10 +216,12 @@ services:
       - temporal
 
   # MATLAB Testing Worker (for testing-matlab queue)
-  testing-worker-matlab:
+  temporal-worker-matlab:
     build:
       context: ./
-      dockerfile: ./docker/api/Dockerfile
+      dockerfile: ./docker/temporal-worker-matlab/Dockerfile
+      args:
+        MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
     command: ["python", "-m", "ctutor_backend.tasks.temporal_worker","--queues","testing-matlab"]
     deploy:
@@ -238,16 +231,8 @@ services:
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - DEBUG_MODE=${DEBUG_MODE}
-      - TOKEN_SECRET=${TOKEN_SECRET}
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}

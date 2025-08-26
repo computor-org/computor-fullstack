@@ -26,14 +26,9 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
 RUN cd /opt/matlab/R2024b/extern/engines/python && python setup.py install
 
-ADD docker/temporal-worker-matlab/requirements.txt /home/matlab/requirements_mat.txt
 ADD src /home/matlab/
 
-RUN pip install --no-cache-dir --upgrade -r requirements_mat.txt
-
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
-
-
 RUN chmod -R 777 /home/matlab
 
 RUN rm /etc/sudoers.d/localsudo

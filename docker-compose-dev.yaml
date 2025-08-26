@@ -264,7 +264,6 @@ services:
     volumes:
       - ./src:/home/matlab/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
-      #- ${MATLAB_RUNTIME_PATH}:/opt/matlab/runtime:ro
     depends_on:
       - temporal
       - postgres

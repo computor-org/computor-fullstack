@@ -255,7 +255,7 @@ const ExampleUploadDialog: React.FC<ExampleUploadDialogProps> = ({
   };
 
   const isSupportedFile = (fileName: string): boolean => {
-    const supportedExtensions = ['.py', '.js', '.java', '.cpp', '.c', '.h', '.txt', '.md', '.yaml', '.yml', '.json'];
+    const supportedExtensions = ['.py', '.js', '.java', '.cpp', '.c', '.h', '.txt', '.md', '.yaml', '.yml', '.json', '.m'];
     return supportedExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
   };
 

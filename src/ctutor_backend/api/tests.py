@@ -154,14 +154,11 @@ async def create_test(
         raise BadRequestException(detail="version_identifier is required")
 
     # Check for existing results with same commit
+    # With the new partial indexes, we can have multiple failed results with the same version_identifier
     existing_results = db.query(Result) \
-        .select_from(CourseSubmissionGroup) \
-        .join(CourseContent, CourseContent.id == CourseSubmissionGroup.course_content_id) \
-        .join(Result, Result.course_content_id == CourseSubmissionGroup.course_content_id) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
         .filter(
-            CourseSubmissionGroupMember.course_member_id == course_member_id,
-            CourseContent.id == assignment.id,
+            Result.course_member_id == course_member_id,
+            Result.course_content_id == assignment.id,
             Result.version_identifier == commit
         ).all()
 
@@ -179,41 +176,77 @@ async def create_test(
     course_submission_group_id = course_submission_group.id
     submission_group_properties = course_submission_group.properties or {}
 
-    if len(existing_results) > 1:
-        raise InternalServerException(f"Multiple Results with commit [{commit}] for this Assignment. Database inconsistency.")
-
-    # If result already exists, handle based on status
-    if len(existing_results) == 1:
-        result: Result = existing_results[0]
-
-        # Update status if not completed
-        if ResultStatus(result.status) != ResultStatus.COMPLETED:
+    # Handle existing results
+    if existing_results:
+        # Sort by created_at to get the most recent
+        latest_result = sorted(existing_results, key=lambda r: r.created_at, reverse=True)[0]
+        
+        # Check if the latest result is still running according to DB
+        if ResultStatus(latest_result.status) in [ResultStatus.PENDING, ResultStatus.SCHEDULED, ResultStatus.RUNNING, ResultStatus.PAUSED]:
+            # Check actual Temporal workflow status
             try:
-                status = await get_result_status(existing_results[0])
-            except:
-                status = ResultStatus.NOT_AVAILABLE
-
-            result.status = status.value
-            if ResultStatus(status) in [ResultStatus.FAILED, ResultStatus.CRASHED, ResultStatus.CANCELLING, ResultStatus.CANCELLED, ResultStatus.NOT_AVAILABLE]:
-                result.version_identifier = f"{result.version_identifier}:{status}"
-
-            db.commit()
-            db.refresh(result)
-
-        status = result.status
-
-        # Return existing result if still running
-        if ResultStatus(status) in [ResultStatus.PENDING, ResultStatus.SCHEDULED, ResultStatus.RUNNING, ResultStatus.PAUSED]:
-            return TestRunResponse(**result.__dict__)
-
-        # If completed, check submit flag
-        if ResultStatus(status) == ResultStatus.COMPLETED:
-            # Update submit flag if requested
-            if test_create.submit and not result.submit:
-                result.submit = True
+                task_executor = get_task_executor()
+                actual_status = await task_executor.get_task_status(latest_result.test_system_id)
+                
+                # Map Temporal status to ResultStatus
+                from ctutor_backend.tasks.base import TaskStatus
+                if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
+                    # Still running, return the existing one
+                    return TestRunResponse(**latest_result.__dict__)
+                elif actual_status.status == TaskStatus.FINISHED:
+                    # Workflow finished, but we need to check if it succeeded or failed
+                    actual_result = await task_executor.get_task_result(latest_result.test_system_id)
+                    
+                    # Check the workflow result status
+                    if actual_result.result and isinstance(actual_result.result, dict):
+                        workflow_status = actual_result.result.get("status", "").lower()
+                        
+                        if workflow_status == "completed":
+                            # Successfully completed
+                            latest_result.status = ResultStatus.COMPLETED
+                            db.commit()
+                            db.refresh(latest_result)
+                            
+                            if test_create.submit and not latest_result.submit:
+                                latest_result.submit = True
+                                db.commit()
+                                db.refresh(latest_result)
+                            return TestRunResponse(**latest_result.__dict__)
+                        else:
+                            # Failed or other non-success status
+                            latest_result.status = ResultStatus.FAILED
+                            db.commit()
+                            db.refresh(latest_result)
+                            # Will create a new run below
+                    else:
+                        # No result or unexpected format, treat as failed
+                        latest_result.status = ResultStatus.FAILED
+                        db.commit()
+                        db.refresh(latest_result)
+                        # Will create a new run below
+                else:  # FAILED, CANCELLED, etc.
+                    # Update DB status to failed
+                    latest_result.status = ResultStatus.FAILED
+                    db.commit()
+                    db.refresh(latest_result)
+                    # Will create a new run below
+            except Exception as e:
+                # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
+                logger.warning(f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}")
+                latest_result.status = ResultStatus.FAILED
                 db.commit()
-                db.refresh(result)
-            return TestRunResponse(**result.__dict__)
+                db.refresh(latest_result)
+                # Will create a new run below
+        
+        # If completed successfully and only updating submit flag
+        elif ResultStatus(latest_result.status) == ResultStatus.COMPLETED:
+            if test_create.submit and not latest_result.submit:
+                latest_result.submit = True
+                db.commit()
+                db.refresh(latest_result)
+            return TestRunResponse(**latest_result.__dict__)
+        
+        # If failed/crashed/cancelled, we'll create a new run below
 
     # Create new test execution
     # Build repository configurations for GitLab

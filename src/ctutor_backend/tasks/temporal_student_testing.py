@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
@@ -162,7 +163,7 @@ async def commit_test_results_activity(
         return isinstance(response,ResultGet)
         
     except Exception as e:
-        return {"error": str(e), "success": False}
+        raise ApplicationError(message=str(e))
 
 
 # Workflows
@@ -253,6 +254,9 @@ class StudentTestingWorkflow(BaseWorkflow):
                     start_to_close_timeout=timedelta(minutes=2),
                     retry_policy=RetryPolicy(maximum_attempts=3)
                 )
+
+                if commit_success == False:
+                    raise Exception({"details": "commit result failed"})
                 
                 completed_at = datetime.utcnow()
                 

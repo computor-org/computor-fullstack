@@ -40,7 +40,7 @@ class PythonTestingBackend(TestingBackend):
     """Python testing backend using subprocess execution."""
     
     def get_backend_type(self) -> str:
-        return "python"
+        return "temporal:python"
     
     async def execute_tests(
         self,
@@ -50,7 +50,7 @@ class PythonTestingBackend(TestingBackend):
         backend_properties: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute Python tests using subprocess."""
-        
+        logging.basicConfig(level=logging.INFO)
         # Get configuration from backend properties
         testing_executable = backend_properties.get(
             "testing_executable",
@@ -121,7 +121,7 @@ class MatlabTestingBackend(TestingBackend):
     """MATLAB testing backend using Pyro RPC to communicate with MATLAB server."""
     
     def get_backend_type(self) -> str:
-        return "matlab"
+        return "temporal:matlab"
     
     async def execute_tests(
         self,
@@ -214,7 +214,7 @@ class JavaTestingBackend(TestingBackend):
     """Java testing backend using JUnit or similar frameworks."""
     
     def get_backend_type(self) -> str:
-        return "java"
+        return "temporal:java"
     
     async def execute_tests(
         self,
@@ -252,9 +252,9 @@ class TestingBackendFactory:
     """Factory for creating testing backend instances based on type."""
     
     _backends: Dict[str, type[TestingBackend]] = {
-        "python": PythonTestingBackend,
-        "matlab": MatlabTestingBackend,
-        "java": JavaTestingBackend,
+        "temporal:python": PythonTestingBackend,
+        "temporal:matlab": MatlabTestingBackend,
+        "temporal:java": JavaTestingBackend,
     }
     
     @classmethod

@@ -91,6 +91,8 @@ async def execute_tests_activity(
     import json
     import shutil
     logger = logging.getLogger(__name__)
+
+    logging.basicConfig(level=logging.INFO)
     
     # Import the testing backend system
     from ctutor_backend.testing import execute_tests_with_backend
@@ -100,18 +102,21 @@ async def execute_tests_activity(
     test_job = TestJob(**test_config)
     
     # Determine backend type from properties or test job
-    backend_type = backend_properties.get("type", "python")
+    backend_type = test_config.get("execution_backend_type")
     
     # Create work directory structure within the temp directory
     work_dir = os.path.dirname(student_path)  # Get parent temp directory
     artifacts_path = os.path.join(work_dir, "artifacts")
     test_files_path = os.path.join(work_dir, "test_files")
     output_path = os.path.join(work_dir, "output")
+
+    reference_path = os.path.join(reference_path,test_config["reference"]["path"])
+    student_path = os.path.join(student_path,test_config["module"]["path"])
     
     # Constants from old system
-    TEST_FILE_NAME = backend_properties.get("test_file", "test.py")
-    SPEC_FILE_NAME = "spec.yaml"
-    REPORT_FILE_NAME = "report.json"
+    TEST_FILE_NAME = "test.yaml"
+    SPEC_FILE_NAME = "specification.yaml"
+    REPORT_FILE_NAME = "testSummary.json"
     
     # Create spec file with directory information
     spec_file_path = os.path.join(work_dir, SPEC_FILE_NAME)
@@ -178,13 +183,15 @@ async def execute_tests_activity(
     
     # Execute tests using the appropriate backend
     try:
-        test_results = await execute_tests_with_backend(
+        await execute_tests_with_backend(
             backend_type=backend_type,
             test_file_path=test_file_path,
             spec_file_path=spec_file_path,
             test_job_config=job_config,
             backend_properties=backend_properties
         )
+
+        test_results = None
         
         # If no results returned, check for output file (some backends write to file)
         if test_results is None:
@@ -257,8 +264,8 @@ async def commit_test_results_activity(
         
         # Create result update
         result_update = ResultUpdate(
-            status=ResultStatus.COMPLETED if test_results["failed"] == 0 else ResultStatus.FAILED,
-            result=0,
+            status=ResultStatus.COMPLETED,
+            result=test_results["result_value"],
             result_json=test_results
         )
         
@@ -369,7 +376,7 @@ class StudentTestingWorkflow(BaseWorkflow):
                     status="completed",
                     result={
                         "test_job_id": job_id,
-                        "test_results": test_results,
+                        #"test_results": test_results,
                         "api_commit_success": commit_success,
                         "started_at": started_at.isoformat(),
                         "completed_at": completed_at.isoformat(),
@@ -377,9 +384,9 @@ class StudentTestingWorkflow(BaseWorkflow):
                     },
                     metadata={
                         "workflow_type": "student_testing",
-                        "passed": test_results["passed"],
-                        "failed": test_results["failed"],
-                        "total": test_results["total"]
+                        "passed": test_results["summary"]["passed"],
+                        "failed": test_results["summary"]["failed"],
+                        "total": test_results["summary"]["total"]
                     }
                 )
                 

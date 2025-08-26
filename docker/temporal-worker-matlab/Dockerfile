@@ -1,8 +1,10 @@
 # Build argument for base image - defaults to local build, can be overridden
-ARG MATLAB_BASE_IMAGE=matlab-base:latest
+# ARG MATLAB_BASE_IMAGE=matlab-base:latest
 
-# Use the MATLAB base image (can be overridden via --build-arg)
-FROM ${MATLAB_BASE_IMAGE}
+# # Use the MATLAB base image (can be overridden via --build-arg)
+# FROM ${MATLAB_BASE_IMAGE}
+
+FROM registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing/matlab:r2024b
 
 USER root
 
@@ -13,35 +15,35 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         python3.10 \
         python3-pip \
         python3.10-venv \
-        postgresql-client \
+        libpython3.10-dev \
         git \
+        nano \
+        curl \
     && apt-get clean \
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 
-# Create worker user if it doesn't exist (matlab image already has matlab user)
-RUN useradd -ms /bin/bash worker || true
+RUN cd /opt/matlab/R2024b/extern/engines/python && python setup.py install
 
-# Set up Python environment
-WORKDIR /home/worker
+ADD docker/temporal-worker-matlab/requirements.txt /home/matlab/requirements_mat.txt
+ADD src /home/matlab/
 
-# Copy and install Python requirements as root
-COPY src/requirements.txt /home/worker/requirements.txt
-RUN python3.10 -m pip install --no-cache-dir --upgrade pip \
-    && python3.10 -m pip install --no-cache-dir --upgrade -r requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements_mat.txt
+RUN pip install -e .
 
-# Install MATLAB Engine API for Python if available
-# This will fail silently if MATLAB is not properly configured
-RUN python3.10 -m pip install matlabengine || true
+RUN chmod -R 777 /home/matlab
 
-# Copy source code will be mounted as volume in docker-compose
-WORKDIR /home/worker/src
+RUN rm /etc/sudoers.d/localsudo
+RUN passwd -d matlab
 
-# Switch to worker user for execution
-USER worker
+USER matlab
+WORKDIR /home/matlab
+
+ENV TZ=UTC
+ENV TZ=Europe/Berlin
 
 # Ensure python3.10 is used
 ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
 
-# Start temporal worker with testing-matlab queue
-CMD ["/usr/bin/python3.10", "-m", "ctutor_backend.tasks.temporal_worker", "--queues=testing-matlab"]
+# Default entrypoint - can be overridden in docker-compose
+ENTRYPOINT ["python", "-m", "ctutor_backend.tasks.temporal_worker"]

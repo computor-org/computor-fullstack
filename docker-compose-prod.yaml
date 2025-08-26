@@ -223,7 +223,7 @@ services:
       args:
         MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
-    command: ["python", "-m", "ctutor_backend.tasks.temporal_worker","--queues","testing-matlab"]
+    command: ["--queues=testing-matlab"]
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
     environment:

@@ -189,6 +189,9 @@ services:
       - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
       - PYTHONPATH=/home/worker/src
+      - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
+      - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
+      - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
     volumes:
       - ./src:/home/worker/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}

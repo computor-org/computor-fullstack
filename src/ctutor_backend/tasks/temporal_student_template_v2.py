@@ -23,6 +23,7 @@ from ..database import get_db
 from ..model.course import Course, CourseContent, CourseFamily
 from ..model.example import Example, ExampleVersion, ExampleRepository
 from ..model.organization import Organization
+from ..model.execution import ExecutionBackend
 from ..services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
@@ -232,8 +233,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             try:
                 logger.info(f"Processing {content.path} with example {content.example_id}")
                 
-                # Get example and repository details
-                example = db.query(Example).filter(Example.id == content.example_id).first()
+                # Get example and repository details with versions loaded
+                example = db.query(Example).options(
+                    joinedload(Example.versions)
+                ).filter(Example.id == content.example_id).first()
                 if not example:
                     logger.error(f"Example {content.example_id} not found")
                     errors.append(f"Example not found for {content.path}")
@@ -262,6 +265,22 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     logger.error(f"Repository not found for example {content.example_id}")
                     errors.append(f"Repository not found for {content.path}")
                     continue
+                
+                # Extract execution backend slug from meta_yaml and link to course_content
+                if not content.execution_backend_id:
+                    backend_slug = example.get_execution_backend_slug(content.example_version)
+                    if backend_slug:
+                        # Find the execution backend by slug
+                        exec_backend = db.query(ExecutionBackend).filter(
+                            ExecutionBackend.slug == backend_slug
+                        ).first()
+                        
+                        if exec_backend:
+                            # Link the execution backend to the course content
+                            content.execution_backend_id = exec_backend.id
+                            logger.info(f"Linked execution backend '{backend_slug}' to course content {content.path}")
+                        else:
+                            logger.warning(f"Execution backend '{backend_slug}' not found in database for {content.path}")
                 
                 # Download example files based on repository source type
                 try:
@@ -610,6 +629,22 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
                 if not content.example_version:
                     logger.warning(f"CourseContent {content.path} has no example_version specified")
                     continue
+                
+                # Extract execution backend slug from meta_yaml and link to course_content
+                if not content.execution_backend_id:
+                    backend_slug = content.example.get_execution_backend_slug(content.example_version)
+                    if backend_slug:
+                        # Find the execution backend by slug
+                        exec_backend = db.query(ExecutionBackend).filter(
+                            ExecutionBackend.slug == backend_slug
+                        ).first()
+                        
+                        if exec_backend:
+                            # Link the execution backend to the course content
+                            content.execution_backend_id = exec_backend.id
+                            logger.info(f"Linked execution backend '{backend_slug}' to course content {content.path}")
+                        else:
+                            logger.warning(f"Execution backend '{backend_slug}' not found in database for {content.path}")
                 
                 # Find the specific version
                 version = None

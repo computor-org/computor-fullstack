@@ -62,7 +62,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
                     .filter( 
                         or_(
                             User.id == permitted_user, \
-                            cm_other.course_id.in_(select(user_courses(permitted_user,"_study_assistant",db)))
+                            cm_other.course_id.in_(select(user_courses(permitted_user,"_tutor",db)))
                         )
                     )
                     .distinct()
@@ -245,8 +245,8 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         else:
 
             actions_mapper = {
-                "get": "_study_assistant",
-                "list": "_study_assistant",
+                "get": "_tutor",
+                "list": "_tutor",
                 "update": "_maintainer"
             }
 
@@ -281,8 +281,8 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         else:
 
             actions_mapper = {
-                "get": "_study_assistant",
-                "list": "_study_assistant",
+                "get": "_tutor",
+                "list": "_tutor",
                 "update": "_maintainer"
             }
 
@@ -302,8 +302,8 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
 
     elif entity == Result:
         actions_mapper = {
-            "get": "_study_assistant",
-            "list": "_study_assistant"
+            "get": "_tutor",
+            "list": "_tutor"
         }
 
         cm_other = aliased(CourseMember)
@@ -338,8 +338,8 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         else:
 
             actions_mapper = {
-                "get": "_study_assistant",
-                "list": "_study_assistant",
+                "get": "_tutor",
+                "list": "_tutor",
                 "update": "_maintainer"
             }
 
@@ -374,8 +374,8 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         else:
 
             actions_mapper = {
-                "get": "_study_assistant",
-                "list": "_study_assistant"
+                "get": "_tutor",
+                "list": "_tutor"
             }
 
             cm_other = aliased(CourseMember)

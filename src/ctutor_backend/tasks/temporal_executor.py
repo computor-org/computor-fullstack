@@ -74,8 +74,8 @@ class TemporalTaskExecutor:
         # Get Temporal client
         client = await get_temporal_client()
         
-        # Generate unique workflow ID
-        workflow_id = f"{submission.task_name}-{uuid.uuid4()}"
+        # Use provided workflow ID or generate a new one
+        workflow_id = submission.workflow_id if submission.workflow_id else f"{submission.task_name}-{uuid.uuid4()}"
         
         # Get task queue name - use workflow's default queue or submission's queue
         workflow_queue = workflow_class.get_task_queue()

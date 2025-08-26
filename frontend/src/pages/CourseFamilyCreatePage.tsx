@@ -37,7 +37,7 @@ const CourseFamilyCreatePage: React.FC = () => {
   };
 
   const handleTaskComplete = (courseFamilyId: string) => {
-    // Navigate to the newly created course family's detail page
+    // Navigate to the specific course family page after successful creation
     navigate(`/admin/course-families/${courseFamilyId}`);
   };
 
@@ -55,23 +55,42 @@ const CourseFamilyCreatePage: React.FC = () => {
     taskProgress: 0,
     taskError: null as string | null,
     taskId: null as string | null,
+    createdEntityId: null as string | null,
+    createdEntityName: null as string | null,
   });
 
   // Update form state when ref changes
   useEffect(() => {
     const interval = setInterval(() => {
       if (formRef.current) {
-        setFormState({
+        const newState = {
           isProcessing: formRef.current.isProcessing,
           taskStatus: formRef.current.taskStatus,
           taskProgress: formRef.current.taskProgress,
           taskError: formRef.current.taskError,
           taskId: formRef.current.taskId,
-        });
+          createdEntityId: formRef.current.createdEntityId,
+          createdEntityName: formRef.current.createdEntityName,
+        };
+        
+        // Check if task just completed successfully
+        if (newState.taskStatus === 'completed' && 
+            formState.taskStatus !== 'completed') {
+          // Wait a bit for the entity ID to be available
+          if (newState.createdEntityId) {
+            handleTaskComplete(newState.createdEntityId);
+          } else {
+            // Fallback to list page if no ID available
+            console.log('No entity ID available, navigating to list');
+            navigate('/admin/course-families');
+          }
+        }
+        
+        setFormState(newState);
       }
     }, 100);
     return () => clearInterval(interval);
-  }, []);
+  }, [formState.taskStatus]);
 
   // Header content with alerts and progress indicators
   const headerContent = (
@@ -93,7 +112,7 @@ const CourseFamilyCreatePage: React.FC = () => {
               <LinearProgress sx={{ mt: 1 }} />
             </Alert>
           )}
-          {formState.isProcessing && formState.taskProgress > 0 && (
+          {formState.isProcessing && formState.taskProgress > 0 && formState.taskStatus !== 'failed' && (
             <Box>
               <Typography variant="body2" color="text.secondary">
                 Creating course family... {formState.taskProgress}%
@@ -113,7 +132,7 @@ const CourseFamilyCreatePage: React.FC = () => {
           )}
           {formState.taskStatus === 'completed' && (
             <Alert severity="success">
-              Course family created successfully!
+              Course Family "{formState.createdEntityName || 'Unnamed'}" created successfully! Redirecting...
             </Alert>
           )}
         </>
@@ -136,7 +155,7 @@ const CourseFamilyCreatePage: React.FC = () => {
         onClick={handleSubmit}
         variant="contained"
         disabled={formState.isProcessing || formState.taskStatus === 'completed' || loading}
-        startIcon={formState.isProcessing ? <CircularProgress size={20} /> : null}
+        startIcon={formState.isProcessing && formState.taskStatus !== 'failed' ? <CircularProgress size={20} /> : null}
       >
         {formState.isProcessing ? 'Processing...' : 'Create Course Family'}
       </Button>

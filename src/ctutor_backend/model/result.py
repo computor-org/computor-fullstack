@@ -12,8 +12,11 @@ class Result(Base):
     __tablename__ = 'result'
     __table_args__ = (
         Index('result_commit_test_system_key', 'test_system_id', 'execution_backend_id', unique=True),
-        Index('result_version_identifier_member_key', 'course_member_id', 'version_identifier', unique=True),
-        Index('result_version_identifier_group_key', 'course_submission_group_id', 'version_identifier', unique=True)
+        # Partial unique indexes - allow multiple results with same version_identifier when status is FAILED(1), CANCELLED(2), or CRASHED(6)
+        Index('result_version_identifier_member_partial_key', 'course_member_id', 'version_identifier', 
+              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
+        Index('result_version_identifier_group_partial_key', 'course_submission_group_id', 'version_identifier', 
+              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)'))
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))

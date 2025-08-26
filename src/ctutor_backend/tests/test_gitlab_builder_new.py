@@ -16,7 +16,7 @@ from uuid import uuid4
 from gitlab.exceptions import GitlabCreateError, GitlabGetError
 from sqlalchemy.exc import IntegrityError
 
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilder
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,
@@ -28,7 +28,7 @@ from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.course import CourseFamily, Course
 
 
-class TestGitLabBuilderNew:
+class TestGitLabBuilder:
     """Test suite for new GitLab builder."""
     
     @pytest.fixture
@@ -98,8 +98,8 @@ class TestGitLabBuilderNew:
         group.namespace = {"id": 50, "path": "parent-group"}
         return group
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.Gitlab')
-    @patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository')
+    @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
+    @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_initialization(self, mock_repo_class, mock_gitlab_class, mock_db_session):
         """Test GitLab builder initialization."""
         # Setup mocks
@@ -111,7 +111,7 @@ class TestGitLabBuilderNew:
         mock_repo_class.return_value = mock_repo_instance
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -124,8 +124,8 @@ class TestGitLabBuilderNew:
         mock_gitlab_instance.auth.assert_called_once()
         mock_repo_class.assert_called_once_with(mock_db_session)
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.Gitlab')
-    @patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository')
+    @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
+    @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_create_deployment_hierarchy_success(
         self,
         mock_repo_class,
@@ -158,7 +158,7 @@ class TestGitLabBuilderNew:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -178,8 +178,8 @@ class TestGitLabBuilderNew:
         mock_db_session.commit.assert_called_once()
         mock_db_session.rollback.assert_not_called()
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.Gitlab')
-    @patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository')
+    @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
+    @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_create_deployment_hierarchy_gitlab_error(
         self,
         mock_repo_class,
@@ -200,7 +200,7 @@ class TestGitLabBuilderNew:
         mock_repo_class.return_value = mock_repo_instance
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -218,8 +218,8 @@ class TestGitLabBuilderNew:
         mock_db_session.rollback.assert_called()
         mock_db_session.commit.assert_not_called()
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.Gitlab')
-    @patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository')
+    @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
+    @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_create_deployment_hierarchy_database_error(
         self,
         mock_repo_class,
@@ -242,7 +242,7 @@ class TestGitLabBuilderNew:
         mock_repo_class.return_value = mock_repo_instance
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -260,8 +260,8 @@ class TestGitLabBuilderNew:
         mock_db_session.rollback.assert_called()
         mock_db_session.commit.assert_not_called()
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.Gitlab')
-    @patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository')
+    @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
+    @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_idempotency_existing_organization(
         self,
         mock_repo_class,
@@ -296,7 +296,7 @@ class TestGitLabBuilderNew:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -310,8 +310,8 @@ class TestGitLabBuilderNew:
         # Should not create new organization in database
         mock_repo_instance.create.assert_not_called()
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.Gitlab')
-    @patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository')
+    @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
+    @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_validate_and_recreate_missing_gitlab_group(
         self,
         mock_repo_class,
@@ -352,7 +352,7 @@ class TestGitLabBuilderNew:
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         
         # Create builder
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=mock_db_session,
             gitlab_url="http://localhost:8084",
             gitlab_token="test-token"
@@ -367,9 +367,9 @@ class TestGitLabBuilderNew:
     
     def test_create_enhanced_config(self, mock_db_session, mock_gitlab_group):
         """Test enhanced GitLab config creation."""
-        with patch('ctutor_backend.generator.gitlab_builder_new.Gitlab'):
-            with patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository'):
-                builder = GitLabBuilderNew(
+        with patch('ctutor_backend.generator.gitlab_builder.Gitlab'):
+            with patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository'):
+                builder = GitLabBuilder(
                     db_session=mock_db_session,
                     gitlab_url="http://localhost:8084",
                     gitlab_token="test-token"
@@ -386,12 +386,12 @@ class TestGitLabBuilderNew:
                 assert config["visibility"] == "private"
                 assert "last_synced_at" in config
     
-    @patch('ctutor_backend.generator.gitlab_builder_new.logger')
+    @patch('ctutor_backend.generator.gitlab_builder.logger')
     def test_logging(self, mock_logger, mock_db_session):
         """Test proper logging throughout operations."""
-        with patch('ctutor_backend.generator.gitlab_builder_new.Gitlab'):
-            with patch('ctutor_backend.generator.gitlab_builder_new.OrganizationRepository'):
-                builder = GitLabBuilderNew(
+        with patch('ctutor_backend.generator.gitlab_builder.Gitlab'):
+            with patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository'):
+                builder = GitLabBuilder(
                     db_session=mock_db_session,
                     gitlab_url="http://localhost:8084",
                     gitlab_token="test-token"

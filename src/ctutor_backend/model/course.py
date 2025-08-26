@@ -1,12 +1,16 @@
 from typing import List, TYPE_CHECKING
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
-    Enum, Float, ForeignKey, ForeignKeyConstraint, Index, 
+    Float, ForeignKey, ForeignKeyConstraint, Index, 
     Integer, String, text, select
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, column_property, Mapped
-from sqlalchemy_utils import LtreeType
+try:
+    from ..custom_types import LtreeType
+except ImportError:
+    # Fallback for Alembic context
+    from ctutor_backend.custom_types import LtreeType
 
 from .base import Base
 
@@ -87,7 +91,6 @@ class Course(Base):
     path = Column(LtreeType, nullable=False)
     course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    version_identifier = Column(String(2048))
 
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
@@ -201,9 +204,8 @@ class CourseContent(Base):
     path = Column(LtreeType, nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    version_identifier = Column(String(2048), nullable=False)
     position = Column(Float(53), nullable=False)
-    max_group_size = Column(Integer, nullable=False)
+    max_group_size = Column(Integer, nullable=True)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
@@ -211,6 +213,11 @@ class CourseContent(Base):
     # Example integration columns
     example_id = Column(UUID, ForeignKey('example.id'), nullable=True)
     example_version = Column(String(64), nullable=True)
+    
+    # Deployment tracking (basic status only)
+    deployed_at = Column(DateTime(True), nullable=True)
+    deployment_status = Column(String(32), server_default=text("'pending'"))  # pending, deploying, deployed, failed
+    
 
     # Relationships
     course_content_type = relationship("CourseContentType", foreign_keys=[course_content_type_id], back_populates="course_contents", lazy="select")
@@ -220,10 +227,12 @@ class CourseContent(Base):
     execution_backend = relationship('ExecutionBackend', back_populates='course_contents')
     results: Mapped[List["Result"]] = relationship('Result', back_populates="course_content", uselist=True, cascade='all,delete')
     course_submission_groups = relationship('CourseSubmissionGroup', back_populates='course_content')
-    course_submission_group_members = relationship('CourseSubmissionGroupMember', back_populates='course_content')
+    # Removed: course_submission_group_members - relationship removed as course_content_id was removed from CourseSubmissionGroupMember
     
     # Example relationships
     example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
+    
+    # Deployment tracking
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(
@@ -275,6 +284,8 @@ class CourseMember(Base):
     results = relationship('Result', back_populates='course_member')
     messages_sent = relationship('Message', back_populates='transmitter')
     message_reads = relationship('MessageRead', back_populates='course_member')
+    gradings_given = relationship('CourseSubmissionGroupGrading', back_populates='graded_by',
+                                 foreign_keys='CourseSubmissionGroupGrading.graded_by_course_member_id')
 
 
 class CourseSubmissionGroup(Base):
@@ -286,9 +297,8 @@ class CourseSubmissionGroup(Base):
     updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
-    properties = Column(JSONB)
-    status = Column(String(2048))
-    grading = Column(Float(53))
+    properties = Column(JSONB)  # Should contain gitlab/git repository info
+    # Removed: status and grading - moved to CourseSubmissionGroupGrading
     max_group_size = Column(Integer, nullable=False)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
@@ -302,13 +312,15 @@ class CourseSubmissionGroup(Base):
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     members = relationship("CourseSubmissionGroupMember", back_populates="group", uselist=True)
     results = relationship('Result', back_populates='course_submission_group')
+    gradings = relationship('CourseSubmissionGroupGrading', back_populates='course_submission_group',
+                           cascade='all, delete-orphan')
 
 
 class CourseSubmissionGroupMember(Base):
     __tablename__ = 'course_submission_group_member'
     __table_args__ = (
-        Index('course_submission_group_course_content_key', 'course_member_id', 'course_content_id', unique=True),
-        Index('course_submission_group_member_key', 'course_submission_group_id', 'course_member_id', unique=True)
+        # Only keep the constraint that makes sense: unique member per submission group
+        Index('course_submission_group_member_key', 'course_submission_group_id', 'course_member_id', unique=True),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -318,19 +330,74 @@ class CourseSubmissionGroupMember(Base):
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    grading = Column(Float(53))
+    # Removed: grading - moved to CourseSubmissionGroupGrading
     course_id = Column(ForeignKey('course.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False, index=True)
     course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_member_id = Column(ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
-    course_content_id = Column(ForeignKey('course_content.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)
+    # Removed: course_content_id - relationship is through CourseSubmissionGroup
 
     # Relationships
-    course_content = relationship('CourseContent', back_populates='course_submission_group_members')
+    # Removed relationship to course_content
     course = relationship('Course')
     course_member = relationship('CourseMember', back_populates='submission_group_members')
     group = relationship("CourseSubmissionGroup", back_populates="members", uselist=False)
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
+
+
+class CourseSubmissionGroupGrading(Base):
+    """
+    Tracks grading information for course submission groups.
+    
+    This table records:
+    - The actual grade (0.0 to 1.0)
+    - The grading status
+    - Who performed the grading (staff member/tutor/lecturer)
+    - When the grading occurred
+    """
+    __tablename__ = 'course_submission_group_grading'
+    __table_args__ = (
+        # Ensure we can quickly find all gradings for a submission group
+        Index('idx_grading_submission_group', 'course_submission_group_id'),
+        # Ensure we can find all gradings by a specific grader
+        Index('idx_grading_graded_by', 'graded_by_course_member_id'),
+    )
+
+    # Primary key and versioning
+    id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
+    version = Column(BigInteger, server_default=text("0"))
+    
+    # Timestamps
+    created_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    updated_at = Column(DateTime(True), nullable=False, server_default=text("now()"))
+    
+    # Foreign keys
+    course_submission_group_id = Column(
+        ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'),
+        nullable=False
+    )
+    graded_by_course_member_id = Column(
+        ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'),
+        nullable=False
+    )
+    
+    # Grading data
+    grading = Column(Float(53), nullable=False)  # Value between 0.0 and 1.0
+    status = Column(String(50))  # 'corrected', 'correction_necessary', 'correction_possible', null, etc.
+    
+    # Relationships
+    course_submission_group = relationship(
+        'CourseSubmissionGroup',
+        back_populates='gradings'
+    )
+    graded_by = relationship(
+        'CourseMember',
+        back_populates='gradings_given',
+        foreign_keys=[graded_by_course_member_id]
+    )
+    
+    def __repr__(self):
+        return f"<CourseSubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status})>"
 
 
 class CourseMemberComment(Base):

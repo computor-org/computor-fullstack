@@ -2,7 +2,7 @@ from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
-from sqlalchemy_utils import Ltree
+from ..custom_types import Ltree
 
 from ctutor_backend.model.course import Course
 
@@ -15,7 +15,6 @@ class CourseTutorGet(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     path: str
 
     repository: CourseTutorRepository
@@ -32,7 +31,6 @@ class CourseTutorList(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     path: str
 
     repository: CourseTutorRepository
@@ -51,7 +49,6 @@ class CourseTutorQuery(ListQuery):
     path: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
 
 def course_tutor_search(db: Session, query, params: Optional[CourseTutorQuery]):
     if params.id != None:
@@ -66,8 +63,6 @@ def course_tutor_search(db: Session, query, params: Optional[CourseTutorQuery]):
         query = query.filter(Course.course_family_id == params.course_family_id)
     if params.organization_id != None:
         query = query.filter(Course.organization_id == params.organization_id)
-    if params.version_identifier != None:
-        query = query.filter(Course.version_identifier == params.version_identifier)
 
     return query
 

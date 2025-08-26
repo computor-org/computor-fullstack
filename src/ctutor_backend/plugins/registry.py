@@ -11,14 +11,14 @@ import logging
 from .base import AuthenticationPlugin, PluginConfig, PluginMetadata, AuthResult, UserInfo
 from .loader import PluginLoader, PluginLoadError
 
+logger = logging.getLogger(__name__)
+
 # Import built-in providers if available
 try:
     from ctutor_backend.auth.providers import BUILTIN_PROVIDERS
 except ImportError as e:
     logger.warning(f"Failed to import BUILTIN_PROVIDERS: {e}")
     BUILTIN_PROVIDERS = {}
-
-logger = logging.getLogger(__name__)
 
 
 class PluginRegistry:
@@ -147,7 +147,11 @@ class PluginRegistry:
             
         except Exception as e:
             logger.error(f"Failed to load built-in provider {provider_name}: {e}")
-            raise
+            # Don't raise for Keycloak connection errors - allow system to continue
+            if provider_name == "keycloak" and "connection" in str(e).lower():
+                logger.warning(f"Continuing without {provider_name} provider - service unavailable")
+            else:
+                raise
     
     async def load_plugin(self, plugin_name: str) -> None:
         """

@@ -6,20 +6,31 @@ from datetime import timedelta
 from ctutor_backend.database import get_db
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseGroup, CourseMember, CourseMemberComment
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 from ctutor_backend.model.result import Result
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 def db_export_course_member_grading(db: Session, course_member_id: str | None = None) -> pd.DataFrame:
 
+    # Subquery to get the latest grading for each submission group
+    latest_grading_sub = db.query(
+        CourseSubmissionGroupGrading.course_submission_group_id,
+        CourseSubmissionGroupGrading.status,
+        CourseSubmissionGroupGrading.grading,
+        func.row_number().over(
+            partition_by=CourseSubmissionGroupGrading.course_submission_group_id,
+            order_by=CourseSubmissionGroupGrading.created_at.desc()
+        ).label('rn')
+    ).subquery()
+
     data = db.query(
         Course.id,
         CourseMember.id,
         CourseContent.path,
         CourseContentType.slug,
-        CourseSubmissionGroup.grading,
-        CourseSubmissionGroup.status,
+        latest_grading_sub.c.grading,
+        latest_grading_sub.c.status,
         User.given_name,
         User.family_name
     ) \
@@ -29,7 +40,12 @@ def db_export_course_member_grading(db: Session, course_member_id: str | None = 
     .join(CourseContent,CourseContent.id == CourseSubmissionGroup.course_content_id) \
     .join(Course,Course.id == CourseContent.course_id) \
     .join(CourseContentType,CourseContentType.id == CourseContent.course_content_type_id) \
-    .join(User,User.id == CourseMember.user_id)
+    .join(User,User.id == CourseMember.user_id) \
+    .outerjoin(
+        latest_grading_sub,
+        (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
+        (latest_grading_sub.c.rn == 1)
+    )
     
     if course_member_id != None:
         data = data.filter(CourseMember.id == course_member_id)

@@ -3,7 +3,7 @@
 ## 🔄 Current Status (Where We Left Off)
 
 ### ✅ What's Complete:
-1. **GitLab Builder Core** - `gitlab_builder_new.py` implemented with:
+1. **GitLab Builder Core** - `gitlab_builder.py` implemented with:
    - Organization → CourseFamily → Course hierarchy creation
    - Enhanced GitLab properties storage (group_id, namespace_id, web_url)
    - Database integration with proper error handling
@@ -71,7 +71,7 @@ logger.debug(f"CourseFamily GitLab config: {course_family.properties.get('gitlab
 4. **Implement Repositories** [MEDIUM]
    - CourseFamilyRepository (similar to OrganizationRepository)
    - CourseRepository with course-specific operations
-   - Use repositories in gitlab_builder_new.py
+   - Use repositories in gitlab_builder.py
 
 5. **Integration** [MEDIUM]
    - Replace api_client.py calls with repository calls
@@ -96,10 +96,10 @@ python delete_test_gitlab_groups.py
 ```
 
 ### Check Logs:
-Look for log output from `gitlab_builder_new.py` - it has detailed logging
+Look for log output from `gitlab_builder.py` - it has detailed logging
 
 ## 💡 Key Files
-- `/src/ctutor_backend/generator/gitlab_builder_new.py` - Main implementation
+- `/src/ctutor_backend/generator/gitlab_builder.py` - Main implementation
 - `/test_gitlab_builder_real.py` - Real test with DB + GitLab
 - `/GITLAB_PROPERTIES_UPDATE.md` - Enhanced properties design
 - `/GITLAB_REFACTORING_PROGRESS.md` - Overall progress

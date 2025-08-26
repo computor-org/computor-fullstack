@@ -55,6 +55,12 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         )
         self._oidc_config = None
         self._jwks = None
+        self._available = False  # Track if Keycloak service is available
+    
+    @property
+    def is_available(self) -> bool:
+        """Check if Keycloak service is available."""
+        return self._available
     
     @property
     def metadata(self) -> PluginMetadata:
@@ -84,10 +90,18 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         try:
             await self._fetch_oidc_config()
             logger.info("Keycloak plugin initialized successfully")
+            self._available = True
             # Note: JWKS will be fetched on-demand when needed for token verification
+        except httpx.ConnectError as e:
+            # Keycloak service is not available - this is allowed
+            logger.warning(f"Keycloak service is not available: {e}")
+            logger.info("Keycloak authentication will be disabled. System will continue without SSO support.")
+            self._available = False
+            self._oidc_config = None
         except Exception as e:
             logger.error(f"Failed to initialize Keycloak plugin: {type(e).__name__}: {e}")
             logger.error("Exception details:", exc_info=True)
+            self._available = False
             raise
     
     async def _fetch_oidc_config(self) -> None:
@@ -194,6 +208,9 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         
         Exchange authorization code for tokens and get user info.
         """
+        if not self._available:
+            raise RuntimeError("Keycloak service is not available")
+        
         try:
             # Exchange code for tokens
             print(f"[DEBUG] Starting token exchange for code: {code[:20]}...")
@@ -353,6 +370,9 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         
         Note: This flow should be avoided in production. Use authorization code flow instead.
         """
+        if not self._available:
+            raise RuntimeError("Keycloak service is not available")
+        
         if not self._oidc_config:
             raise RuntimeError("Plugin not initialized")
         

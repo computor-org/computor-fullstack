@@ -118,6 +118,28 @@ Each content node is configured using a `meta.yaml` file. These files define met
 
 The system allows deep nesting of units, while assignments can only exist under the root or directly under a unit.
 
+### Student Template Repository Structure
+
+The platform generates student-template repositories using a **flat directory structure** based on example identifiers, providing a clean and navigable layout for students:
+
+- **Flat Structure**: Assignments are organized as top-level directories, not nested hierarchically
+- **Example Identifiers**: Directory names use `example.identifier` from the Example Library
+- **Configurable**: Can be overridden via `CourseContentProperties.directory` field
+- **Self-Contained**: Each assignment directory contains all necessary files and resources
+
+**Example Structure:**
+```
+student-template/
+├── python-basics-hello-world/
+├── algorithms-sorting-intro/
+├── data-structures-linked-list/
+└── README.md
+```
+
+This approach replaces complex nested paths (e.g., `week_1/aufgabe_1/sub_task/`) with clear, descriptive directory names that directly reflect assignment content.
+
+For detailed implementation, see [STUDENT_TEMPLATE_DIRECTORY_STRUCTURE.md](./STUDENT_TEMPLATE_DIRECTORY_STRUCTURE.md).
+
 ---
 
 ## 🗄️ MinIO Object Storage

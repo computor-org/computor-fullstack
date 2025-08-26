@@ -15,7 +15,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilder
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,
@@ -26,7 +26,7 @@ from ctutor_backend.interface.deployments import (
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.course import CourseFamily, Course
 from ctutor_backend.services.git_service import GitService
-from sqlalchemy_utils import Ltree
+from ..custom_types import Ltree
 
 
 def test_course_family_refresh_fix():
@@ -83,7 +83,7 @@ def test_course_family_refresh_fix():
     mock_db_session.refresh = Mock()
     
     # Create builder instance with mocked GitLab
-    builder = GitLabBuilderNew.__new__(GitLabBuilderNew)  # Create without __init__
+    builder = GitLabBuilder.__new__(GitLabBuilder)  # Create without __init__
     builder.db = mock_db_session
     builder.gitlab = mock_gitlab
     builder.git_service = mock_git_service

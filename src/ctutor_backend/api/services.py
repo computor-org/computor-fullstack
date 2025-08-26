@@ -18,7 +18,7 @@ services_router = APIRouter()
 @services_router.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def service_proxy(permissions: Annotated[Principal, Depends(get_current_permissions)], service: str, path: str, request: Request, db: Session = Depends(get_db)):
 
-    target_roles = ["_maintainer", "_owner", "_study_assistant"]
+    target_roles = ["_maintainer", "_owner", "_tutor"]
     result = db.query(func.count(CourseMember.course_role_id)) \
         .filter(CourseMember.user_id == permissions.user_id, CourseMember.course_role_id.in_(target_roles)) \
         .scalar()

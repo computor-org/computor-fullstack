@@ -24,7 +24,6 @@ from .temporal_examples import (
 )
 from .temporal_student_testing import (
     StudentTestingWorkflow,
-    SubmissionProcessingWorkflow,
     clone_repository_activity,
     execute_tests_activity,
     commit_test_results_activity
@@ -39,9 +38,22 @@ from .temporal_hierarchy_management import (
     CreateOrganizationWorkflow,
     CreateCourseFamilyWorkflow,
     CreateCourseWorkflow,
+    DeployComputorHierarchyWorkflow,
     create_organization_activity,
     create_course_family_activity,
-    create_course_activity
+    create_course_activity,
+    create_course_content_types_activity
+)
+from .temporal_student_template_v2 import (
+    GenerateStudentTemplateWorkflowV2,
+    generate_student_template_v2,
+    generate_student_and_assignments_repositories,
+    generate_assignments_repository
+)
+from .temporal_student_repository import (
+    StudentRepositoryCreationWorkflow,
+    create_student_repository,
+    create_team_repository
 )
 
 
@@ -73,12 +85,15 @@ class TemporalWorker:
             ExampleDataProcessingWorkflow,
             ExampleErrorHandlingWorkflow,
             StudentTestingWorkflow,
-            SubmissionProcessingWorkflow,
             ReleaseStudentsWorkflow,
             ReleaseCourseWorkflow,
             CreateOrganizationWorkflow,
             CreateCourseFamilyWorkflow,
             CreateCourseWorkflow,
+            DeployComputorHierarchyWorkflow,
+            # DeployExamplesToCourseWorkflow,  # Deprecated - removed
+            GenerateStudentTemplateWorkflowV2,
+            StudentRepositoryCreationWorkflow,  # Student repository forking
         ]
         
         activities = [
@@ -92,6 +107,12 @@ class TemporalWorker:
             create_organization_activity,
             create_course_family_activity,
             create_course_activity,
+            create_course_content_types_activity,
+            generate_student_template_v2,  # Original version
+            generate_student_and_assignments_repositories,  # New dual-repo version
+            generate_assignments_repository,  # Assignments-only version
+            create_student_repository,  # Fork student-template for individual student
+            create_team_repository,  # Fork student-template for team
         ]
         
         # Create a worker for each task queue

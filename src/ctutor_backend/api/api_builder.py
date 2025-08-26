@@ -49,16 +49,16 @@ class CrudRouter:
     def get(self):
         async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)) -> self.dto.get:
             # Check cache first
-            cache_key = f"{self.dto.model.__tablename__}:get:{permissions.user_id}:{id}"
-            cached_result = await cache.get(cache_key)
+            # cache_key = f"{self.dto.model.__tablename__}:get:{permissions.user_id}:{id}"
+            # cached_result = await cache.get(cache_key)
             
-            if cached_result:
-                return self.dto.get.model_validate_json(cached_result)
+            # if cached_result:
+            #     return self.dto.get.model_validate_json(cached_result)
             
             result = await get_id_db(permissions, db, id, self.dto)
             
-            # Cache the result
-            await cache.set(cache_key, result.model_dump_json(), ttl=self.dto.cache_ttl)
+            # # Cache the result
+            # await cache.set(cache_key, result.model_dump_json(), ttl=self.dto.cache_ttl)
             
             return result
         return route
@@ -66,25 +66,25 @@ class CrudRouter:
     def list(self):
         async def route(permissions: Annotated[Principal, Depends(get_current_permissions)], cache: Annotated[BaseCache, Depends(get_redis_client)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
             # Generate cache key based on params and user permissions
-            import hashlib
-            params_hash = hashlib.sha256(params.model_dump_json(exclude_none=True).encode()).hexdigest()
-            cache_key = f"{self.dto.model.__tablename__}:list:{permissions.user_id}:{params_hash}"
+            # import hashlib
+            # params_hash = hashlib.sha256(params.model_dump_json(exclude_none=True).encode()).hexdigest()
+            # cache_key = f"{self.dto.model.__tablename__}:list:{permissions.user_id}:{params_hash}"
             
-            cached_result = await cache.get(cache_key)
-            if cached_result:
-                cached_data = cached_result
-                response.headers["X-Total-Count"] = str(cached_data.get("total", 0))
-                return [self.dto.list.model_validate(item) for item in cached_data.get("items", [])]
+            # cached_result = await cache.get(cache_key)
+            # if cached_result:
+            #     cached_data = cached_result
+            #     response.headers["X-Total-Count"] = str(cached_data.get("total", 0))
+            #     return [self.dto.list.model_validate(item) for item in cached_data.get("items", [])]
             
             list_result, total = await list_db(permissions, db, params, self.dto)
             response.headers["X-Total-Count"] = str(total)
             
             # Cache the result
-            cache_data = {
-                "items": [item.model_dump(mode='json') for item in list_result],
-                "total": total
-            }
-            await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)
+            # cache_data = {
+            #     "items": [item.model_dump(mode='json') for item in list_result],
+            #     "total": total
+            # }
+            # await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)
             
             return list_result
         return route
@@ -105,15 +105,17 @@ class CrudRouter:
     def delete(self):
         async def route(background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], id: UUID | str, cache: Annotated[BaseCache, Depends(get_redis_client)], db: Session = Depends(get_db)):
 
+            entity_deleted = None
             if len(self.on_deleted) > 0:
-
                 entity_deleted = await get_id_db(permissions, db, id, self.dto)
 
-                # Clear related cache entries
+            # Clear related cache entries
             await self._clear_entity_cache(cache, self.dto.model.__tablename__)
 
-            for task in self.on_created:
-                background_tasks.add_task(task, entity_deleted, db, permissions)
+            # Run on_deleted tasks (not on_created)
+            for task in self.on_deleted:
+                if entity_deleted:
+                    background_tasks.add_task(task, entity_deleted, db, permissions)
 
             return delete_db(permissions, db, id, self.dto.model)
 

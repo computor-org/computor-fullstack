@@ -5,7 +5,7 @@ from ctutor_backend.interface.course_families import CourseFamilyGet
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.model.course import Course
-from sqlalchemy_utils import Ltree
+from ..custom_types import Ltree
 
 class CourseProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None
@@ -27,7 +27,6 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
     path: str
     course_family_id: str
-    version_identifier: Optional[str] = None
     properties: Optional[CourseProperties] = None
 
 class CourseGet(BaseEntityGet,CourseCreate):
@@ -37,7 +36,6 @@ class CourseGet(BaseEntityGet,CourseCreate):
     path: str
     course_family_id: str
     organization_id: str
-    version_identifier: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
 
     course_family: Optional[CourseFamilyGet] = None
@@ -54,7 +52,6 @@ class CourseList(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     path: str
     properties: Optional[CoursePropertiesGet] = None
 
@@ -68,7 +65,6 @@ class CourseList(BaseModel):
 class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    version_identifier: Optional[str] = None
     properties: Optional[CourseProperties] = None
 
 class CourseQuery(ListQuery):
@@ -78,7 +74,6 @@ class CourseQuery(ListQuery):
     path: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
 
@@ -95,8 +90,6 @@ def course_search(db: Session, query, params: Optional[CourseQuery]):
         query = query.filter(Course.course_family_id == params.course_family_id)
     if params.organization_id != None:
         query = query.filter(Course.organization_id == params.organization_id)
-    if params.version_identifier != None:
-        query = query.filter(Course.version_identifier == params.version_identifier)
     if params.provider_url != None:
          query = query.filter(Course.properties["gitlab"].op("->>")("url") == params.provider_url)
     if params.full_path != None:

@@ -140,47 +140,29 @@ const CoursesPage: React.FC = () => {
     {
       id: 'title',
       label: 'Course',
-      render: (value, row) => (
-        <Box>
-          <Typography variant="subtitle2">
-            {value || 'Untitled Course'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {row.path}
-          </Typography>
-        </Box>
+      render: (value) => (
+        <Typography variant="subtitle2">
+          {value || 'Untitled Course'}
+        </Typography>
       ),
     },
     {
-      id: 'course_family',
-      label: 'Course Family',
-      accessor: (row) => row.course_family?.title || '-',
-      render: (value, row) => (
+      id: 'path',
+      label: 'Path',
+      render: (value) => (
+        <Typography variant="body2" color="text.secondary">
+          {value}
+        </Typography>
+      ),
+    },
+    {
+      id: 'course_family_id',
+      label: 'Course Family ID',
+      render: (value) => (
         <Stack direction="row" spacing={1} alignItems="center">
           <SchoolIcon fontSize="small" color="action" />
-          <Box>
-            <Typography variant="body2">{value}</Typography>
-            {row.course_family?.organization && (
-              <Typography variant="caption" color="text.secondary">
-                {row.course_family.organization.title}
-              </Typography>
-            )}
-          </Box>
+          <Typography variant="body2">{value}</Typography>
         </Stack>
-      ),
-    },
-    {
-      id: 'description',
-      label: 'Description',
-      render: (value) => (
-        <Typography variant="body2" sx={{ 
-          maxWidth: 300, 
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap' 
-        }}>
-          {value || '-'}
-        </Typography>
       ),
     },
     {

@@ -28,6 +28,12 @@ from . import temporal_system
 # Import Temporal student testing tasks to auto-register
 from . import temporal_student_testing
 
+# Import Temporal student template tasks to auto-register
+from . import temporal_student_template_v2
+
+# Import Temporal student repository tasks to auto-register
+from . import temporal_student_repository
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

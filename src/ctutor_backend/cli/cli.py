@@ -10,6 +10,7 @@ from .test import run_test
 from .admin import admin
 from .worker import worker
 from .generate_types import generate_types
+from .deployment import deployment
 
 @click.group()
 def cli():
@@ -26,6 +27,7 @@ cli.add_command(admin,"admin")
 cli.add_command(template,"templates")
 cli.add_command(worker,"worker")
 cli.add_command(generate_types,"generate-types")
+cli.add_command(deployment,"deployment")
 # cli.add_command(experiment_1,"exp")
 
 if __name__ == '__main__':

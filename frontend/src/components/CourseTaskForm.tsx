@@ -16,7 +16,7 @@ import {
   LinearProgress,
 } from '@mui/material';
 import { CourseGet, CourseCreate, CourseUpdate, CourseFamilyGet } from '../types/generated/courses';
-import { HierarchyTaskService } from '../services/hierarchyTaskService';
+import { HierarchyTaskService, TaskStatusMapper } from '../services/hierarchyTaskService';
 import { apiClient } from '../services/apiClient';
 
 interface CourseTaskFormProps {
@@ -36,6 +36,8 @@ export interface CourseTaskFormHandle {
   taskProgress: number;
   taskError: string | null;
   taskId: string | null;
+  createdEntityId: string | null;
+  createdEntityName: string | null;
   handleSubmit: (e?: React.FormEvent) => void;
 }
 
@@ -68,6 +70,8 @@ const CourseTaskForm = React.forwardRef<CourseTaskFormHandle, CourseTaskFormProp
   const [taskProgress, setTaskProgress] = useState(0);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [createdEntityId, setCreatedEntityId] = useState<string | null>(null);
+  const [createdEntityName, setCreatedEntityName] = useState<string | null>(null);
 
   // Load course families for dropdown
   useEffect(() => {
@@ -126,24 +130,31 @@ const CourseTaskForm = React.forwardRef<CourseTaskFormHandle, CourseTaskFormProp
       try {
         const status = await HierarchyTaskService.getTaskStatus(taskId);
         
-        if (status.status === 'COMPLETED') {
+        if (TaskStatusMapper.isSuccess(status.status)) {
           setTaskStatus('completed');
           setTaskProgress(100);
           setIsMonitoring(false);
           
-          if (status.result?.course_id) {
-            if (onTaskComplete) {
-              onTaskComplete(status.result.course_id);
+          // Fetch the full result when task completes
+          try {
+            const resultResponse = await HierarchyTaskService.getTaskResult(taskId);
+            if (resultResponse.result?.result?.course_id) {
+              setCreatedEntityId(resultResponse.result.result.course_id);
+              setCreatedEntityName(resultResponse.result.result?.name || formData.title);
             }
+          } catch (error) {
+            console.error('Error fetching task result:', error);
+            // Fallback to formData title if result fetch fails
+            setCreatedEntityName(formData.title);
           }
           
           return true;
-        } else if (status.status === 'FAILED') {
+        } else if (TaskStatusMapper.isFailed(status.status)) {
           setTaskStatus('failed');
           setTaskError(status.message || 'Task failed');
           setIsMonitoring(false);
           return true;
-        } else if (status.status === 'RUNNING') {
+        } else if (TaskStatusMapper.isRunning(status.status)) {
           if (status.message) {
             const progressMatch = status.message.match(/progress: (\d+)/);
             if (progressMatch) {
@@ -229,8 +240,10 @@ const CourseTaskForm = React.forwardRef<CourseTaskFormHandle, CourseTaskFormProp
     taskProgress,
     taskError,
     taskId,
+    createdEntityId,
+    createdEntityName,
     handleSubmit,
-  }), [isProcessing, taskStatus, taskProgress, taskError, taskId, handleSubmit]);
+  }), [isProcessing, taskStatus, taskProgress, taskError, taskId, createdEntityId, createdEntityName, handleSubmit]);
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
@@ -279,8 +292,23 @@ const CourseTaskForm = React.forwardRef<CourseTaskFormHandle, CourseTaskFormProp
             </Alert>
           )}
           {taskStatus === 'completed' && (
-            <Alert severity="success">
-              Course created successfully!
+            <Alert 
+              severity="success" 
+              action={
+                createdEntityId && (
+                  <Button 
+                    color="inherit" 
+                    size="small"
+                    variant="outlined"
+                    onClick={() => window.open(`/admin/courses/${createdEntityId}`, '_blank')}
+                    sx={{ ml: 1 }}
+                  >
+                    View Course
+                  </Button>
+                )
+              }
+            >
+              Course "{createdEntityName || 'Unnamed'}" created successfully!
             </Alert>
           )}
         </Box>

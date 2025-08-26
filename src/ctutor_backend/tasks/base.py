@@ -30,7 +30,7 @@ class TaskResult(BaseModel):
     finished_at: Optional[datetime] = None
     progress: Optional[Dict[str, Any]] = None
     
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)
 
 
 class BaseTask(ABC):
@@ -113,6 +113,7 @@ class TaskSubmission(BaseModel):
     task_name: str
     parameters: Dict[str, Any] = {}
     queue: str = "computor-tasks"  # Task queue name
+    workflow_id: Optional[str] = None  # Custom workflow ID (if not provided, will be auto-generated)
     delay: Optional[int] = None  # Delay in seconds before execution
     
     
@@ -144,4 +145,4 @@ class TaskInfo(BaseModel):
     execution_time: Optional[datetime] = None
     history_length: Optional[int] = None
     
-    model_config = ConfigDict(use_enum_values=True)
+    model_config = ConfigDict(use_enum_values=True, arbitrary_types_allowed=True)

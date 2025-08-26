@@ -10,9 +10,8 @@ from ctutor_backend.api.permissions import check_permissions
 from ctutor_backend.interface.filter import apply_filters
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.base import EntityInterface, ListQuery
-from sqlalchemy_utils import Ltree
 from sqlalchemy.inspection import inspect
-from sqlalchemy_utils import Ltree, LtreeType
+from ..custom_types import Ltree, LtreeType
 from sqlalchemy.exc import StatementError
 
 async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_type: Any, response_type: BaseModel, post_create: Any = None):
@@ -45,10 +44,27 @@ async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_t
         response = response_type.model_validate(db_item,from_attributes=True)
 
         if post_create != None:
-            post_create(db_item, db)
+            import asyncio
+            if asyncio.iscoroutinefunction(post_create):
+                await post_create(db_item, db)
+            else:
+                post_create(db_item, db)
 
         return response
-    #except IntegrityError as e:
+    except exc.IntegrityError as e:
+        db.rollback()
+        # Just provide a cleaner version of the database error without hardcoding constraint names
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        # Try to extract just the first line and clean it up a bit
+        if 'DETAIL:' in error_msg:
+            # Include the DETAIL part which often has useful info
+            main_error = error_msg.split('\n')[0]
+            detail_part = error_msg.split('DETAIL:')[1].split('\n')[0].strip()
+            clean_msg = f"{main_error}. {detail_part}"
+        else:
+            clean_msg = error_msg.split('\n')[0] if '\n' in error_msg else error_msg
+        raise BadRequestException(detail=clean_msg)
+            
     except Exception as e:
         print(e.args)
         db.rollback()
@@ -104,7 +120,6 @@ async def list_db(permissions: Principal, db: Session, params: ListQuery, interf
     return query_result, total
 
 def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity: Any, db_type: Any, response_type: BaseModel, db_item = None, post_update: Any = None):
-
     if id != None:
 
         query = check_permissions(permissions,db_type,"update",db)
@@ -122,7 +137,12 @@ def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity
 
     old_db_item = response_type(**db_item.__dict__)
 
-    # TODO: manage Ltree patches
+    # Handle Ltree columns specially
+    mapper = inspect(db_type)
+    for column in mapper.columns.keys():
+        if isinstance(mapper.columns[column].type, LtreeType):
+            if column in entity.keys() and entity[column] != None and isinstance(entity[column], str):
+                entity[column] = Ltree(entity[column])
 
     try:
         for key in entity.keys():
@@ -139,8 +159,12 @@ def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity
 
     except Exception as e:
         db.rollback()
-        print(e.args)
-        raise BadRequestException(detail=e.args)
+        print(f"Exception in update_db: {e}")
+        print(f"Exception type: {type(e)}")
+        print(f"Exception args: {e.args}")
+        import traceback
+        traceback.print_exc()
+        raise BadRequestException(detail=str(e))
 
 def delete_db(permissions: Principal, db: Session, id: UUID | str, db_type: Any):
 

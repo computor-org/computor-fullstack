@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.326009
+ * Generated on: 2025-08-19T09:18:24.846500
 
  * Category: Courses
 
@@ -10,7 +10,7 @@
 
 
 
-import type { ComputorDeploymentConfig, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet } from './common';
+import type { ComputorDeploymentConfig, CourseMemberGitLabConfig, DeploymentHistory, GitLabConfig, GitLabConfigGet, GitLabCredentials } from './common';
 
 import type { OrganizationGet } from './organizations';
 
@@ -58,7 +58,6 @@ export interface CourseCreate {
   description?: string | null;
   path: string;
   course_family_id: string;
-  version_identifier?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -68,7 +67,6 @@ export interface CourseGet {
   description?: string | null;
   path: string;
   course_family_id: string;
-  version_identifier?: string | null;
   properties?: CoursePropertiesGet | null;
   /** Creation timestamp */
   created_at?: string | null;
@@ -85,7 +83,6 @@ export interface CourseList {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   properties?: CoursePropertiesGet | null;
 }
@@ -93,7 +90,6 @@ export interface CourseList {
 export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
-  version_identifier?: string | null;
   properties?: CourseProperties | null;
 }
 
@@ -290,7 +286,6 @@ export interface CourseContentStudentGet {
   course_id: string;
   course_content_type_id: string;
   course_content_kind_id: string;
-  version_identifier: string;
   position: number;
   max_group_size?: number | null;
   submitted?: boolean | null;
@@ -306,7 +301,6 @@ export interface CourseContentStudentList {
   course_id: string;
   course_content_type_id: string;
   course_content_kind_id: string;
-  version_identifier: string;
   position: number;
   max_group_size?: number | null;
   submitted?: boolean | null;
@@ -334,7 +328,6 @@ export interface CourseStudentGet {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   course_content_types: CourseContentTypeGet[];
   path: string;
   repository: CourseStudentRepository;
@@ -345,7 +338,6 @@ export interface CourseStudentList {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   course_content_types: CourseContentTypeList[];
   repository: CourseStudentRepository;
@@ -385,6 +377,54 @@ export interface CourseContentKindList {
 export interface CourseContentKindUpdate {
   title?: string | null;
   description?: string | null;
+}
+
+/**
+ * DTO for releasing a course.
+ */
+export interface ReleaseCourseCreate {
+  course_id?: string | null;
+  gitlab_url?: string | null;
+  descendants?: boolean | null;
+  deployment?: ComputorDeploymentConfig | null;
+}
+
+/**
+ * DTO for releasing course content.
+ */
+export interface ReleaseCourseContentCreate {
+  release_dir?: string | null;
+  course_id?: string | null;
+  gitlab_url?: string | null;
+  ascendants?: boolean;
+  descendants?: boolean;
+  deployment?: ComputorDeploymentConfig | null;
+}
+
+/**
+ * DTO for updating course release.
+ */
+export interface CourseReleaseUpdate {
+  course?: CourseUpdate | null;
+  course_content_types: CourseContentTypeCreate[];
+}
+
+/**
+ * Request to create a course family via Temporal workflow.
+ */
+export interface CourseFamilyTaskRequest {
+  course_family: Record<string, any>;
+  organization_id: string;
+  gitlab?: GitLabCredentials | null;
+}
+
+/**
+ * Request to create a course via Temporal workflow.
+ */
+export interface CourseTaskRequest {
+  course: Record<string, any>;
+  course_family_id: string;
+  gitlab?: GitLabCredentials | null;
 }
 
 export interface CourseFamilyProperties {
@@ -436,10 +476,14 @@ export interface CourseFamilyUpdate {
 
 export interface CourseContentProperties {
   gitlab?: GitLabConfig | null;
+  /** Complete deployment history for this content */
+  deployment_history?: DeploymentHistory | null;
 }
 
 export interface CourseContentPropertiesGet {
   gitlab?: GitLabConfigGet | null;
+  /** Complete deployment history for this content */
+  deployment_history?: DeploymentHistory | null;
 }
 
 export interface CourseContentCreate {
@@ -449,12 +493,15 @@ export interface CourseContentCreate {
   course_id: string;
   course_content_type_id: string;
   properties?: CourseContentProperties | null;
-  version_identifier: string;
   position?: number;
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
   execution_backend_id?: string | null;
+  example_id?: string | null;
+  example_version?: string | null;
+  deployment_status?: string | null;
+  deployed_at?: string | null;
 }
 
 export interface CourseContentGet {
@@ -473,12 +520,15 @@ export interface CourseContentGet {
   course_content_type_id: string;
   course_content_kind_id: string;
   properties?: CourseContentPropertiesGet | null;
-  version_identifier: string;
   position: number;
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
   execution_backend_id?: string | null;
+  example_id?: string | null;
+  example_version?: string | null;
+  deployment_status?: string | null;
+  deployed_at?: string | null;
   course_content_type?: CourseContentTypeGet | null;
 }
 
@@ -489,20 +539,24 @@ export interface CourseContentList {
   course_id: string;
   course_content_type_id: string;
   course_content_kind_id: string;
-  version_identifier: string;
   position: number;
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
   execution_backend_id?: string | null;
+  example_id?: string | null;
+  example_version?: string | null;
+  deployment_status?: string | null;
+  deployed_at?: string | null;
+  course_content_type?: CourseContentTypeGet | null;
 }
 
 export interface CourseContentUpdate {
   path?: string | null;
   title?: string | null;
   description?: string | null;
+  course_content_type_id?: string | null;
   properties?: CourseContentProperties | null;
-  version_identifier?: string | null;
   position?: number | null;
   max_group_size?: number | null;
   max_test_runs?: number | null;
@@ -559,7 +613,6 @@ export interface CourseTutorGet {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   repository: CourseTutorRepository;
 }
@@ -569,7 +622,6 @@ export interface CourseTutorList {
   title?: string | null;
   course_family_id?: string | null;
   organization_id?: string | null;
-  version_identifier?: string | null;
   path: string;
   repository: CourseTutorRepository;
 }
@@ -581,33 +633,34 @@ export interface CourseSignupResponse {
   repository: string;
 }
 
-export interface ReleaseCourseCreate {
-  course_id?: string | null;
-  gitlab_url?: string | null;
-  descendants?: boolean | null;
-  deployment?: ComputorDeploymentConfig | null;
-}
-
-export interface ReleaseCourseContentCreate {
-  release_dir?: string | null;
-  course_id?: string | null;
-  gitlab_url?: string | null;
-  ascendants?: boolean;
-  descendants?: boolean;
-  release_dir_list?: string[];
-}
-
-export interface CourseReleaseUpdate {
-  course?: CourseUpdate | null;
-  course_content_types: CourseContentTypeCreate[];
-}
-
 export interface CourseContentMessage {
   body: string;
 }
 
 export interface CourseContentFileQuery {
   filename?: string | null;
+}
+
+/**
+ * Request to assign an example to course content.
+ */
+export interface AssignExampleRequest {
+  /** UUID of the Example to assign */
+  example_id: string;
+  /** Version to assign (default: latest) */
+  example_version?: string;
+}
+
+/**
+ * Response for course content with example information.
+ */
+export interface CourseContentExampleResponse {
+  id: string;
+  path: string;
+  title: string;
+  example?: Record<string, any> | null;
+  /** pending_release, released, modified */
+  deployment_status: string;
 }
 
 export interface CourseMemberCommentTutorCreate {

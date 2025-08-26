@@ -10,6 +10,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import CheckConstraint, UniqueConstraint
+try:
+    from ..custom_types import LtreeType
+except ImportError:
+    # Fallback for Alembic context
+    from ctutor_backend.custom_types import LtreeType
 
 from .base import Base
 
@@ -43,12 +48,6 @@ class ExampleRepository(Base):
     default_version = Column(String(100), nullable=True, comment="Default version to sync from (branch for Git, optional for MinIO)")
     
     # Access control
-    visibility = Column(
-        String(20), 
-        nullable=False, 
-        default="private",
-        comment="Repository visibility: public, private, or restricted"
-    )
     organization_id = Column(
         UUID(as_uuid=True), 
         ForeignKey("organization.id"),
@@ -70,10 +69,6 @@ class ExampleRepository(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "visibility IN ('public', 'private', 'restricted')",
-            name="check_visibility"
-        ),
-        CheckConstraint(
             "source_type IN ('git', 'minio', 'github', 's3', 'gitlab')",
             name="check_source_type"
         ),
@@ -83,24 +78,9 @@ class ExampleRepository(Base):
         return f"<ExampleRepository(id={self.id}, name='{self.name}')>"
     
     @property
-    def is_public(self) -> bool:
-        """Check if repository is publicly accessible."""
-        return self.visibility == "public"
-    
-    @property
-    def is_private(self) -> bool:
-        """Check if repository is private."""
-        return self.visibility == "private"
-    
-    @property
-    def is_restricted(self) -> bool:
-        """Check if repository is restricted to specific organizations."""
-        return self.visibility == "restricted"
-    
-    @property
     def needs_credentials(self) -> bool:
         """Check if repository requires access credentials."""
-        return not self.is_public and self.access_credentials is not None
+        return self.access_credentials is not None
 
 
 class Example(Base):
@@ -131,16 +111,20 @@ class Example(Base):
         comment="Name of the directory containing this example (e.g., 'hello-world')"
     )
     
+    # Hierarchical identifier
+    identifier = Column(
+        LtreeType,
+        nullable=False,
+        comment="Hierarchical identifier using dots as separators"
+    )
+    
     # Example metadata
     title = Column(String(255), nullable=False, comment="Human-readable title of the example")
     description = Column(Text, comment="Detailed description of the example")
-    subject = Column(String(50), comment="Primary programming language (e.g., 'python', 'java')")
     
     # Organization and categorization
     category = Column(String(100), comment="Category for grouping examples")
     tags = Column(ARRAY(String), nullable=False, default=[], comment="Tags for searching and filtering")
-    
-    version_identifier = Column(String(64), comment="Version Identifier (e.g. hash) of example directory contents for change detection")
     
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -162,14 +146,19 @@ class Example(Base):
     # Dependency relationships
     dependencies = relationship("ExampleDependency", foreign_keys="ExampleDependency.example_id", back_populates="example")
     
+    # Deployment tracking
+    
     # Constraints
     __table_args__ = (
         # Unique constraint: one example per directory per repository
         UniqueConstraint("example_repository_id", "directory", name="unique_example_per_directory"),
         
+        # Unique constraint: one example per identifier per repository
+        UniqueConstraint("example_repository_id", "identifier", name="unique_example_per_identifier"),
+        
         # Check constraints
         CheckConstraint(
-            "directory ~ '^[a-zA-Z0-9_-]+$'",
+            "directory ~ '^[a-zA-Z0-9._-]+$'",
             name="check_directory_format"
         ),
     )
@@ -181,6 +170,49 @@ class Example(Base):
     def full_path(self) -> str:
         """Get the full path within the repository."""
         return self.directory
+    
+    def get_execution_backend_slug(self, version_tag: str = None) -> str:
+        """
+        Extract the execution backend slug from the meta_yaml of a specific version.
+        
+        Args:
+            version_tag: Specific version to get backend from. If None, uses latest version.
+            
+        Returns:
+            Execution backend slug if found, None otherwise
+        """
+        import yaml
+        
+        # Find the appropriate version
+        version = None
+        if version_tag:
+            # Find specific version
+            for v in self.versions:
+                if v.version_tag == version_tag:
+                    version = v
+                    break
+        else:
+            # Get latest version (highest version number)
+            if self.versions:
+                version = max(self.versions, key=lambda v: v.version_number)
+        
+        if not version or not version.meta_yaml:
+            return None
+        
+        try:
+            # Parse the meta.yaml content
+            meta_data = yaml.safe_load(version.meta_yaml)
+            
+            # Navigate to properties.executionBackend.slug
+            properties = meta_data.get('properties', {})
+            if properties:
+                execution_backend = properties.get('executionBackend', {})
+                if execution_backend and isinstance(execution_backend, dict):
+                    return execution_backend.get('slug')
+            
+            return None
+        except (yaml.YAMLError, AttributeError, TypeError):
+            return None
 
 
 class ExampleVersion(Base):
@@ -222,6 +254,18 @@ class ExampleVersion(Base):
         comment="Path in storage system (MinIO path, S3 key, etc.)"
     )
     
+    # Content metadata
+    meta_yaml = Column(
+        Text,
+        nullable=False,
+        comment="Content of meta.yaml file for this version"
+    )
+    test_yaml = Column(
+        Text,
+        nullable=True,
+        comment="Content of test.yaml file for this version (optional)"
+    )
+    
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     created_by = Column(UUID(as_uuid=True), ForeignKey("user.id"), comment="User who created this version")
@@ -229,6 +273,8 @@ class ExampleVersion(Base):
     # Relationships
     example = relationship("Example", back_populates="versions")
     created_by_user = relationship("User", foreign_keys=[created_by])
+    
+    # Deployment tracking
     
     # Constraints
     __table_args__ = (
@@ -242,10 +288,10 @@ class ExampleVersion(Base):
 
 class ExampleDependency(Base):
     """
-    Dependency relationship between examples.
+    Dependency relationship between examples with version constraints.
     
-    Tracks when one example depends on another.
-    Uses a simplified model where dependencies always refer to the current version.
+    Tracks when one example depends on another with optional version constraints.
+    Supports semantic versioning constraints like '>=1.2.0', '^2.1.0', '~1.3.0', etc.
     """
     
     __tablename__ = "example_dependency"
@@ -267,6 +313,13 @@ class ExampleDependency(Base):
         comment="Example that this depends on"
     )
     
+    # Version constraint
+    version_constraint = Column(
+        String(100),
+        nullable=True,
+        comment="Version constraint (e.g., '>=1.2.0', '^2.1.0', '~1.3.0'). NULL means latest version."
+    )
+    
     # Tracking
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     
@@ -283,4 +336,5 @@ class ExampleDependency(Base):
     )
     
     def __repr__(self):
-        return f"<ExampleDependency(example_id={self.example_id}, depends_id={self.depends_id})>"
+        constraint = f", version_constraint='{self.version_constraint}'" if self.version_constraint else ""
+        return f"<ExampleDependency(example_id={self.example_id}, depends_id={self.depends_id}{constraint})>"

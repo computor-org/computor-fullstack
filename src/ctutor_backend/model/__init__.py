@@ -13,6 +13,7 @@ from .course import (
     CourseMember,
     CourseSubmissionGroup,
     CourseSubmissionGroupMember,
+    CourseSubmissionGroupGrading,
     CourseMemberComment
 )
 from .execution import ExecutionBackend
@@ -20,7 +21,7 @@ from .result import Result
 from .role import Role, RoleClaim, UserRole
 from .group import Group, GroupClaim, UserGroup
 from .message import Message, MessageRead
-from .example import Example, ExampleRepository
+from .example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 
 # Import all models to ensure relationships are properly set up
 from . import auth, organization, role, group, execution, course, result, message, example
@@ -48,6 +49,7 @@ __all__ = [
     'CourseMember',
     'CourseSubmissionGroup',
     'CourseSubmissionGroupMember',
+    'CourseSubmissionGroupGrading',
     'CourseMemberComment',
     # Execution
     'ExecutionBackend',
@@ -66,5 +68,7 @@ __all__ = [
     'MessageRead',
     # Example models
     'ExampleRepository',
-    'Example'
+    'Example',
+    'ExampleVersion',
+    'ExampleDependency',
 ]

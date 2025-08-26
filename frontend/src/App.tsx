@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import { Settings, Login, Logout } from '@mui/icons-material';
 import Dashboard from './pages/Dashboard';
-import StudentsPage from './pages/StudentsPage';
 import CoursesPage from './pages/CoursesPage';
 import SSODebug from './pages/SSODebug';
 import Tasks from './pages/Tasks';
@@ -32,7 +31,10 @@ import CourseFamilyDetailPage from './pages/CourseFamilyDetailPage';
 import CourseFamilyEditPage from './pages/CourseFamilyEditPage';
 import CourseFamilyCreatePage from './pages/CourseFamilyCreatePage';
 import CourseCreatePage from './pages/CourseCreatePage';
+import CourseDetailPage from './pages/CourseDetailPage';
 import RolesPage from './pages/RolesPage';
+import ExamplesPage from './pages/ExamplesPage';
+import ExampleDetailPage from './pages/ExampleDetailPage';
 import Sidebar from './components/Sidebar';
 import SSOLoginModal from './components/SSOLoginModal';
 import SSOCallback from './components/SSOCallback';
@@ -217,10 +219,10 @@ function AuthenticatedAppContent() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/students" element={<StudentsPage />} />
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/admin/courses" element={<CoursesPage />} />
           <Route path="/admin/courses/create" element={<CourseCreatePage />} />
+          <Route path="/admin/courses/:id" element={<CourseDetailPage />} />
           <Route path="/admin/tasks" element={<Tasks />} />
           <Route path="/admin/tasks/:taskId" element={<TaskDetail />} />
           <Route path="/admin/users" element={<UsersPage />} />
@@ -235,8 +237,9 @@ function AuthenticatedAppContent() {
           <Route path="/admin/course-families/:id" element={<CourseFamilyDetailPage />} />
           <Route path="/admin/course-families/:id/edit" element={<CourseFamilyEditPage />} />
           <Route path="/admin/roles" element={<RolesPage />} />
+          <Route path="/admin/examples" element={<ExamplesPage />} />
+          <Route path="/admin/examples/:id" element={<ExampleDetailPage />} />
           <Route path="/course/:courseId" element={<Dashboard />} />
-          <Route path="/course/:courseId/students" element={<StudentsPage />} />
           <Route path="/admin/*" element={<Dashboard />} />
           <Route path="/debug/sso" element={<SSODebug />} />
         </Routes>

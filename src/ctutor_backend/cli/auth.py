@@ -1,6 +1,7 @@
 import os
 import click
 import yaml
+from functools import wraps
 from ctutor_backend.cli.config import CLIAuthConfig
 
 HOME_DIR = os.path.expanduser("~") or os.environ.get("HOME") or os.environ.get("USERPROFILE")
@@ -187,7 +188,7 @@ def login(auth_method,base_url,username,password,gitlab_host,gitlab_token):
 
 
 def authenticate(func):
-
+    @wraps(func)
     def wrapper(*args, **kwargs):
 
         file = os.path.join(CTUTOR_DIR,AUTH_FILE)

@@ -12,9 +12,7 @@ from temporalio.common import RetryPolicy
 
 from ctutor_backend.api.system import ReleaseStudentsCreate
 from ctutor_backend.api.utils import collect_sub_path_positions_if_meta_exists
-from ctutor_backend.generator.gitlab_builder import CodeabilityGitlabBuilder
 from ctutor_backend.interface.deployments import ApiConfig, ComputorDeploymentConfig, CodeabilityReleaseBuilder
-from ctutor_backend.interface.tests import Submission
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 

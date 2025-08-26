@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import EntityInterface, ListQuery
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from ctutor_backend.model.course import Course, CourseMember
-from sqlalchemy_utils import Ltree
+from ..custom_types import Ltree
 
 class CourseStudentRepository(BaseModel):
     provider_url: Optional[str] = None
@@ -15,7 +15,6 @@ class CourseStudentGet(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     course_content_types: list[CourseContentTypeGet]
     path: str
 
@@ -33,7 +32,6 @@ class CourseStudentList(BaseModel):
     title: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     path: str
     course_content_types: list[CourseContentTypeList]
 
@@ -53,7 +51,6 @@ class CourseStudentQuery(ListQuery):
     path: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
-    version_identifier: Optional[str] = None
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
     full_path_student: Optional[str] = None
@@ -71,8 +68,6 @@ def course_student_search(db: Session, query, params: Optional[CourseStudentQuer
         query = query.filter(Course.course_family_id == params.course_family_id)
     if params.organization_id != None:
         query = query.filter(Course.organization_id == params.organization_id)
-    if params.version_identifier != None:
-        query = query.filter(Course.version_identifier == params.version_identifier)
 
     if params.provider_url != None:
         query = query.filter(Course.properties["gitlab"].op("->>")("url") == params.provider_url)

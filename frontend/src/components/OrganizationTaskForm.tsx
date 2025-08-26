@@ -18,7 +18,7 @@ import {
   FormControlLabel,
 } from '@mui/material';
 import { OrganizationGet, OrganizationCreate, OrganizationUpdate } from '../types/generated/organizations';
-import { HierarchyTaskService } from '../services/hierarchyTaskService';
+import { HierarchyTaskService, TaskStatusMapper } from '../services/hierarchyTaskService';
 import { apiClient } from '../services/apiClient';
 
 interface OrganizationTaskFormProps {
@@ -37,6 +37,8 @@ export interface OrganizationTaskFormHandle {
   taskProgress: number;
   taskError: string | null;
   taskId: string | null;
+  createdEntityId: string | null;
+  createdEntityName: string | null;
   handleSubmit: (e?: React.FormEvent) => void;
 }
 
@@ -77,6 +79,8 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
   const [taskProgress, setTaskProgress] = useState(0);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [createdEntityId, setCreatedEntityId] = useState<string | null>(null);
+  const [createdEntityName, setCreatedEntityName] = useState<string | null>(null);
 
   useEffect(() => {
     if (organization && mode === 'edit') {
@@ -118,25 +122,36 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
       try {
         const status = await HierarchyTaskService.getTaskStatus(taskId);
         
-        if (status.status === 'COMPLETED') {
+        if (TaskStatusMapper.isSuccess(status.status)) {
           setTaskStatus('completed');
           setTaskProgress(100);
           setIsMonitoring(false);
           
-          // Extract organization ID from result
-          if (status.result?.organization_id) {
-            if (onTaskComplete) {
-              onTaskComplete(status.result.organization_id);
+          // Fetch the full result when task completes
+          try {
+            const resultResponse = await HierarchyTaskService.getTaskResult(taskId);
+            console.log('Organization task result:', resultResponse);
+            if (resultResponse.result?.result?.organization_id) {
+              console.log('Setting organization ID:', resultResponse.result.result.organization_id);
+              setCreatedEntityId(resultResponse.result.result.organization_id);
+              setCreatedEntityName(resultResponse.result.result?.name || formData.title);
+            } else {
+              console.log('No organization_id found in result');
+              setCreatedEntityName(formData.title);
             }
+          } catch (error) {
+            console.error('Error fetching task result:', error);
+            // Fallback to formData title if result fetch fails
+            setCreatedEntityName(formData.title);
           }
           
           return true;
-        } else if (status.status === 'FAILED') {
+        } else if (TaskStatusMapper.isFailed(status.status)) {
           setTaskStatus('failed');
           setTaskError(status.message || 'Task failed');
           setIsMonitoring(false);
           return true;
-        } else if (status.status === 'RUNNING') {
+        } else if (TaskStatusMapper.isRunning(status.status)) {
           // Update progress if available
           if (status.message) {
             const progressMatch = status.message.match(/progress: (\d+)/);
@@ -240,8 +255,10 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
     taskProgress,
     taskError,
     taskId,
+    createdEntityId,
+    createdEntityName,
     handleSubmit,
-  }), [isProcessing, taskStatus, taskProgress, taskError, taskId, handleSubmit]);
+  }), [isProcessing, taskStatus, taskProgress, taskError, taskId, createdEntityId, createdEntityName, handleSubmit]);
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
@@ -260,7 +277,7 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
         </Box>
       )}
 
-      {!hideStatusAlerts && taskStatus && taskStatus !== 'completed' && (
+      {!hideStatusAlerts && taskStatus && (
         <Box sx={{ mb: 2 }}>
           {taskStatus === 'submitting' && (
             <Alert severity="info">Submitting organization creation task...</Alert>
@@ -290,8 +307,23 @@ const OrganizationTaskForm = React.forwardRef<OrganizationTaskFormHandle, Organi
             </Alert>
           )}
           {taskStatus === 'completed' && (
-            <Alert severity="success">
-              Organization created successfully!
+            <Alert 
+              severity="success" 
+              action={
+                createdEntityId && (
+                  <Button 
+                    color="inherit" 
+                    size="small"
+                    variant="outlined"
+                    onClick={() => window.open(`/admin/organizations/${createdEntityId}`, '_blank')}
+                    sx={{ ml: 1 }}
+                  >
+                    View Organization
+                  </Button>
+                )
+              }
+            >
+              Organization "{createdEntityName || 'Unnamed'}" created successfully!
             </Alert>
           )}
         </Box>

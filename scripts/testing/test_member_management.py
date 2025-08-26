@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 env_file = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_file)
 
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilder
 from ctutor_backend.database import get_db
 from ctutor_backend.model.course import Course
 from sqlalchemy_utils import Ltree
@@ -56,7 +56,7 @@ async def main():
         return
     
     # Create builder
-    builder = GitLabBuilderNew(db=db, gitlab=gl, user_id="test-user")
+    builder = GitLabBuilder(db=db, gitlab=gl, user_id="test-user")
     
     try:
         # Find a test course

@@ -200,7 +200,11 @@ class TypeScriptGenerator:
                             # Check for BaseModel or classes that might inherit from it
                             if base_name in ['BaseModel', 'BaseDeployment', 'RepositoryConfig', 
                                            'GitLabConfigGet', 'BaseEntityList', 'BaseEntityGet',
-                                           'BaseEntityCreate', 'BaseEntityUpdate']:
+                                           'BaseEntityCreate', 'BaseEntityUpdate',
+                                           # Add deployment configuration classes
+                                           'OrganizationConfig', 'CourseFamilyConfig', 'CourseConfig',
+                                           'HierarchicalOrganizationConfig', 'HierarchicalCourseFamilyConfig',
+                                           'HierarchicalCourseConfig']:
                                 # Try to import the module and get the class
                                 try:
                                     # Convert file path to module path
@@ -263,6 +267,7 @@ class TypeScriptGenerator:
             'roles': [],
             'sso': [],
             'tasks': [],
+            'examples': [],
             'common': [],
         }
         
@@ -301,6 +306,8 @@ class TypeScriptGenerator:
                 category = 'sso'
             elif 'task' in module_name or 'task' in model_name or 'job' in model_name:
                 category = 'tasks'
+            elif 'example' in module_name or 'example' in model_name:
+                category = 'examples'
             
             model_categories[category].append(model)
             model_to_category[model.__name__] = category

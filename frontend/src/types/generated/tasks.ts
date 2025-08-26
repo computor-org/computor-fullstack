@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.332300
+ * Generated on: 2025-08-19T09:18:24.847500
 
  * Category: Tasks
 
@@ -23,4 +23,13 @@ export interface TestJob {
   reference?: Repository | null;
   test_number?: number;
   submission_number?: number;
+}
+
+/**
+ * Response with task ID for async operation.
+ */
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
 }

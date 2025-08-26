@@ -36,7 +36,7 @@ const OrganizationCreatePage: React.FC = () => {
   };
 
   const handleTaskComplete = (organizationId: string) => {
-    // Navigate to the newly created organization's detail page
+    // Navigate to the specific organization page after successful creation
     navigate(`/admin/organizations/${organizationId}`);
   };
 
@@ -54,23 +54,42 @@ const OrganizationCreatePage: React.FC = () => {
     taskProgress: 0,
     taskError: null as string | null,
     taskId: null as string | null,
+    createdEntityId: null as string | null,
+    createdEntityName: null as string | null,
   });
 
   // Update form state when ref changes
   useEffect(() => {
     const interval = setInterval(() => {
       if (formRef.current) {
-        setFormState({
+        const newState = {
           isProcessing: formRef.current.isProcessing,
           taskStatus: formRef.current.taskStatus,
           taskProgress: formRef.current.taskProgress,
           taskError: formRef.current.taskError,
           taskId: formRef.current.taskId,
-        });
+          createdEntityId: formRef.current.createdEntityId,
+          createdEntityName: formRef.current.createdEntityName,
+        };
+        
+        // Check if task just completed successfully
+        if (newState.taskStatus === 'completed' && 
+            formState.taskStatus !== 'completed') {
+          // Wait a bit for the entity ID to be available
+          if (newState.createdEntityId) {
+            handleTaskComplete(newState.createdEntityId);
+          } else {
+            // Fallback to list page if no ID available
+            console.log('No entity ID available, navigating to list');
+            navigate('/admin/organizations');
+          }
+        }
+        
+        setFormState(newState);
       }
     }, 100);
     return () => clearInterval(interval);
-  }, []);
+  }, [formState.taskStatus]);
 
   // Header content with alerts and progress indicators
   const headerContent = (
@@ -92,7 +111,7 @@ const OrganizationCreatePage: React.FC = () => {
               <LinearProgress sx={{ mt: 1 }} />
             </Alert>
           )}
-          {formState.isProcessing && formState.taskProgress > 0 && (
+          {formState.isProcessing && formState.taskProgress > 0 && formState.taskStatus !== 'failed' && (
             <Box>
               <Typography variant="body2" color="text.secondary">
                 Creating organization... {formState.taskProgress}%
@@ -112,7 +131,7 @@ const OrganizationCreatePage: React.FC = () => {
           )}
           {formState.taskStatus === 'completed' && (
             <Alert severity="success">
-              Organization created successfully!
+              Organization "{formState.createdEntityName || 'Unnamed'}" created successfully! Redirecting...
             </Alert>
           )}
         </>
@@ -135,7 +154,7 @@ const OrganizationCreatePage: React.FC = () => {
         onClick={handleSubmit}
         variant="contained"
         disabled={formState.isProcessing || formState.taskStatus === 'completed' || loading}
-        startIcon={formState.isProcessing ? <CircularProgress size={20} /> : null}
+        startIcon={formState.isProcessing && formState.taskStatus !== 'failed' ? <CircularProgress size={20} /> : null}
       >
         {formState.isProcessing ? 'Processing...' : 'Create Organization'}
       </Button>

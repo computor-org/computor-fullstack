@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-07-21T09:06:47.334683
+ * Generated on: 2025-08-19T09:18:24.850450
 
  * Category: Common
 
@@ -462,11 +462,103 @@ export interface GroupClaimUpdate {
   properties?: any | null;
 }
 
+/**
+ * DTO for creating a student.
+ */
+export interface StudentCreate {
+  user_id?: (string | string) | null;
+  user?: UserGet | null;
+  course_group_id?: (string | string) | null;
+  course_group_title?: string | null;
+  role?: string | null;
+}
+
+/**
+ * DTO for releasing multiple students.
+ */
+export interface ReleaseStudentsCreate {
+  students?: StudentCreate[];
+  course_id: any;
+}
+
+/**
+ * DTO for TUG student export data.
+ */
+export interface TUGStudentExport {
+  course_group_title: string;
+  family_name: string;
+  given_name: string;
+  matriculation_number: string;
+  created_at: string;
+}
+
+/**
+ * DTO for status query parameters.
+ */
+export interface StatusQuery {
+  course_id?: string | null;
+}
+
+/**
+ * GitLab connection credentials.
+ */
+export interface GitLabCredentials {
+  gitlab_url: string;
+  gitlab_token: string;
+}
+
+/**
+ * Represents a pending change for template generation.
+ */
+export interface PendingChange {
+  /** new, update, remove */
+  type: string;
+  content_id: string;
+  path: string;
+  title: string;
+}
+
+/**
+ * Response for pending changes check.
+ */
+export interface PendingChangesResponse {
+  total_changes: number;
+  changes: PendingChange[];
+  last_release?: Record<string, any> | null;
+}
+
+/**
+ * Request to generate student template.
+ */
+export interface GenerateTemplateRequest {
+  /** Custom commit message (optional) */
+  commit_message?: string | null;
+}
+
+/**
+ * Response for template generation request.
+ */
+export interface GenerateTemplateResponse {
+  workflow_id: string;
+  status?: string;
+  contents_to_process: number;
+}
+
 export interface GitCommit {
   hash: string;
   date: string;
   message: string;
   author: string;
+}
+
+/**
+ * Represents a test dependency with slug and version constraint.
+ */
+export interface TestDependency {
+  /** Hierarchical slug of the dependency example (e.g., 'physics.math.vectors') */
+  slug: string;
+  /** Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version. */
+  version?: string | null;
 }
 
 /**
@@ -518,6 +610,108 @@ export interface SubmissionGroupUpdate {
   max_group_size?: number | null;
   max_submissions?: number | null;
   status?: string | null;
+}
+
+/**
+ * Repository information for a submission group
+ */
+export interface SubmissionGroupRepository {
+  provider?: string;
+  url: string;
+  full_path: string;
+  clone_url?: string | null;
+  web_url?: string | null;
+}
+
+/**
+ * Basic member information
+ */
+export interface SubmissionGroupMemberBasic {
+  id: string;
+  user_id: string;
+  course_member_id: string;
+  username?: string | null;
+  full_name?: string | null;
+}
+
+/**
+ * Student's view of grading
+ */
+export interface SubmissionGroupGradingStudent {
+  id: string;
+  grading: number;
+  status?: string | null;
+  graded_by?: string | null;
+  created_at: string;
+}
+
+/**
+ * Student's view of a submission group
+ */
+export interface SubmissionGroupStudent {
+  id: string;
+  course_id: string;
+  course_content_id: string;
+  course_content_title?: string | null;
+  course_content_path?: string | null;
+  example_identifier?: string | null;
+  max_group_size: number;
+  current_group_size?: number;
+  members?: SubmissionGroupMemberBasic[];
+  repository?: SubmissionGroupRepository | null;
+  latest_grading?: SubmissionGroupGradingStudent | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Query parameters for student submission groups
+ */
+export interface SubmissionGroupStudentQuery {
+  course_id?: string | null;
+  course_content_id?: string | null;
+  has_repository?: boolean | null;
+  is_graded?: boolean | null;
+}
+
+/**
+ * Single deployment history action entry.
+ */
+export interface DeploymentHistoryAction {
+  /** Type of deployment action */
+  action: any;
+  /** When the action occurred */
+  timestamp: string;
+  /** Example ID involved in the action */
+  example_id?: string | null;
+  /** Example version at time of action */
+  example_version?: string | null;
+  /** Previous example ID (for reassignment) */
+  previous_example_id?: string | null;
+  /** Previous example version (for reassignment) */
+  previous_example_version?: string | null;
+  /** Reason for the action (optional) */
+  reason?: string | null;
+  /** User ID who performed the action */
+  performed_by?: string | null;
+  /** Temporal workflow ID if applicable */
+  workflow_id?: string | null;
+  /** Error message if action failed */
+  error_message?: string | null;
+}
+
+/**
+ * Complete deployment history for a CourseContent.
+ */
+export interface DeploymentHistory {
+  /** List of deployment actions in chronological order */
+  actions?: DeploymentHistoryAction[];
+  /** Timestamp of last successful deployment */
+  last_successful_deployment?: string | null;
+  /** Example ID of last successful deployment */
+  last_successful_example_id?: string | null;
+  /** Example version of last successful deployment */
+  last_successful_example_version?: string | null;
 }
 
 export interface SubmissionGroupMemberProperties {
@@ -727,7 +921,312 @@ export interface StorageUsageStats {
   last_updated: string;
 }
 
+/**
+ * Base class for all deployment configurations.
+ */
 export interface BaseDeployment {
+}
+
+/**
+ * User deployment configuration for creating users in the system.
+ */
+export interface UserDeployment {
+  /** User's given name */
+  given_name?: string | null;
+  /** User's family name */
+  family_name?: string | null;
+  /** User's email address */
+  email?: string | null;
+  /** User number/identifier (student ID) */
+  number?: string | null;
+  /** Unique username */
+  username?: string | null;
+  /** Type of user account (user or token) */
+  user_type?: string;
+  /** Additional user properties */
+  properties?: Record<string, any> | null;
+  /** Initial password for the user */
+  password?: string | null;
+  /** GitLab username (if different from username) */
+  gitlab_username?: string | null;
+  /** GitLab email (if different from email) */
+  gitlab_email?: string | null;
+}
+
+/**
+ * Account deployment configuration for external service accounts (e.g., GitLab).
+ */
+export interface AccountDeployment {
+  /** Account provider (e.g., 'gitlab', 'github') */
+  provider: string;
+  /** Account type (e.g., 'oauth', 'api_token') */
+  type: string;
+  /** Account ID in the provider system */
+  provider_account_id: string;
+  /** Provider-specific account properties */
+  properties?: Record<string, any> | null;
+  /** Access token for API access */
+  access_token?: string | null;
+  /** Refresh token for token renewal */
+  refresh_token?: string | null;
+  /** GitLab username */
+  gitlab_username?: string | null;
+  /** GitLab email */
+  gitlab_email?: string | null;
+  /** GitLab user ID */
+  gitlab_user_id?: number | null;
+  /** Whether the GitLab user has admin privileges */
+  is_admin?: boolean | null;
+  /** Whether the user can create GitLab groups */
+  can_create_group?: boolean | null;
+}
+
+/**
+ * Course member deployment configuration for assigning users to courses.
+ */
+export interface CourseMemberDeployment {
+  /** Direct course ID */
+  id?: string | null;
+  /** Organization path (e.g., 'kit') */
+  organization?: string | null;
+  /** Course family path (e.g., 'prog') */
+  course_family?: string | null;
+  /** Course path (e.g., 'prog1') */
+  course?: string | null;
+  /** Course role ID (e.g., '_student', '_tutor', '_lecturer') */
+  role?: string;
+  /** Course group name or ID (required for students) */
+  group?: string | null;
+}
+
+/**
+ * Combined user and account deployment configuration.
+ */
+export interface UserAccountDeployment {
+  /** User configuration */
+  user: UserDeployment;
+  /** Associated external accounts */
+  accounts?: AccountDeployment[];
+  /** Course memberships for this user */
+  course_members?: CourseMemberDeployment[];
+}
+
+/**
+ * Configuration for deploying multiple users and their accounts.
+ */
+export interface UsersDeploymentConfig {
+  /** List of users to deploy */
+  users: UserAccountDeployment[];
+}
+
+/**
+ * GitLab repository configuration.
+ */
+export interface GitLabConfig {
+  /** GitLab instance URL */
+  url?: string | null;
+  /** GitLab API token */
+  token?: string | null;
+  /** Parent group ID */
+  parent?: number | null;
+  /** Full path in GitLab */
+  full_path?: string | null;
+  /** GitLab group ID */
+  group_id?: number | null;
+  /** Parent group ID */
+  parent_id?: number | null;
+  /** Namespace ID */
+  namespace_id?: number | null;
+  /** Namespace path */
+  namespace_path?: string | null;
+  /** Web URL */
+  web_url?: string | null;
+  /** Visibility level */
+  visibility?: string | null;
+  /** Last sync timestamp */
+  last_synced_at?: string | null;
+}
+
+/**
+ * GitHub repository configuration (future support).
+ */
+export interface GitHubConfig {
+  /** GitHub instance URL */
+  url?: string | null;
+  /** GitHub API token */
+  token?: string | null;
+  /** GitHub organization */
+  organization?: string | null;
+}
+
+/**
+ * Execution backend configuration for courses.
+ */
+export interface ExecutionBackendConfig {
+  /** Unique identifier for the backend */
+  slug: string;
+  /** Type of execution backend (e.g., python, matlab) */
+  type: string;
+  /** Backend version */
+  version?: string | null;
+  /** Backend-specific settings */
+  settings?: Record<string, any> | null;
+}
+
+/**
+ * Course content type configuration for deployment.
+ */
+export interface CourseContentTypeConfig {
+  /** Unique identifier for the content type */
+  slug: string;
+  /** Display title for the content type */
+  title?: string | null;
+  /** Description of the content type */
+  description?: string | null;
+  /** Display color (hex, rgb, hsl, or named color) */
+  color?: string | null;
+  /** Additional properties */
+  properties?: Record<string, any> | null;
+  /** ID of the course content kind (e.g., 'assignment', 'unit') */
+  kind: string;
+}
+
+/**
+ * Configuration for course-related GitLab projects.
+ */
+export interface CourseProjects {
+  /** Path for tests project */
+  tests?: string | null;
+  /** Path for student template project */
+  student_template?: string | null;
+  /** Path for reference solution project */
+  reference?: string | null;
+  /** Path for examples project */
+  examples?: string | null;
+  /** Path for documents project */
+  documents?: string | null;
+}
+
+/**
+ * Organization configuration.
+ */
+export interface OrganizationConfig {
+  /** Organization display name */
+  name: string;
+  /** Organization path/slug */
+  path: string;
+  /** Organization description */
+  description?: string | null;
+  /** Organization-specific settings */
+  settings?: Record<string, any> | null;
+  /** GitLab configuration */
+  gitlab?: GitLabConfig | null;
+  /** GitHub configuration (future) */
+  github?: GitHubConfig | null;
+}
+
+/**
+ * Course family configuration.
+ */
+export interface CourseFamilyConfig {
+  /** Course family display name */
+  name: string;
+  /** Course family path/slug */
+  path: string;
+  /** Course family description */
+  description?: string | null;
+  /** Course family-specific settings */
+  settings?: Record<string, any> | null;
+}
+
+/**
+ * Course configuration.
+ */
+export interface CourseConfig {
+  /** Course display name */
+  name: string;
+  /** Course path/slug */
+  path: string;
+  /** Course description */
+  description?: string | null;
+  /** Course project structure */
+  projects?: CourseProjects | null;
+  /** Available execution backends for this course */
+  execution_backends?: ExecutionBackendConfig[] | null;
+  /** Course content types to be created (assignments, units, etc.) */
+  content_types?: CourseContentTypeConfig[] | null;
+  /** Course-specific settings */
+  settings?: Record<string, any> | null;
+}
+
+/**
+ * Course configuration for hierarchical deployment.
+ */
+export interface HierarchicalCourseConfig {
+  /** Course display name */
+  name: string;
+  /** Course path/slug */
+  path: string;
+  /** Course description */
+  description?: string | null;
+  /** Course project structure */
+  projects?: CourseProjects | null;
+  /** Available execution backends for this course */
+  execution_backends?: ExecutionBackendConfig[] | null;
+  /** Course content types to be created (assignments, units, etc.) */
+  content_types?: CourseContentTypeConfig[] | null;
+  /** Course-specific settings */
+  settings?: Record<string, any> | null;
+}
+
+/**
+ * Course family configuration with nested courses.
+ */
+export interface HierarchicalCourseFamilyConfig {
+  /** Course family display name */
+  name: string;
+  /** Course family path/slug */
+  path: string;
+  /** Course family description */
+  description?: string | null;
+  /** Course family-specific settings */
+  settings?: Record<string, any> | null;
+  /** List of courses in this course family */
+  courses?: HierarchicalCourseConfig[];
+}
+
+/**
+ * Organization configuration with nested course families.
+ */
+export interface HierarchicalOrganizationConfig {
+  /** Organization display name */
+  name: string;
+  /** Organization path/slug */
+  path: string;
+  /** Organization description */
+  description?: string | null;
+  /** Organization-specific settings */
+  settings?: Record<string, any> | null;
+  /** GitLab configuration */
+  gitlab?: GitLabConfig | null;
+  /** GitHub configuration (future) */
+  github?: GitHubConfig | null;
+  /** List of course families in this organization */
+  course_families?: HierarchicalCourseFamilyConfig[];
+}
+
+/**
+ * Hierarchical deployment configuration for creating organization -> course family -> course structures.
+ * 
+ * Supports deploying multiple organizations, each with multiple course families and courses.
+ */
+export interface ComputorDeploymentConfig {
+  /** List of organizations with nested course families and courses */
+  organizations: HierarchicalOrganizationConfig[];
+  /** List of users with their accounts and course memberships */
+  users?: UserAccountDeployment[];
+  /** Global deployment settings */
+  settings?: Record<string, any> | null;
 }
 
 export interface GitlabGroupProjectConfig {
@@ -769,23 +1268,6 @@ export interface GitLabConfigGet {
   last_synced_at?: string | null;
 }
 
-export interface GitLabConfig {
-  settings?: any | null;
-  url?: string | null;
-  full_path?: string | null;
-  directory?: string | null;
-  registry?: string | null;
-  parent?: number | null;
-  group_id?: number | null;
-  parent_id?: number | null;
-  namespace_id?: number | null;
-  namespace_path?: string | null;
-  web_url?: string | null;
-  visibility?: string | null;
-  last_synced_at?: string | null;
-  token?: string | null;
-}
-
 export interface TypeConfig {
   kind: string;
   slug: string;
@@ -797,12 +1279,6 @@ export interface TypeConfig {
 
 export interface CourseGroupConfig {
   name: string;
-}
-
-export interface ExecutionBackendConfig {
-  slug: string;
-  type: string;
-  settings?: any | null;
 }
 
 export interface CourseExecutionBackendConfig {
@@ -817,36 +1293,6 @@ export interface FileSourceConfig {
 
 export interface CourseSettingsConfig {
   source?: FileSourceConfig | null;
-}
-
-export interface CourseConfig {
-  name: string;
-  path: string;
-  description?: string | null;
-  executionBackends?: CourseExecutionBackendConfig[] | null;
-  settings?: CourseSettingsConfig | null;
-}
-
-export interface CourseFamilyConfig {
-  name: string;
-  path: string;
-  description?: string | null;
-  settings?: any | null;
-}
-
-export interface OrganizationConfig {
-  name: string;
-  path: string;
-  description?: string | null;
-  settings?: any | null;
-  gitlab?: GitLabConfig | null;
-}
-
-export interface ComputorDeploymentConfig {
-  organization: OrganizationConfig;
-  courseFamily: CourseFamilyConfig;
-  course: CourseConfig;
-  settings?: any | null;
 }
 
 export interface CodeAbilityTestCommon {
@@ -867,6 +1313,30 @@ export interface VSCExtensionConfig {
   download_link: string;
 }
 
+/**
+ * Request model for deployment from configuration.
+ */
+export interface DeploymentRequest {
+  /** Deployment configuration as dictionary */
+  deployment_config: Record<string, any>;
+  /** If true, only validate the configuration without deploying */
+  validate_only?: boolean;
+}
+
+/**
+ * Response model for deployment operations.
+ */
+export interface DeploymentResponse {
+  /** Temporal workflow ID */
+  workflow_id: string;
+  /** Deployment status */
+  status: string;
+  /** Status message */
+  message: string;
+  /** Full deployment path */
+  deployment_path?: string | null;
+}
+
 export interface GitlabSignup {
   provider: string;
   token: string;
@@ -874,30 +1344,4 @@ export interface GitlabSignup {
 
 export interface GitlabSignupResponse {
   courses?: CourseSignupResponse[];
-}
-
-export interface StudentCreate {
-  user_id?: (string | string) | null;
-  user?: UserGet | null;
-  course_group_id?: (string | string) | null;
-  course_group_title?: string | null;
-  role?: string | null;
-}
-
-export interface ReleaseStudentsCreate {
-  students?: StudentCreate[];
-  course_id: any;
-}
-
-export interface TUGStudentExport {
-  course_group_title: string;
-  family_name: string;
-  given_name: string;
-  matriculation_number: string;
-  created_at: string;
-  email: string;
-}
-
-export interface StatusQuery {
-  course_id?: string | null;
 }

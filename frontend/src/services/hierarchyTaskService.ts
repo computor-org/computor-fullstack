@@ -34,10 +34,64 @@ export interface TaskStatus {
   error?: string;
 }
 
+// Backend TaskStatus enum values (from ctutor_backend.tasks.base.TaskStatus)
+export type BackendTaskStatus = 
+  | 'queued'     // TaskStatus.QUEUED
+  | 'started'    // TaskStatus.STARTED
+  | 'finished'   // TaskStatus.FINISHED
+  | 'failed'     // TaskStatus.FAILED
+  | 'deferred'   // TaskStatus.DEFERRED
+  | 'cancelled'; // TaskStatus.CANCELLED
+
+// Frontend display status
+export type FrontendTaskStatus = 
+  | 'pending'
+  | 'running' 
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
 export interface TaskStatusResponse {
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: BackendTaskStatus;
   message?: string;
   result?: any;
+}
+
+// Status mapping utility
+export class TaskStatusMapper {
+  static toFrontendStatus(backendStatus: BackendTaskStatus): FrontendTaskStatus {
+    switch (backendStatus) {
+      case 'queued':
+      case 'deferred':
+        return 'pending';
+      case 'started':
+        return 'running';
+      case 'finished':
+        return 'completed';
+      case 'failed':
+        return 'failed';
+      case 'cancelled':
+        return 'cancelled';
+      default:
+        return 'pending';
+    }
+  }
+
+  static isCompleted(status: BackendTaskStatus): boolean {
+    return ['finished', 'failed', 'cancelled'].includes(status);
+  }
+
+  static isSuccess(status: BackendTaskStatus): boolean {
+    return status === 'finished';
+  }
+
+  static isFailed(status: BackendTaskStatus): boolean {
+    return status === 'failed';
+  }
+
+  static isRunning(status: BackendTaskStatus): boolean {
+    return status === 'started';
+  }
 }
 
 export interface TaskResult {
@@ -162,7 +216,7 @@ export class HierarchyTaskService {
    */
   static async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
     try {
-      const response = await apiClient.get<TaskStatusResponse>(`/system/status/${taskId}`);
+      const response = await apiClient.get<TaskStatusResponse>(`/tasks/${taskId}/status`);
       return response;
     } catch (error: any) {
       console.error('Error getting task status:', error);
@@ -204,22 +258,22 @@ export class HierarchyTaskService {
           const taskStatus: TaskStatus = {
             task_id: taskId,
             task_name: 'hierarchy_creation',
-            status: status.status === 'COMPLETED' ? 'SUCCESS' : 
-                   status.status === 'FAILED' ? 'FAILURE' : 
-                   status.status === 'RUNNING' ? 'PROGRESS' : 'PENDING',
+            status: TaskStatusMapper.isSuccess(status.status) ? 'SUCCESS' : 
+                   TaskStatusMapper.isFailed(status.status) ? 'FAILURE' : 
+                   TaskStatusMapper.isRunning(status.status) ? 'PROGRESS' : 'PENDING',
             created_at: new Date().toISOString(),
             progress: status.message ? { stage: status.message } : undefined,
-            error: status.status === 'FAILED' ? status.message : undefined
+            error: TaskStatusMapper.isFailed(status.status) ? status.message : undefined
           };
           onProgress(taskStatus);
         }
         
-        if (status.status === 'COMPLETED' || status.status === 'FAILED') {
+        if (TaskStatusMapper.isCompleted(status.status)) {
           return {
             task_id: taskId,
             status: status.status,
             result: status.result,
-            error: status.status === 'FAILED' ? status.message : undefined,
+            error: TaskStatusMapper.isFailed(status.status) ? status.message : undefined,
             created_at: new Date().toISOString(),
             finished_at: new Date().toISOString()
           };

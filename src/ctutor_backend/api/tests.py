@@ -1,434 +1,391 @@
-import os
-import shutil
-import tempfile
-from typing import Annotated, Optional
-from fastapi import Depends, APIRouter, BackgroundTasks
-from gitlab import Gitlab
-from gitlab.v4.objects import Project
+from typing import Annotated
+import logging
+from fastapi import Depends, APIRouter
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.api.crud import create_db
-from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException, NotImplementedException
+from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.permissions import check_course_permissions
 from ctutor_backend.api.results import get_result_status
-from ctutor_backend.client.crud_client import CrudClient
 from ctutor_backend.database import get_db
-from ctutor_backend.generator.git_helper import checkout_branch, git_repo_commit
 from ctutor_backend.interface.course_contents import CourseContentGet
-from ctutor_backend.interface.course_members import CourseMemberProperties
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultCreate, ResultGet, ResultInterface, ResultStatus, ResultUpdate
-from ctutor_backend.interface.tests import Submission, TestCreate, TestJob
+from ctutor_backend.interface.results import ResultCreate, ResultStatus
+from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseFamily
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
-from sqlalchemy_utils import Ltree
-from ctutor_backend.settings import settings
-#from ctutor_backend.helpers import get_prefect_client
+from ctutor_backend.model.example import Example
+from ..custom_types import Ltree
+from ctutor_backend.tasks import get_task_executor, TaskSubmission
 
-def handle_merge_request(submission: Submission, branch: str, title: str) -> bool:
-
-  gl = Gitlab(url=submission.provider,private_token=submission.token)
-
-  subm_repo = submission.full_path
-
-  gitlab_projects = gl.projects.list(search=subm_repo, search_namespaces=True)
-
-  if len(gitlab_projects) != 1:
-    raise Exception("The project does not exist")
-  
-  submission_project: Project = gitlab_projects[0]
-
-  found_mrs = submission_project.mergerequests.list(source_branch=branch)
-
-  if len(found_mrs) > 1:
-    raise Exception("[handle_merge_request] This is a critical error")
-  elif len(found_mrs) == 0:
-
-    merge_request = submission_project.mergerequests.create(
-      {
-        "id": submission_project.get_id(),
-        "source_branch": branch,
-        "target_branch": "main",
-        "target_project_id": submission_project.get_id(),
-        "title": title
-      }
-    )
-
-    print(f"new merge request created [{branch}]")
-
-    return True
-
-  else:
-    merge_request = found_mrs[0]
-
-    if merge_request.state == "merged":
-
-      submission_project.mergerequests.update(merge_request.get_id(),{"state_event": "reopen"})
-
-      print(f"Merge request [{branch}] already merged")
-
-      return False
-    else:
-      print(f"show merge request [{branch}]")
-
-      return True
-
-def copy_subdirectory(source,destination,directory):
-  source_path = os.path.join(source, directory)
-  destination_path = os.path.join(destination, directory)
-
-  if os.path.exists(destination_path):
-    shutil.rmtree(destination_path)
-  os.makedirs(destination_path)
-
-  for item in os.listdir(source_path):
-    s_item = os.path.join(source_path, item)
-    d_item = os.path.join(destination_path, item)
-    if os.path.isdir(s_item):
-      shutil.copytree(s_item, d_item)
-    else:
-      shutil.copy2(s_item, d_item)
-
-def create_submission(submission: Submission):
-
-  if submission == None:
-    raise Exception("[create_submission_flow] Submission is None")
-  
-  assignment_dir = submission.assignment.properties.gitlab.directory
-
-  branch = f"submission/{submission.assignment.path}"
-  title = f"Submission: {submission.assignment.path}"
-
-  with tempfile.TemporaryDirectory() as root_path:
-
-    student_work_dir = f"{root_path}/student"
-    submission_work_dir = f"{root_path}/submission"
-
-    submission.module.clone(student_work_dir)
-
-    submission.submission.clone(submission_work_dir)
-
-
-    checkout_branch(submission_work_dir,"main")
-  
-    checkout_branch(submission_work_dir,branch)
-
-    copy_subdirectory(student_work_dir,submission_work_dir,assignment_dir)
-
-    git_repo_commit(submission_work_dir, f"submission: {submission.assignment.path}", branch)
-
-    accepted = handle_merge_request(submission, branch, title)
-
-    if not accepted:
-      raise Exception("Merge request Failed")
-
-  try:
-    CrudClient(
-        url_base=os.environ.get("EXECUTION_BACKEND_API_URL"),
-        auth=(os.environ.get("EXECUTION_BACKEND_API_USER"),os.environ.get("EXECUTION_BACKEND_API_PASSWORD")),
-        entity_interface=ResultInterface).update(submission.result_id,ResultUpdate(submit=True))
-  except Exception as e:
-    print(str(e))
-    print("Error in crud client updating submit boolen for result")
-
-
-# TODO: REFACTORING
-async def prefect_test_job(test_job: TestJob, properties: dict) -> str:
-  raise NotImplementedException()
-    # if settings.DEBUG_MODE == "production":
-    #   prefect_url = properties["url"]
-    # else:
-    #   prefect_url = "http://localhost:4200/api"
-
-    # async with PrefectClient(prefect_url) as client:
-      
-    #   try:
-    #     deployment = await client.read_deployment_by_name(properties["deployment"])
-    #   except:
-    #     raise NotFoundException(detail=f"Worker [{properties['deployment']}] is currently not available. Please wait a moment!")
-      
-    #   try:
-    #     flow_run = await client.create_flow_run_from_deployment(
-    #       deployment_id=deployment.id,
-    #       parameters={
-    #         "test_job": test_job.model_dump(exclude_none=True)
-    #       },
-    #       tags=[f"user:{test_job.user_id}"]
-    #     )
-
-    #     return str(flow_run.id)
-
-    #   except:
-    #     raise BadRequestException()
-
-async def submission_job(submission: Submission):
-  raise NotImplementedException()
-  # async with get_prefect_client() as client:
-
-  #   deployment = await client.read_deployment_by_name("submit-result/system")
-
-  #   try:
-  #     flow_run = await client.create_flow_run_from_deployment(
-  #       deployment_id=deployment.id,
-  #       parameters={
-  #         "submission": submission.model_dump(exclude_none=True)
-  #       },
-  #       tags=[f"user:{submission.user_id}"]
-  #     )
-
-  #     return str(flow_run.id)
-
-  #   except:
-  #     raise BadRequestException()
 
 class TestRunResponse(ResultCreate):
-  id: str
-  submission_flow_run_id: Optional[str | None] = None
+    id: str
+
 
 tests_router = APIRouter()
 
+
 @tests_router.post("", response_model=TestRunResponse)
-async def create_test(test_create: TestCreate, background_tasks: BackgroundTasks, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
+async def create_test(
+    test_create: TestCreate,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Create and execute a test for a course assignment.
+    Tests are now executed via Temporal workflows.
+    Submit flag is stored as a boolean in the Result model.
+    """
+    user_id = permissions.user_id
 
-  user_id = permissions.user_id
+    # Get course member
+    # if test_create.provider_url == None or test_create.project == None:
+    #     course_member = db.query(CourseMember).join(User, User.id == CourseMember.user_id).filter(User.id == user_id).first()
+    # else:
+    #     course_member = check_course_permissions(permissions, CourseMember, "_student", db) \
+    #         .filter(
+    #             CourseMember.properties["gitlab"].op("->>")("url") == test_create.provider_url,
+    #             CourseMember.properties["gitlab"].op("->>")("full_path") == test_create.project
+    #         ).first()
 
-  if test_create.provider_url == None or test_create.project == None:
-    course_member = db.query(CourseMember).join(User, User.id == CourseMember.user_id).filter(User.id == user_id).first()
+    course_member = db.query(CourseMember) \
+        .join(User, User.id == CourseMember.user_id) \
+            .join(CourseContent, CourseContent.course_id == CourseMember.course_id) \
+                .filter(User.id == user_id).first()
 
-  else:
-    course_member = check_course_permissions(permissions,CourseMember,"_student",db) \
-      .filter(
-        CourseMember.properties["gitlab"].op("->>")("url") == test_create.provider_url,
-        CourseMember.properties["gitlab"].op("->>")("full_path") == test_create.project
-      ).first()
+    if not course_member:
+        raise NotFoundException(detail="Course member not found")
 
-  course_member_id = course_member.id
-  course_member_properties = CourseMemberProperties(**course_member.properties)
+    course_member_id = course_member.id
 
-  results_count_subquery = (
-      db.query(
-          Result.course_content_id,
-          func.count(Result.id).label("total_results_count")
-      )
-      .group_by(Result.course_content_id)
-      .subquery()
-  )
-
-  joined_query = db.query(CourseContent,Course,Organization,CourseSubmissionGroup.max_submissions,results_count_subquery.c.total_results_count) \
-      .join(CourseContentType, CourseContentType.id == CourseContent.course_content_type_id) \
-        .join(Course,Course.id == CourseContent.course_id) \
-          .join(CourseMember, CourseMember.course_id == Course.id) \
-            .join(CourseFamily, CourseFamily.id == Course.course_family_id) \
-              .join(Organization, Organization.id == CourseFamily.organization_id) \
-                .join(CourseExecutionBackend, CourseExecutionBackend.course_id == CourseContent.course_id) \
-                  .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-                    .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-                  .outerjoin(
-                    results_count_subquery,
-                    (CourseContent.id == results_count_subquery.c.course_content_id)
-                  ).filter(Course.id == course_member.course_id, CourseMember.id == course_member_id)
-
-  if test_create.course_content_id != None:
-
-    query_result = joined_query.filter(CourseContent.id == test_create.course_content_id, CourseContentType.course_content_kind_id == "assignment").first()
-
-  elif test_create.course_content_path != None:
-
-    query_result = joined_query.filter(CourseContent.path == Ltree(test_create.course_content_path), CourseContentType.course_content_kind_id == "assignment").first()
-
-  elif test_create.directory != None:
-
-    # new_parts = []
-    
-    # for part in test_create.directory.split("/"):
-    #   new_parts.append(position_directory_to_db_path(part))
-    query_result = joined_query.filter(
-      CourseContent.properties["gitlab"].op("->>")("directory") == test_create.directory, 
-      CourseContentType.course_content_kind_id == "assignment"
-    ).first()
-    # query_result = joined_query.filter(CourseContent.path == Ltree(".".join(new_parts)), CourseContentType.course_content_kind_id == "assignment").first()
-  
-  submissions = query_result[4] if query_result[4] != None else 0
-  allowed_max_submissions = query_result[3]
-
-  if allowed_max_submissions is not None and submissions >= allowed_max_submissions:
-    raise BadRequestException(detail="Reached max submissions for this course_content")
-
-  try:
-    assignment = CourseContentGet(**query_result[0].__dict__)
-    print(assignment.model_dump_json(indent=4))
-  except:
-    raise BadRequestException(detail="CourseContent of kind 'unit' could not be released.")
-
-  course = query_result[1]
-  organization = query_result[2]
-  
-  organization_properties = OrganizationProperties(**organization.properties)
-  course_properties = CourseProperties(**course.properties)
-  assignment_properties = assignment.properties
-  execution_backend_id = assignment.execution_backend_id
-
-  commit = test_create.version_identifier
-
-  if commit == None:
-    raise BadRequestException(detail="commit is None")
-
-  results = db.query(Result) \
-      .select_from(CourseSubmissionGroup) \
-        .join(CourseContent, CourseContent.id == CourseSubmissionGroup.course_content_id) \
-          .join(Result,Result.course_content_id == CourseSubmissionGroup.course_content_id) \
-            .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id) \
-  .filter(
-      CourseSubmissionGroupMember.course_member_id == course_member_id,
-      CourseContent.id == assignment.id,
-      Result.version_identifier == commit
-    ).all()
-
-  course_submission_group_id = db.query(CourseSubmissionGroup.id) \
-      .join(CourseSubmissionGroupMember,CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .filter(CourseSubmissionGroupMember.course_member_id == course_member_id, CourseSubmissionGroupMember.course_content_id == assignment.id).scalar()
-
-  if len(results) > 1:
-    raise InternalServerException(f"More than one Result with commit [{commit}] for this Assignment. This is a critical database error, please inform your admin.")
-
-  # if gitlab
-  if course_member_properties.gitlab != None:
-
-    provider = organization_properties.gitlab.url
-    full_path_course = course_properties.gitlab.full_path
-    assignment_directory = assignment_properties.gitlab.directory
-    token = decrypt_api_key(organization_properties.gitlab.token)
-
-    full_path_module = course_member_properties.gitlab.full_path
-    full_path_reference = f"{full_path_course}/assignments"
-    
-    gitlab_path_module = f"{provider}/{full_path_module}.git"
-    gitlab_path_reference = f"{provider}/{full_path_reference}.git"
-
-    student_repository = Repository(
-        url=gitlab_path_module,
-        path=assignment_directory,
-        token=token,
-        commit=commit
-    )
-    reference_repository = Repository(
-        url=gitlab_path_reference,
-        path=assignment_directory,
-        token=token,
-        commit=assignment.version_identifier
+    # Subquery for counting existing results
+    results_count_subquery = (
+        db.query(
+            Result.course_content_id,
+            func.count(Result.id).label("total_results_count")
+        )
+        .group_by(Result.course_content_id)
+        .subquery()
     )
 
-    def create_submission(assignment, result_id: str):
-      full_path_submission = course_member_properties.gitlab.full_path_submission
+    # Build main query joining necessary tables
+    joined_query = db.query(
+        CourseContent,
+        Course,
+        Organization,
+        CourseSubmissionGroup.max_submissions,
+        results_count_subquery.c.total_results_count,
+        Example
+    ) \
+        .join(CourseContentType, CourseContentType.id == CourseContent.course_content_type_id) \
+        .join(Course, Course.id == CourseContent.course_id) \
+        .join(CourseMember, CourseMember.course_id == Course.id) \
+        .join(CourseFamily, CourseFamily.id == Course.course_family_id) \
+        .join(Organization, Organization.id == CourseFamily.organization_id) \
+        .join(CourseExecutionBackend, CourseExecutionBackend.course_id == CourseContent.course_id) \
+        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
+        .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
+        .outerjoin(Example, Example.id == CourseContent.example_id) \
+        .outerjoin(
+            results_count_subquery,
+            (CourseContent.id == results_count_subquery.c.course_content_id)
+        ).filter(Course.id == course_member.course_id, CourseMember.id == course_member_id)
 
-      if full_path_submission == None:
-        raise BadRequestException(detail=f"CourseMember has no submission repository.")
+    # Find the course content based on provided parameters
+    if test_create.course_content_id != None:
+        query_result = joined_query.filter(
+            CourseContent.id == test_create.course_content_id,
+            CourseContentType.course_content_kind_id == "assignment"
+        ).first()
+    elif test_create.course_content_path != None:
+        query_result = joined_query.filter(
+            CourseContent.path == Ltree(test_create.course_content_path),
+            CourseContentType.course_content_kind_id == "assignment"
+        ).first()
+    elif test_create.directory != None:
+        # Use the Example.directory field for lookup
+        query_result = joined_query.filter(
+            Example.directory == test_create.directory,
+            CourseContentType.course_content_kind_id == "assignment"
+        ).first()
+    else:
+        raise BadRequestException(detail="Must provide course_content_id, course_content_path, or directory")
 
-      gitlab_path_submission = f"{provider}/{full_path_submission}.git"
+    if not query_result:
+        raise NotFoundException(detail="Assignment not found")
 
-      return Submission(
-        assignment=assignment,
-        submission=Repository(
-          url=gitlab_path_submission,
-          token=token,
-        ),
-        provider=provider,
-        full_path=full_path_submission,
-        token=token,
-        module=student_repository,
-        result_id=result_id,
-        user_id=user_id
-      )
+    # Extract query results
+    course_content = query_result[0]
+    course = query_result[1]
+    organization = query_result[2]
+    allowed_max_submissions = query_result[3]
+    submissions = query_result[4] if query_result[4] != None else 0
+    example = query_result[5]
 
+    # Check max submissions limit
+    if allowed_max_submissions is not None and submissions >= allowed_max_submissions:
+        raise BadRequestException(detail="Reached max submissions for this course_content")
 
-    job = TestJob(
-      user_id=user_id,
-      course_member_id=str(course_member_id),
-      course_content_id=str(assignment.id),
-      execution_backend_id=str(execution_backend_id),
-      module=student_repository,
-      reference=reference_repository
-    )
-  else:
-    raise NotImplementedException()
+    # Convert to CourseContentGet
+    try:
+        assignment = CourseContentGet(**course_content.__dict__)
+    except:
+        raise BadRequestException(detail="Failed to process assignment")
 
-  ##
-  
-  submission_flow_run_id = None
+    # Get properties
+    organization_properties = OrganizationProperties(**organization.properties)
+    course_properties = CourseProperties(**course.properties)
+    assignment_properties = assignment.properties
+    execution_backend_id = assignment.execution_backend_id
 
-  if len(results) == 1:
-    result: Result = results[0]
+    # Validate version identifier (commit)
+    commit = test_create.version_identifier
+    if commit == None:
+        raise BadRequestException(detail="version_identifier is required")
 
-    if ResultStatus(result.status) != ResultStatus.COMPLETED:
-      try:
-        status = await get_result_status(results[0])
-      except:
-        status = ResultStatus.NOT_AVAILABLE
-      
-      result.status = status.value
-      if ResultStatus(status) in [ResultStatus.FAILED,ResultStatus.CRASHED,ResultStatus.CANCELLING,ResultStatus.CANCELLED,ResultStatus.NOT_AVAILABLE]:
-        result.version_identifier = f"{result.version_identifier}:{status}"
+    # Check for existing results with same commit
+    # With the new partial indexes, we can have multiple failed results with the same version_identifier
+    existing_results = db.query(Result) \
+        .filter(
+            Result.course_member_id == course_member_id,
+            Result.course_content_id == assignment.id,
+            Result.version_identifier == commit
+        ).all()
 
-      db.commit()
-      db.refresh(result)
-
-    status = result.status
-
-    if ResultStatus(status) in [ResultStatus.PENDING,ResultStatus.SCHEDULED,ResultStatus.RUNNING,ResultStatus.PAUSED]:
-      return TestRunResponse(**result.__dict__)
-
-    if ResultStatus(status) == ResultStatus.COMPLETED:
-      if result.submit == True and test_create.submit == True:
-        return TestRunResponse(**result.__dict__)
-
-      elif result.submit == False and test_create.submit == True and result.status == 0:
-        submission_flow_run_id = await submission_job(create_submission(assignment,str(result.id)))
-
-      return TestRunResponse(submission_flow_run_id=submission_flow_run_id,**result.__dict__)
-
-  ##
-
-  execution_backend = db.query(ExecutionBackend) \
-    .filter(ExecutionBackend.id == execution_backend_id).first()
-
-  if execution_backend.type == "prefect":
-    test_system_id = await prefect_test_job(job, execution_backend.properties) # TODO: why not using course_execution_backend.properties?
-  else:
-    raise BadRequestException("execution_backend type not supported!")
+    # Get submission group
+    course_submission_group = db.query(CourseSubmissionGroup) \
+        .join(CourseSubmissionGroupMember, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
+        .filter(
+            CourseSubmissionGroupMember.course_member_id == course_member_id,
+            CourseSubmissionGroup.course_content_id == assignment.id
+        ).first()
     
-  try:
-    # print("[ResultCreate] start ")
+    if not course_submission_group:
+        raise BadRequestException(detail="No submission group found for this assignment")
+    
+    course_submission_group_id = course_submission_group.id
+    submission_group_properties = course_submission_group.properties or {}
+
+    # Handle existing results
+    if existing_results:
+        # Sort by created_at to get the most recent
+        latest_result = sorted(existing_results, key=lambda r: r.created_at, reverse=True)[0]
+        
+        # Check if the latest result is still running according to DB
+        if ResultStatus(latest_result.status) in [ResultStatus.PENDING, ResultStatus.SCHEDULED, ResultStatus.RUNNING, ResultStatus.PAUSED]:
+            # Check actual Temporal workflow status
+            try:
+                task_executor = get_task_executor()
+                actual_status = await task_executor.get_task_status(latest_result.test_system_id)
+                
+                # Map Temporal status to ResultStatus
+                from ctutor_backend.tasks.base import TaskStatus
+                if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
+                    # Still running, return the existing one
+                    return TestRunResponse(**latest_result.__dict__)
+                elif actual_status.status == TaskStatus.FINISHED:
+                    # Workflow finished, but we need to check if it succeeded or failed
+                    actual_result = await task_executor.get_task_result(latest_result.test_system_id)
+                    
+                    # Check the workflow result status
+                    if actual_result.result and isinstance(actual_result.result, dict):
+                        workflow_status = actual_result.result.get("status", "").lower()
+                        
+                        if workflow_status == "completed":
+                            # Successfully completed
+                            latest_result.status = ResultStatus.COMPLETED
+                            db.commit()
+                            db.refresh(latest_result)
+                            
+                            if test_create.submit and not latest_result.submit:
+                                latest_result.submit = True
+                                db.commit()
+                                db.refresh(latest_result)
+                            return TestRunResponse(**latest_result.__dict__)
+                        else:
+                            # Failed or other non-success status
+                            latest_result.status = ResultStatus.FAILED
+                            db.commit()
+                            db.refresh(latest_result)
+                            # Will create a new run below
+                    else:
+                        # No result or unexpected format, treat as failed
+                        latest_result.status = ResultStatus.FAILED
+                        db.commit()
+                        db.refresh(latest_result)
+                        # Will create a new run below
+                else:  # FAILED, CANCELLED, etc.
+                    # Update DB status to failed
+                    latest_result.status = ResultStatus.FAILED
+                    db.commit()
+                    db.refresh(latest_result)
+                    # Will create a new run below
+            except Exception as e:
+                # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
+                logger.warning(f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}")
+                latest_result.status = ResultStatus.FAILED
+                db.commit()
+                db.refresh(latest_result)
+                # Will create a new run below
+        
+        # If completed successfully and only updating submit flag
+        elif ResultStatus(latest_result.status) == ResultStatus.COMPLETED:
+            if test_create.submit and not latest_result.submit:
+                latest_result.submit = True
+                db.commit()
+                db.refresh(latest_result)
+            return TestRunResponse(**latest_result.__dict__)
+        
+        # If failed/crashed/cancelled, we'll create a new run below
+
+    # Create new test execution
+    # Build repository configurations for GitLab
+    gitlab_config = submission_group_properties.get('gitlab')
+    if not gitlab_config:
+        raise BadRequestException(
+            detail="Student repository not configured for this assignment. Please ensure student repository has been created."
+        )
+    
+    # Validate organization GitLab configuration
+    if not organization_properties.gitlab or not organization_properties.gitlab.url:
+        raise BadRequestException(detail="Organization GitLab configuration is missing")
+    
+    # Validate course GitLab configuration
+    if not course_properties.gitlab or not course_properties.gitlab.full_path:
+        raise BadRequestException(detail="Course GitLab configuration is missing")
+    
+    if gitlab_config != None:
+        provider = organization_properties.gitlab.url
+        full_path_course = course_properties.gitlab.full_path
+        
+        # Use directory from submission group if available, then Example.directory, then assignment properties
+        if gitlab_config.get('directory'):
+            assignment_directory = gitlab_config['directory']
+        elif example and example.directory:
+            assignment_directory = example.directory
+        elif assignment_properties.gitlab and assignment_properties.gitlab.directory:
+            assignment_directory = assignment_properties.gitlab.directory
+        else:
+            raise BadRequestException(detail="No directory found for assignment")
+        
+        token = decrypt_api_key(organization_properties.gitlab.token)
+        
+        # Validate that submission group has GitLab repository set up
+        if not gitlab_config.get('full_path'):
+            raise BadRequestException(
+                detail="Student repository path not configured. Please ensure student repository has been created."
+            )
+        
+        full_path_module = gitlab_config['full_path']
+        full_path_reference = f"{full_path_course}/assignments"
+
+        gitlab_path_module = f"{provider}/{full_path_module}.git"
+        gitlab_path_reference = f"{provider}/{full_path_reference}.git"
+
+        student_repository = Repository(
+            url=gitlab_path_module,
+            path=assignment_directory,
+            token=token,
+            commit=commit
+        )
+        reference_repository = Repository(
+            url=gitlab_path_reference,
+            path=assignment_directory,
+            token=token,
+            commit="main"
+        ) # TODO
+
+        job = TestJob(
+            user_id=user_id,
+            course_member_id=str(course_member_id),
+            course_content_id=str(assignment.id),
+            execution_backend_id=str(execution_backend_id),
+            module=student_repository,
+            reference=reference_repository
+        )
+    else:
+        raise BadRequestException(detail="Only GitLab is currently supported")
+
+    # Get execution backend
+    execution_backend = db.query(ExecutionBackend) \
+        .filter(ExecutionBackend.id == execution_backend_id).first()
+
+    if not execution_backend:
+        raise BadRequestException(detail=f"Execution backend not found")
+
+    # Generate a unique workflow ID that will be used for both database and Temporal
+    import uuid
+    workflow_id = f"student-testing-{str(uuid.uuid4())}"
+
+    # Create result entry with the pre-generated workflow ID
     result_create = Result(
-        submit=0,
+        submit=test_create.submit or False,  # Store submit flag as boolean
         course_member_id=course_member_id,
         course_submission_group_id=course_submission_group_id,
         course_content_id=assignment.id,
+        course_content_type_id=course_content.course_content_type_id,  # Keep for now, can be removed later
         execution_backend_id=execution_backend.id,
-        test_system_id=test_system_id,
+        test_system_id=workflow_id,  # Use the pre-generated workflow ID
         result=0,
         result_json=None,
         properties=None,
-        status=ResultStatus.SCHEDULED,
+        status=ResultStatus.PENDING,  # Start as PENDING
         version_identifier=commit
     )
 
     db.add(result_create)
     db.commit()
+    db.refresh(result_create)
 
-    if test_create.submit == True:
-      submission_flow_run_id = await submission_job(create_submission(assignment,str(result_create.id)))
+    # Start Temporal workflow for testing with our pre-generated workflow ID
+    try:
+        if execution_backend.type == "temporal":
+            # Use task executor to submit the task
+            task_executor = get_task_executor()
+            
+            task_submission = TaskSubmission(
+                task_name="student_testing",
+                workflow_id=workflow_id,  # Use our pre-generated workflow ID
+                parameters={
+                    "test_job": job.model_dump(),
+                    "execution_backend_properties": execution_backend.properties,
+                    "result_id": str(result_create.id)  # Pass the result ID to the workflow
+                },
+                queue=execution_backend.properties.get("task_queue", "computor-tasks")
+            )
+            
+            submitted_id = await task_executor.submit_task(task_submission)
+            
+            # Verify the workflow ID matches (should be the same)
+            if submitted_id != workflow_id:
+                logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
+            
+            # Update status to SCHEDULED now that task is submitted
+            result_create.status = ResultStatus.SCHEDULED
+            db.commit()
+            db.refresh(result_create)
+        else:
+            raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported. Use 'temporal'.")
+    except Exception as e:
+        # If task submission fails, update result status to FAILED
+        result_create.status = ResultStatus.FAILED
+        result_create.properties = {"error": str(e)}
+        db.commit()
+        db.refresh(result_create)
+        raise
 
     return TestRunResponse(
-      submission_flow_run_id=submission_flow_run_id,
-        id = result_create.id,
+        id=str(result_create.id),
         submit=result_create.submit,
         course_member_id=result_create.course_member_id,
         course_submission_group_id=result_create.course_submission_group_id,
@@ -441,8 +398,3 @@ async def create_test(test_create: TestCreate, background_tasks: BackgroundTasks
         status=result_create.status,
         version_identifier=result_create.version_identifier
     )
-  
-  except Exception as e:
-    print(e.with_traceback(None))
-    print(f"[ResultCreate] {e.args}")
-    raise e

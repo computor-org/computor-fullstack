@@ -5,4 +5,6 @@ source .env
 set +a
 
 echo "Applying Alembic migrations..."
-cd src/ctutor_backend && alembic upgrade head
+cd src
+export PYTHONPATH=$PWD:$PYTHONPATH
+cd ctutor_backend && alembic upgrade head

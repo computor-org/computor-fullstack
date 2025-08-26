@@ -24,151 +24,103 @@ from ctutor_backend.model.course import CourseRole, CourseContentKind
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.interface.tokens import encrypt_api_key
 from ctutor_backend.model.auth import User, Account
+from ctutor_backend.model.example import ExampleRepository
 from ctutor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
 import asyncio
 
 
 def initialize_system_roles(db: Session):
-    """Initialize essential system roles."""
-    print("🔧 Initializing system roles...")
+    """Initialize essential system roles (now handled by Alembic migration)."""
+    print("🔧 Checking system roles...")
     
-    system_roles = [
-        {
-            'id': '_admin',
-            'title': 'Administrator',
-            'description': 'Full system permissions.',
-            'builtin': True
-        },
-        {
-            'id': '_user_manager',
-            'title': 'User Manager',
-            'description': 'Manage user accounts and permissions.',
-            'builtin': True
-        },
-        {
-            'id': '_organization_manager',
-            'title': 'Organization Manager',
-            'description': 'Manage organizations and their members.',
-            'builtin': True
-        }
-    ]
+    # These are now created in the Alembic migration
+    # Just verify they exist
+    system_roles = ['_admin', '_user_manager', '_organization_manager']
     
-    for role_data in system_roles:
-        existing_role = db.query(Role).filter(Role.id == role_data['id']).first()
-        if not existing_role:
-            role = Role(**role_data)
-            db.add(role)
-            print(f"   ✅ Created system role: {role_data['id']}")
+    for role_id in system_roles:
+        existing_role = db.query(Role).filter(Role.id == role_id).first()
+        if existing_role:
+            print(f"   ✅ System role exists: {role_id}")
         else:
-            print(f"   ⚠️  System role already exists: {role_data['id']}")
+            print(f"   ⚠️  System role missing: {role_id} (check migrations)")
     
     db.commit()
 
 
 def initialize_course_roles(db: Session):
-    """Initialize essential course roles."""
-    print("🎓 Initializing course roles...")
+    """Initialize essential course roles (now handled by Alembic migration)."""
+    print("🎓 Checking course roles...")
     
-    course_roles = [
-        {
-            'id': '_student',
-            'title': 'Student',
-            'description': 'Course participant with basic permissions.',
-            'builtin': True
-        },
-        {
-            'id': '_tutor',
-            'title': 'Tutor',
-            'description': 'Course teaching assistant with elevated permissions.',
-            'builtin': True
-        },
-        {
-            'id': '_lecturer',
-            'title': 'Lecturer',
-            'description': 'Course instructor with full course permissions.',
-            'builtin': True
-        },
-        {
-            'id': '_maintainer',
-            'title': 'Maintainer',
-            'description': 'Course maintainer with administrative permissions.',
-            'builtin': True
-        },
-        {
-            'id': '_owner',
-            'title': 'Owner',
-            'description': 'Course owner with full control.',
-            'builtin': True
-        }
-    ]
+    # These are now created in the Alembic migration
+    # Just verify they exist
+    course_roles = ['_student', '_tutor', '_lecturer', '_maintainer', '_owner']
     
-    for role_data in course_roles:
-        existing_role = db.query(CourseRole).filter(CourseRole.id == role_data['id']).first()
-        if not existing_role:
-            role = CourseRole(**role_data)
-            db.add(role)
-            print(f"   ✅ Created course role: {role_data['id']}")
+    for role_id in course_roles:
+        existing_role = db.query(CourseRole).filter(CourseRole.id == role_id).first()
+        if existing_role:
+            print(f"   ✅ Course role exists: {role_id}")
         else:
-            print(f"   ⚠️  Course role already exists: {role_data['id']}")
+            print(f"   ⚠️  Course role missing: {role_id} (check migrations)")
     
     db.commit()
 
 
 def initialize_course_content_kinds(db: Session):
-    """Initialize course content kinds."""
-    print("📚 Initializing course content kinds...")
+    """Initialize course content kinds (now handled by Alembic migration)."""
+    print("📚 Checking course content kinds...")
     
-    content_kinds = [
-        {
-            'id': 'assignment',
-            'title': 'Assignment',
-            'description': 'Programming assignments for students',
-            'has_ascendants': True,
-            'has_descendants': False,
-            'submittable': True
-        },
-        {
-            'id': 'unit',
-            'title': 'Unit',
-            'description': 'Learning units and modules',
-            'has_ascendants': True,
-            'has_descendants': True,
-            'submittable': False
-        }
-    ]
+    # These are now created in the Alembic migration
+    # Just verify they exist
+    content_kinds = ['assignment', 'unit']
     
-    for kind_data in content_kinds:
-        existing_kind = db.query(CourseContentKind).filter(CourseContentKind.id == kind_data['id']).first()
-        if not existing_kind:
-            kind = CourseContentKind(**kind_data)
-            db.add(kind)
-            print(f"   ✅ Created content kind: {kind_data['id']}")
+    for kind_id in content_kinds:
+        existing_kind = db.query(CourseContentKind).filter(CourseContentKind.id == kind_id).first()
+        if existing_kind:
+            print(f"   ✅ Content kind exists: {kind_id}")
         else:
-            print(f"   ⚠️  Content kind already exists: {kind_data['id']}")
+            print(f"   ⚠️  Content kind missing: {kind_id} (check migrations)")
     
     db.commit()
 
 
 def initialize_execution_backends(db: Session):
-    """Initialize default execution backends."""
-    print("⚙️  Initializing execution backends...")
+    """Initialize default execution backends (now handled by Alembic migration)."""
+    print("⚙️  Checking execution backends...")
     
-    backends = [
-        {
-            'slug': 'temporal.builtin',
-            'type': 'temporal',
-            'properties': {}
-        }
-    ]
+    # This is now created in the Alembic migration
+    # Just verify it exists
+    backend_slug = 'temporal.builtin'
     
-    for backend_data in backends:
-        existing_backend = db.query(ExecutionBackend).filter(ExecutionBackend.slug == backend_data['slug']).first()
-        if not existing_backend:
-            backend = ExecutionBackend(**backend_data)
-            db.add(backend)
-            print(f"   ✅ Created execution backend: {backend_data['slug']}")
-        else:
-            print(f"   ⚠️  Execution backend already exists: {backend_data['slug']}")
+    existing_backend = db.query(ExecutionBackend).filter(ExecutionBackend.slug == backend_slug).first()
+    if existing_backend:
+        print(f"   ✅ Execution backend exists: {backend_slug}")
+    else:
+        print(f"   ⚠️  Execution backend missing: {backend_slug} (check migrations)")
+    
+    db.commit()
+
+
+def initialize_example_repositories(db: Session):
+    """Initialize default example repositories."""
+    print("📚 Initializing example repositories...")
+    
+    # Default MinIO-based example repository
+    default_repo = {
+        'name': 'Default Examples',
+        'description': 'Default repository for programming examples and tutorials',
+        'source_type': 'minio',
+        'source_url': 'examples-bucket'
+    }
+    
+    # Check if default repository exists
+    existing_repo = db.query(ExampleRepository).filter(ExampleRepository.name == default_repo['name']).first()
+    if not existing_repo:
+        repo = ExampleRepository(**default_repo)
+        db.add(repo)
+        db.commit()
+        print(f"   ✅ Created default example repository: {default_repo['name']}")
+    else:
+        print(f"   ⚠️  Default example repository already exists: {default_repo['name']}")
     
     db.commit()
 
@@ -316,6 +268,7 @@ def main():
             initialize_course_roles(db)
             initialize_course_content_kinds(db)
             initialize_execution_backends(db)
+            initialize_example_repositories(db)
             create_admin_user(db)
             
         print("=" * 50)
@@ -325,8 +278,10 @@ def main():
         print("   • Course roles: _student, _tutor, _lecturer, _maintainer, _owner")
         print("   • Content kinds: assignment, lecture, exercise, exam, unit")
         print("   • Execution backends: temporal")
+        print("   • Example repositories: Default Examples (MinIO)")
         print(f"   • Admin user: username '{os.environ.get('EXECUTION_BACKEND_API_USER', 'admin')}', password '{os.environ.get('EXECUTION_BACKEND_API_PASSWORD', 'admin')}'")
         print("\n🎯 You can now start the application!")
+        print("📚 Upload examples to the 'Default Examples' repository via the web UI!")
         
     except Exception as e:
         print(f"❌ Error during initialization: {e}")

@@ -1,8 +1,9 @@
 import json
+import logging
 from uuid import UUID
 from typing import Annotated
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import APIRouter, Depends
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.mappers import course_member_course_content_result_mapper
@@ -23,6 +24,7 @@ from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 
 student_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 async def student_get_course_content_cached(course_content_id: str, permissions: Principal, cache: BaseCache, db: Session):
 
@@ -93,7 +95,7 @@ def student_get_course_content(course_content_id: UUID | str, permissions: Annot
 
     course_contents_result = user_course_content_query(permissions.get_user_id_or_throw(),course_content_id,db)
  
-    return course_member_course_content_result_mapper(course_contents_result)
+    return course_member_course_content_result_mapper(course_contents_result, db)
 
 @student_router.get("/course-contents", response_model=list[CourseContentStudentList])
 def student_list_course_contents(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
@@ -105,7 +107,7 @@ def student_list_course_contents(permissions: Annotated[Principal, Depends(get_c
     response_list: list[CourseContentStudentList] = []
 
     for course_contents_result in course_contents_results:
-        response_list.append(course_member_course_content_result_mapper(course_contents_result))
+        response_list.append(course_member_course_content_result_mapper(course_contents_result, db))
 
     return response_list
 
@@ -125,13 +127,12 @@ async def student_list_courses(permissions: Annotated[Principal, Depends(get_cur
             title=course.title,
             course_family_id=course.course_family_id,
             organization_id=course.organization_id,
-            version_identifier=course.version_identifier,
             course_content_types=course.course_content_types,
             path=course.path,
             repository=CourseStudentRepository(
-                provider_url=course.properties["gitlab"]["url"],
-                full_path=course.properties["gitlab"]["full_path"]
-            )
+                provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
+                full_path=course.properties.get("gitlab", {}).get("full_path") if course.properties else None
+            ) if course.properties and course.properties.get("gitlab") else None
         ))
 
     return response_list
@@ -146,13 +147,12 @@ async def student_get_course(course_id: UUID | str,permissions: Annotated[Princi
         title=course.title,
         course_family_id=course.course_family_id,
         organization_id=course.organization_id,
-        version_identifier=course.version_identifier,
         course_content_types=course.course_content_types,
         path=course.path,
         repository=CourseStudentRepository(
-            provider_url=course.properties["gitlab"]["url"],
-            full_path=course.properties["gitlab"]["full_path"]
-        )
+            provider_url=course.properties.get("gitlab", {}).get("url") if course.properties else None,
+            full_path=course.properties.get("gitlab", {}).get("full_path") if course.properties else None
+        ) if course.properties and course.properties.get("gitlab") else None
     )
 
 @student_router.get("/course-contents/{course_content_id}/messages", response_model=list[dict])
@@ -236,3 +236,5 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
         repositories.append(f"{props.gitlab.url}/{props.gitlab.full_path}")
 
     return repositories
+
+

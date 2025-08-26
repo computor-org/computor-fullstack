@@ -75,6 +75,7 @@ const CourseFamiliesPage: React.FC = () => {
           limit: rowsPerPage,
           offset: page * rowsPerPage,
           ...(searchTerm && { title: searchTerm }),
+          include: 'organization',  // Request organization data
         },
       });
 
@@ -150,39 +151,28 @@ const CourseFamiliesPage: React.FC = () => {
       id: 'title',
       label: 'Course Family',
       render: (value, row) => (
-        <Box>
-          <Typography variant="subtitle2">
-            {value || 'Untitled Course Family'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {row.path}
-          </Typography>
-        </Box>
+        <Typography variant="subtitle2">
+          {value || 'Untitled Course Family'}
+        </Typography>
       ),
     },
     {
-      id: 'organization',
-      label: 'Organization',
-      accessor: (row) => row.organization?.title || '-',
-      render: (value, row) => (
+      id: 'path',
+      label: 'Path',
+      render: (value) => (
+        <Typography variant="body2" color="text.secondary">
+          {value}
+        </Typography>
+      ),
+    },
+    {
+      id: 'organization_id',
+      label: 'Organization ID',
+      render: (value) => (
         <Stack direction="row" spacing={1} alignItems="center">
           <SchoolIcon fontSize="small" color="action" />
           <Typography variant="body2">{value}</Typography>
         </Stack>
-      ),
-    },
-    {
-      id: 'description',
-      label: 'Description',
-      render: (value) => (
-        <Typography variant="body2" sx={{ 
-          maxWidth: 300, 
-          overflow: 'hidden', 
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap' 
-        }}>
-          {value || '-'}
-        </Typography>
       ),
     },
   ];

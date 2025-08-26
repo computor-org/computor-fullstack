@@ -15,7 +15,7 @@ lecturer_router = APIRouter()
 @lecturer_router.get("/courses/{course_id}", response_model=CourseGet)
 async def lecturer_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
-    course = check_course_permissions(permissions,Course,"_maintainer",db).filter(Course.id == course_id).first()
+    course = check_course_permissions(permissions,Course,"_lecturer",db).filter(Course.id == course_id).first()
 
     if course == None:
         raise NotFoundException()
@@ -25,6 +25,6 @@ async def lecturer_get_courses(course_id: UUID | str, permissions: Annotated[Pri
 @lecturer_router.get("/courses", response_model=list[CourseList])
 def lecturer_list_courses(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseQuery = Depends(), db: Session = Depends(get_db)):
 
-    query = check_course_permissions(permissions,Course,"_maintainer",db)
+    query = check_course_permissions(permissions,Course,"_lecturer",db)
 
     return CourseInterface.search(db,query,params)

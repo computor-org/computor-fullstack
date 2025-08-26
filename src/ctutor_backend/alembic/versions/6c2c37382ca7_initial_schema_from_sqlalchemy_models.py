@@ -210,13 +210,11 @@ def upgrade() -> None:
     sa.Column('source_url', sa.Text(), nullable=False, comment='Repository URL (Git URL, MinIO path, etc.)'),
     sa.Column('access_credentials', sa.Text(), nullable=True, comment='Encrypted access credentials (Git token, MinIO credentials JSON, etc.)'),
     sa.Column('default_version', sa.String(length=100), nullable=True, comment='Default version to sync from (branch for Git, optional for MinIO)'),
-    sa.Column('visibility', sa.String(length=20), nullable=False, server_default='private', comment='Repository visibility: public, private, or restricted'),
     sa.Column('organization_id', postgresql.UUID(), nullable=True, comment='Organization that owns this repository'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this repository'),
     sa.Column('updated_by', postgresql.UUID(), nullable=True, comment='User who last updated this repository'),
-    sa.CheckConstraint("visibility IN ('public', 'private', 'restricted')", name='check_visibility'),
     sa.CheckConstraint("source_type IN ('git', 'minio', 'github', 's3', 'gitlab')", name='check_source_type'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
     sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], ),
@@ -228,12 +226,11 @@ def upgrade() -> None:
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_repository_id', postgresql.UUID(), nullable=False, comment='Reference to the repository containing this example'),
     sa.Column('directory', sa.String(length=255), nullable=False, comment="Name of the directory containing this example (e.g., 'hello-world')"),
+    sa.Column('identifier', sqlalchemy_utils.types.ltree.LtreeType(), nullable=False, comment='Hierarchical identifier using dots as separators'),
     sa.Column('title', sa.String(length=255), nullable=False, comment='Human-readable title of the example'),
     sa.Column('description', sa.Text(), nullable=True, comment='Detailed description of the example'),
-    sa.Column('subject', sa.String(length=50), nullable=True, comment="Primary programming language (e.g., 'python', 'java')"),
     sa.Column('category', sa.String(length=100), nullable=True, comment='Category for grouping examples'),
     sa.Column('tags', postgresql.ARRAY(sa.String()), nullable=False, server_default='{}', comment='Tags for searching and filtering'),
-    sa.Column('version_identifier', sa.String(length=64), nullable=True, comment='Version Identifier (e.g. hash) of example directory contents for change detection'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this example record'),
@@ -243,7 +240,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['example_repository_id'], ['example_repository.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('example_repository_id', 'directory', name='unique_example_per_directory')
+    sa.UniqueConstraint('example_repository_id', 'directory', name='unique_example_per_directory'),
+    sa.UniqueConstraint('example_repository_id', 'identifier', name='unique_example_per_identifier')
     )
     op.create_table('profile',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -366,7 +364,6 @@ def upgrade() -> None:
     sa.Column('path', sqlalchemy_utils.types.ltree.LtreeType(), nullable=False),
     sa.Column('course_family_id', postgresql.UUID(), nullable=False),
     sa.Column('organization_id', postgresql.UUID(), nullable=False),
-    sa.Column('version_identifier', sa.String(length=2048), nullable=True),
     sa.ForeignKeyConstraint(['course_family_id'], ['course_family.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['organization_id'], ['organization.id'], onupdate='RESTRICT', ondelete='CASCADE'),
@@ -442,9 +439,8 @@ def upgrade() -> None:
     sa.Column('path', sqlalchemy_utils.types.ltree.LtreeType(), nullable=False),
     sa.Column('course_id', postgresql.UUID(), nullable=False),
     sa.Column('course_content_type_id', postgresql.UUID(), nullable=False),
-    sa.Column('version_identifier', sa.String(length=2048), nullable=False),
     sa.Column('position', sa.Float(precision=53), nullable=False),
-    sa.Column('max_group_size', sa.Integer(), nullable=False),
+    sa.Column('max_group_size', sa.Integer(), nullable=True),
     sa.Column('max_test_runs', sa.Integer(), nullable=True),
     sa.Column('max_submissions', sa.Integer(), nullable=True),
     sa.Column('execution_backend_id', postgresql.UUID(), nullable=True),
@@ -466,6 +462,8 @@ def upgrade() -> None:
     sa.Column('version_tag', sa.String(length=64), nullable=False, comment="Version identifier (e.g., 'v1.0', 'v2.0-beta', commit hash)"),
     sa.Column('version_number', sa.Integer(), nullable=False, comment='Sequential version number for ordering'),
     sa.Column('storage_path', sa.Text(), nullable=False, comment='Path in storage system (MinIO path, S3 key, etc.)'),
+    sa.Column('meta_yaml', sa.Text(), nullable=False, comment='Content of meta.yaml file for this version'),
+    sa.Column('test_yaml', sa.Text(), nullable=True, comment='Content of test.yaml file for this version (optional)'),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this version'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
@@ -478,6 +476,7 @@ def upgrade() -> None:
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_id', postgresql.UUID(), nullable=False, comment='Example that has the dependency'),
     sa.Column('depends_id', postgresql.UUID(), nullable=False, comment='Example that this depends on'),
+    sa.Column('version_constraint', sa.String(100), nullable=True, comment="Version constraint (e.g., '>=1.2.0', '^2.1.0', '~1.3.0'). NULL means latest version."),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['depends_id'], ['example.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['example_id'], ['example.id'], ondelete='CASCADE'),
@@ -804,7 +803,37 @@ def upgrade() -> None:
         ORDER BY depth, depends_id;
         $$ LANGUAGE sql;
     """)
-
+    
+    # Insert default course_content_kinds
+    op.execute("""
+        INSERT INTO course_content_kind (id, title, description, has_ascendants, has_descendants, submittable)
+        VALUES 
+            ('assignment', 'Assignment', 'Programming assignments for students', true, false, true),
+            ('unit', 'Unit', 'Learning units and modules', true, true, false)
+        ON CONFLICT (id) DO NOTHING;
+    """)
+    
+    # Insert default system roles
+    op.execute("""
+        INSERT INTO role (id, title, description, builtin)
+        VALUES 
+            ('_admin', 'Administrator', 'Full system permissions.', true),
+            ('_user_manager', 'User Manager', 'Manage user accounts and permissions.', true),
+            ('_organization_manager', 'Organization Manager', 'Manage organizations and their members.', true)
+        ON CONFLICT (id) DO NOTHING;
+    """)
+    
+    # Insert default course roles
+    op.execute("""
+        INSERT INTO course_role (id, title, description, builtin)
+        VALUES 
+            ('_student', 'Student', 'Course participant with basic permissions.', true),
+            ('_tutor', 'Tutor', 'Course teaching assistant with elevated permissions.', true),
+            ('_lecturer', 'Lecturer', 'Course instructor with full course permissions.', true),
+            ('_maintainer', 'Maintainer', 'Course maintainer with administrative permissions.', true),
+            ('_owner', 'Owner', 'Course owner with full control.', true)
+        ON CONFLICT (id) DO NOTHING;
+    """)
 
 def downgrade() -> None:
     """Downgrade schema."""

@@ -3,11 +3,30 @@ from typing import Optional
 from minio import Minio
 from minio.error import S3Error
 import logging
+from .utils.docker_utils import is_running_in_docker
 
 logger = logging.getLogger(__name__)
 
+
+def get_minio_endpoint() -> str:
+    """
+    Get MinIO endpoint, handling Docker networking.
+    
+    Returns:
+        str: MinIO endpoint URL
+    """
+    endpoint = os.environ.get('MINIO_ENDPOINT', 'localhost:9000')
+    
+    # In Docker environment, use the MinIO service name for container-to-container communication
+    if is_running_in_docker() and 'localhost' in endpoint:
+        # When services communicate within Docker network, use service name
+        return endpoint.replace('localhost', 'minio')
+    
+    return endpoint
+
+
 # Environment configuration
-MINIO_ENDPOINT = os.environ.get('MINIO_ENDPOINT', 'localhost:9000')
+MINIO_ENDPOINT = get_minio_endpoint()
 MINIO_ACCESS_KEY = os.environ.get('MINIO_ACCESS_KEY', 'minioadmin')
 MINIO_SECRET_KEY = os.environ.get('MINIO_SECRET_KEY', 'minioadmin')
 MINIO_SECURE = os.environ.get('MINIO_SECURE', 'false').lower() == 'true'

@@ -1,79 +1,77 @@
 """
-CodeAbility Meta Models for Assignment Repository Structure
+CodeAbility Meta Models for Assignment/Example Metadata
 
-This module defines the Pydantic models for meta.yaml files at different levels 
-of the assignments repository hierarchy:
+This module defines the Pydantic models for meta.yaml files in example directories.
+Each example contains a single meta.yaml file describing the assignment properties,
+files, execution backend, and other metadata.
 
-1. Root Level (Course): CodeAbilityCourseMeta - defines the overall course
-2. Unit Level: CodeAbilityUnitMeta - defines units or content kinds with ascends
-3. Assignment Level: CodeAbilityExampleMeta - defines individual assignments/examples
-
-Each level has its own meta.yaml file with specific fields appropriate for that level.
+Examples are course-agnostic and can be assigned to multiple courses through
+the CourseContent model which links examples to specific course contexts.
 """
 
-from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_yaml import to_yaml_str
 
 
-class LanguageEnum(str, Enum):
-    """Supported languages for course content."""
-    de = "de"
-    en = "en"
-
-
-class MetaTypeEnum(str, Enum):
-    """Types of meta.yaml files in the hierarchy."""
-    Course = "course"
-    Unit = "unit"
-    Assignment = "assignment"
-
-
-class QualificationEnum(str, Enum):
-    """Test qualification types."""
-    verifyEqual = "verifyEqual"
-    matches = "matches"
-    contains = "contains"
-    startsWith = "startsWith"
-    endsWith = "endsWith"
-    count = "count"
-    regexp = "regexp"
-
-
-class TypeEnum(str, Enum):
-    """Test types for assignments."""
-    variable = "variable"
-    graphics = "graphics"
-    structural = "structural"
-    linting = "linting"
-    exist = "exist"
-    error = "error"
-    warning = "warning"
-    help = "help"
-    stdout = "stdout"
-
-
-class StatusEnum(str, Enum):
-    """Execution status for assignments."""
-    scheduled = "SCHEDULED"
-    completed = "COMPLETED"
-    timedout = "TIMEDOUT"
-    crashed = "CRASHED"
-    cancelled = "CANCELLED"
-    skipped = "SKIPPED"
-    failed = "FAILED"
-
-
-class ResultEnum(str, Enum):
-    """Test result types."""
-    passed = "PASSED"
-    failed = "FAILED"
-    skipped = "SKIPPED"
 
 
 # Version regex pattern
 VERSION_REGEX = "^([1-9]\\d*|0)(\\.(([1-9]\\d*)|0)){0,3}$"
+
+
+class TestDependency(BaseModel):
+    """Represents a test dependency with slug and version constraint."""
+    
+    slug: str = Field(
+        ...,
+        description="Hierarchical slug of the dependency example (e.g., 'physics.math.vectors')"
+    )
+    version: Optional[str] = Field(
+        None,
+        description="Version constraint (e.g., '>=1.2.0', '^2.1.0', '1.0.0'). If not specified, uses latest version."
+    )
+    
+    @field_validator('slug')
+    @classmethod
+    def validate_slug(cls, v):
+        """Validate that slug follows hierarchical format."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Slug must be a non-empty string")
+        
+        # Basic validation - could be more strict
+        parts = v.split('.')
+        if len(parts) < 2:
+            raise ValueError("Slug must be hierarchical (e.g., 'domain.subdomain.name')")
+        
+        return v
+    
+    @field_validator('version')
+    @classmethod
+    def validate_version_constraint(cls, v):
+        """Validate version constraint format."""
+        if v is None:
+            return v
+        
+        if not isinstance(v, str):
+            raise ValueError("Version constraint must be a string")
+        
+        # Basic validation for common patterns
+        # Could be enhanced with proper semantic versioning parser
+        valid_prefixes = ['>=', '<=', '>', '<', '^', '~', '==', '']
+        
+        # Remove prefix to check version format
+        version_part = v
+        for prefix in sorted(valid_prefixes, key=len, reverse=True):
+            if v.startswith(prefix):
+                version_part = v[len(prefix):]
+                break
+        
+        # Basic version format check (could be more comprehensive)
+        if version_part and not version_part.replace('.', '').replace('-', '').replace('+', '').isalnum():
+            raise ValueError(f"Invalid version format: {v}")
+        
+        return v
 
 
 class CodeAbilityBase(BaseModel):
@@ -111,17 +109,11 @@ class CodeAbilityPerson(CodeAbilityBase):
 class CourseExecutionBackendConfig(CodeAbilityBase):
     """Configuration for course execution backend."""
     slug: str = Field(description="Unique identifier for the execution backend")
+    version: str = Field(description="Version of the execution backend (e.g., 'r2024b', 'v1.0')")
     settings: Optional[dict] = Field(None, description="Backend-specific settings")
 
 
-class TypeConfig(CodeAbilityBase):
-    """Configuration for content types."""
-    kind: str = Field(description="Type of content (e.g., 'assignment', 'unit')")
-    slug: str = Field(description="Unique identifier for the content type")
-    title: str = Field(description="Human-readable title")
-    color: Optional[str] = Field(None, description="Color for UI representation")
-    description: Optional[str] = Field(None, description="Description of the content type")
-    properties: dict = Field(default_factory=dict, description="Additional properties")
+# TypeConfig removed - content types are managed at CourseContent level, not in examples
 
 
 class CodeAbilityMetaProperties(CodeAbilityBase):
@@ -142,27 +134,45 @@ class CodeAbilityMetaProperties(CodeAbilityBase):
         default_factory=list,
         description="Template files for student projects"
     )
+    testDependencies: Optional[List[Union[str, TestDependency]]] = Field(
+        default_factory=list,
+        description="List of example dependencies. Can be simple strings (slugs) or objects with slug and version constraints"
+    )
+    
+    @field_validator('testDependencies', mode='before')
+    @classmethod
+    def normalize_test_dependencies(cls, v):
+        """Normalize testDependencies to handle mixed string/object format."""
+        if not v:
+            return v
+        
+        if not isinstance(v, list):
+            raise ValueError("testDependencies must be a list")
+        
+        normalized = []
+        for item in v:
+            if isinstance(item, str):
+                # Convert string to TestDependency object with no version constraint (= latest)
+                normalized.append(TestDependency(slug=item, version=None))
+            elif isinstance(item, dict):
+                # Let Pydantic handle dict -> TestDependency conversion
+                normalized.append(item)
+            elif isinstance(item, TestDependency):
+                # Already a TestDependency object
+                normalized.append(item)
+            else:
+                raise ValueError(f"testDependencies items must be strings or objects, got {type(item)}")
+        
+        return normalized
     executionBackend: Optional[CourseExecutionBackendConfig] = Field(
         None,
         description="Execution backend configuration for this assignment"
     )
-    maxTestRuns: Optional[int] = Field(
-        None,
-        ge=0,
-        description="Maximum number of test runs allowed"
-    )
-    maxSubmissions: Optional[int] = Field(
-        None,
-        ge=0,
-        description="Maximum number of submissions allowed"
-    )
-    maxGroupSize: Optional[int] = Field(
-        None,
-        ge=1,
-        description="Maximum group size for collaborative assignments"
-    )
+    # Course-dependent fields removed - these belong to course configuration, not example metadata
+    # maxTestRuns, maxSubmissions, maxGroupSize are course/term specific and should be
+    # configured at the CourseContent or Course level, not in the example meta.yaml
 
-    @field_validator('maxTestRuns', 'maxSubmissions', 'maxGroupSize', 'executionBackend', mode='before')
+    @field_validator('executionBackend', mode='before')
     @classmethod
     def empty_list_to_none(cls, value):
         """Convert empty lists to None."""
@@ -171,16 +181,16 @@ class CodeAbilityMetaProperties(CodeAbilityBase):
         return value
 
 
-class CodeAbilityBaseMeta(CodeAbilityBase):
-    """Base meta information common to all levels."""
+class CodeAbilityMeta(CodeAbilityBase):
+    """Meta information for assignments/examples."""
     version: Optional[str] = Field(
         "1.0",
         pattern=VERSION_REGEX,
         description="Version of the meta format"
     )
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Assignment,
-        description="Type of content (course, unit, assignment)"
+    slug: Optional[str] = Field(
+        None,
+        description="Unique identifier for the assignment"
     )
     title: Optional[str] = Field(
         None,
@@ -191,9 +201,9 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         None,
         description="Detailed description of the content"
     )
-    language: Optional[LanguageEnum] = Field(
-        LanguageEnum.en,
-        description="Primary language of the content"
+    language: Optional[str] = Field(
+        "en",
+        description="Primary language of the content (e.g., 'en', 'de', 'fr', etc.)"
     )
     license: Optional[str] = Field(
         "Not specified",
@@ -220,6 +230,10 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         default_factory=list,
         description="Keywords for categorization"
     )
+    properties: Optional[CodeAbilityMetaProperties] = Field(
+        default_factory=CodeAbilityMetaProperties,
+        description="Assignment-specific properties"
+    )
 
     @field_validator('description', mode='before')
     @classmethod
@@ -230,71 +244,3 @@ class CodeAbilityBaseMeta(CodeAbilityBase):
         return value
 
 
-class CodeAbilityExampleMeta(CodeAbilityBaseMeta):
-    """
-    Meta information for assignment/release level directories.
-    
-    This is used for individual assignments, examples, or exercises.
-    Contains the most detailed information including submission requirements,
-    test configuration, and execution settings.
-    """
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Assignment,
-        description="Must be 'assignment' for release-level meta"
-    )
-    properties: Optional[CodeAbilityMetaProperties] = Field(
-        default_factory=CodeAbilityMetaProperties,
-        description="Assignment-specific properties"
-    )
-
-
-class CodeAbilityUnitMeta(CodeAbilityBaseMeta):
-    """
-    Meta information for unit/content kind directories.
-    
-    This is used for organizational units like chapters, modules, or thematic groups.
-    Contains information about the unit structure and content organization.
-    """
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Unit,
-        description="Must be 'unit' for unit-level meta"
-    )
-    type: str = Field(
-        description="Content type slug (e.g., 'chapter', 'module', 'week')"
-    )
-
-
-class CodeAbilityCourseMeta(CodeAbilityBaseMeta):
-    """
-    Meta information for course root level.
-    
-    This is used at the root of the assignments repository to define
-    the overall course structure, content types, and execution backends.
-    """
-    kind: Optional[MetaTypeEnum] = Field(
-        MetaTypeEnum.Course,
-        description="Must be 'course' for course-level meta"
-    )
-    contentTypes: Optional[List[TypeConfig]] = Field(
-        default_factory=list,
-        description="Available content types for this course"
-    )
-    executionBackends: Optional[List[CourseExecutionBackendConfig]] = Field(
-        default_factory=list,
-        description="Available execution backends for this course"
-    )
-
-
-# Legacy compatibility - keep the old CodeAbilityMeta for backward compatibility
-class CodeAbilityMeta(CodeAbilityExampleMeta):
-    """
-    Legacy meta model for backward compatibility.
-    
-    This extends CodeAbilityExampleMeta with additional fields that were
-    used in the original implementation.
-    """
-    type: str = Field(description="Content type (legacy field)")
-    testDependencies: Optional[List[str]] = Field(
-        default_factory=list,
-        description="Test dependencies (legacy field)"
-    )

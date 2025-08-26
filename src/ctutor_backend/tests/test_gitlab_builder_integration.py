@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from ctutor_backend.generator.gitlab_builder_new import GitLabBuilderNew
+from ctutor_backend.generator.gitlab_builder import GitLabBuilder
 from ctutor_backend.interface.deployments import (
     ComputorDeploymentConfig,
     OrganizationConfig,
@@ -89,7 +89,7 @@ def main():
     # Create builder
     print("\n🔨 Creating GitLab builder...")
     try:
-        builder = GitLabBuilderNew(
+        builder = GitLabBuilder(
             db_session=db_session,
             gitlab_url=TEST_GITLAB_URL,
             gitlab_token=TEST_GITLAB_TOKEN,

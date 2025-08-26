@@ -208,6 +208,7 @@ services:
       context: ./
       dockerfile: ./docker/temporal-worker-python/Dockerfile
     restart: unless-stopped
+    command: ["--queues=testing-python"]
     deploy:
       replicas: ${PYTHON_TESTING_WORKER_REPLICAS:-1}
     environment:
@@ -241,6 +242,7 @@ services:
         MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     restart: unless-stopped
     command: ["--queues=testing-matlab"]
+    hostname: ''
     deploy:
       replicas: ${MATLAB_TESTING_WORKER_REPLICAS:-1}
     environment:
@@ -251,13 +253,16 @@ services:
       - DEBUG_MODE=${DEBUG_MODE}
       - SYSTEM_GIT_EMAIL=${SYSTEM_GIT_EMAIL:-worker@computor.local}
       - SYSTEM_GIT_NAME=${SYSTEM_GIT_NAME:-Computor Worker}
-      - PYTHONPATH=/home/worker/src
+      - PYTHONPATH=/home/matlab/src
       - EXECUTION_BACKEND_API_URL=${EXECUTION_BACKEND_API_URL}
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
-      #- MATLAB_RUNTIME_PATH=${MATLAB_RUNTIME_PATH:-/opt/matlab/runtime}
+      - MATLAB_TEST_ENGINE_URL=${MATLAB_TEST_ENGINE_URL}
+      - MATLAB_TEST_ENGINE_TOKEN=${MATLAB_TEST_ENGINE_TOKEN}
+      - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
+      - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
     volumes:
-      - ./src:/home/worker/src:ro
+      - ./src:/home/matlab/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
       #- ${MATLAB_RUNTIME_PATH}:/opt/matlab/runtime:ro
     depends_on:

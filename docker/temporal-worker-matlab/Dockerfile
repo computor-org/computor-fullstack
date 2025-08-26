@@ -12,6 +12,7 @@ USER root
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install --no-install-recommends --yes \
+        software-properties-common \
         python3.10 \
         python3-pip \
         python3.10-venv \
@@ -29,7 +30,9 @@ ADD docker/temporal-worker-matlab/requirements.txt /home/matlab/requirements_mat
 ADD src /home/matlab/
 
 RUN pip install --no-cache-dir --upgrade -r requirements_mat.txt
-RUN pip install -e .
+
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
+
 
 RUN chmod -R 777 /home/matlab
 
@@ -45,5 +48,8 @@ ENV TZ=Europe/Berlin
 # Ensure python3.10 is used
 ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
 
-# Default entrypoint - can be overridden in docker-compose
-ENTRYPOINT ["python", "-m", "ctutor_backend.tasks.temporal_worker"]
+# Copy the matlab-server.py script
+COPY docker/temporal-worker-matlab/matlab-server.py /home/matlab/matlab-server.py
+
+# Default entrypoint - matlab-server.py will start the temporal worker internally
+ENTRYPOINT ["python", "/home/matlab/matlab-server.py"]

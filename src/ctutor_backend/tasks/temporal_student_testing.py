@@ -86,53 +86,72 @@ async def execute_tests_activity(
 ) -> Dict[str, Any]:
     """Execute tests comparing student and reference implementations."""
     
-    # Simple test execution - compare outputs
-    test_results = {
-        "passed": 0,
-        "failed": 0,
-        "total": 0,
-        "details": []
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Import the testing backend system
+    from .testing_backends import execute_tests_with_backend
+    from ctutor_backend.interface.tests import TestJob
+    
+    # Parse the test job configuration
+    test_job = TestJob(**test_config)
+    
+    # Determine backend type from properties or test job
+    backend_type = backend_properties.get("type", "python")
+    
+    # Prepare test and spec file paths based on backend type
+    if backend_type == "matlab":
+        # For MATLAB, the test file and spec file are in specific locations
+        test_file_path = os.path.join(student_path, backend_properties.get("test_file", "solution.m"))
+        spec_file_path = os.path.join(reference_path, backend_properties.get("spec_file", "test_spec.m"))
+    elif backend_type == "python":
+        # For Python, look for test scripts
+        test_file_path = os.path.join(reference_path, "tests", backend_properties.get("test_file", "test_solution.py"))
+        spec_file_path = os.path.join(reference_path, backend_properties.get("spec_file", "spec.yaml"))
+    else:
+        # Generic paths for other backends
+        test_file_path = os.path.join(reference_path, "tests", "test")
+        spec_file_path = os.path.join(reference_path, "spec")
+    
+    logger.info(f"Executing tests with backend: {backend_type}")
+    logger.info(f"Test file: {test_file_path}")
+    logger.info(f"Spec file: {spec_file_path}")
+    
+    # Prepare job configuration for the backend
+    job_config = {
+        "user_id": test_job.user_id,
+        "course_member_id": test_job.course_member_id,
+        "course_content_id": test_job.course_content_id,
+        "execution_backend_id": test_job.execution_backend_id,
+        "test_number": test_job.test_number,
+        "submission_number": test_job.submission_number,
+        "submit": test_config.get("submit", False),
+        "student_path": student_path,
+        "reference_path": reference_path
     }
     
-    # Example: Run Python tests if test scripts exist
-    test_script_path = os.path.join(reference_path, "tests", "test_solution.py")
-    
-    if os.path.exists(test_script_path):
-        # Run pytest
-        cmd = ["python", "-m", "pytest", test_script_path, "-v", "--json-report"]
-        result = subprocess.run(
-            cmd,
-            cwd=student_path,
-            capture_output=True,
-            text=True
+    # Execute tests using the appropriate backend
+    try:
+        test_results = await execute_tests_with_backend(
+            backend_type=backend_type,
+            test_file_path=test_file_path,
+            spec_file_path=spec_file_path,
+            test_job_config=job_config,
+            backend_properties=backend_properties
         )
         
-        test_results["total"] = 1
-        if result.returncode == 0:
-            test_results["passed"] = 1
-            test_results["details"].append({
-                "test": "pytest",
-                "status": "passed",
-                "output": result.stdout
-            })
-        else:
-            test_results["failed"] = 1
-            test_results["details"].append({
-                "test": "pytest",
-                "status": "failed",
-                "output": result.stderr
-            })
-    else:
-        # Default: Just check if files exist
-        test_results["total"] = 1
-        test_results["passed"] = 1
-        test_results["details"].append({
-            "test": "basic",
-            "status": "passed",
-            "output": "Basic validation passed"
-        })
-    
-    return test_results
+        logger.info(f"Test execution completed. Results: {test_results}")
+        return test_results
+        
+    except Exception as e:
+        logger.error(f"Error executing tests: {e}")
+        return {
+            "passed": 0,
+            "failed": 1,
+            "total": 1,
+            "error": str(e),
+            "details": {"exception": str(e)}
+        }
 
 
 @activity.defn(name="commit_test_results")

@@ -82,24 +82,6 @@ def initialize_course_content_kinds(db: Session):
     
     db.commit()
 
-
-def initialize_execution_backends(db: Session):
-    """Initialize default execution backends (now handled by Alembic migration)."""
-    print("⚙️  Checking execution backends...")
-    
-    # This is now created in the Alembic migration
-    # Just verify it exists
-    backend_slug = 'temporal.builtin'
-    
-    existing_backend = db.query(ExecutionBackend).filter(ExecutionBackend.slug == backend_slug).first()
-    if existing_backend:
-        print(f"   ✅ Execution backend exists: {backend_slug}")
-    else:
-        print(f"   ⚠️  Execution backend missing: {backend_slug} (check migrations)")
-    
-    db.commit()
-
-
 def initialize_example_repositories(db: Session):
     """Initialize default example repositories."""
     print("📚 Initializing example repositories...")
@@ -267,7 +249,6 @@ def main():
             initialize_system_roles(db)
             initialize_course_roles(db)
             initialize_course_content_kinds(db)
-            initialize_execution_backends(db)
             initialize_example_repositories(db)
             create_admin_user(db)
             

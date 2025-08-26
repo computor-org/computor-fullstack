@@ -197,86 +197,88 @@ class StudentTestingWorkflow(BaseWorkflow):
         workflow.logger.info(f"Starting student testing for job {job_id}")
         started_at = datetime.utcnow()
         
-        try:
-            # Parse test job
-            job_config = TestJob(**test_job)
-            
-            # Create temporary directory name (will be created in activity)
-            work_dir = f"/tmp/test-{job_id}"
-            student_path = os.path.join(work_dir, "student")
-            reference_path = os.path.join(work_dir, "reference")
-            
-            # Clone student repository
-            workflow.logger.info("Cloning student repository")
-            await workflow.execute_activity(
-                clone_repository_activity,
-                args=[job_config.module.model_dump(), student_path],
-                start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(maximum_attempts=3)
-            )
-            
-            # Clone reference repository
-            workflow.logger.info("Cloning reference repository")
-            await workflow.execute_activity(
-                clone_repository_activity,
-                args=[job_config.reference.model_dump(), reference_path],
-                start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(maximum_attempts=3)
-            )
-            
-            # Execute tests
-            workflow.logger.info("Executing tests")
-            test_results = await workflow.execute_activity(
-                execute_tests_activity,
-                args=[student_path, reference_path, test_job, execution_backend_properties],
-                start_to_close_timeout=timedelta(minutes=20),
-                retry_policy=RetryPolicy(maximum_attempts=1)
-            )
-            
-            # Commit results
-            workflow.logger.info("Committing results to API")
-            api_config = {
-                "url": os.environ.get("EXECUTION_BACKEND_API_URL", "http://localhost:8000"),
-                "username": os.environ.get("EXECUTION_BACKEND_API_USER", "admin"),
-                "password": os.environ.get("EXECUTION_BACKEND_API_PASSWORD", "admin")
-            }
-            
-            commit_success = await workflow.execute_activity(
-                commit_test_results_activity,
-                args=[job_id, test_results, api_config],
-                start_to_close_timeout=timedelta(minutes=2),
-                retry_policy=RetryPolicy(maximum_attempts=3)
-            )
-            
-            completed_at = datetime.utcnow()
-            
-            return WorkflowResult(
-                status="completed",
-                result={
-                    "test_job_id": job_id,
-                    "test_results": test_results,
-                    "api_commit_success": commit_success,
-                    "started_at": started_at.isoformat(),
-                    "completed_at": completed_at.isoformat(),
-                    "duration_seconds": (completed_at - started_at).total_seconds()
-                },
-                metadata={
-                    "workflow_type": "student_testing",
-                    "passed": test_results["passed"],
-                    "failed": test_results["failed"],
-                    "total": test_results["total"]
+        with tempfile.TemporaryDirectory() as work_dir:
+            try:
+                # Parse test job
+                job_config = TestJob(**test_job)
+                
+                # Create temporary directory name (will be created in activity)
+                
+                #work_dir = f"/tmp/test-{job_id}"
+                student_path = os.path.join(work_dir, "student")
+                reference_path = os.path.join(work_dir, "reference")
+                
+                # Clone student repository
+                workflow.logger.info("Cloning student repository")
+                await workflow.execute_activity(
+                    clone_repository_activity,
+                    args=[job_config.module.model_dump(), student_path],
+                    start_to_close_timeout=timedelta(minutes=5),
+                    retry_policy=RetryPolicy(maximum_attempts=3)
+                )
+                
+                # Clone reference repository
+                workflow.logger.info("Cloning reference repository")
+                await workflow.execute_activity(
+                    clone_repository_activity,
+                    args=[job_config.reference.model_dump(), reference_path],
+                    start_to_close_timeout=timedelta(minutes=5),
+                    retry_policy=RetryPolicy(maximum_attempts=3)
+                )
+                
+                # Execute tests
+                workflow.logger.info("Executing tests")
+                test_results = await workflow.execute_activity(
+                    execute_tests_activity,
+                    args=[student_path, reference_path, test_job, execution_backend_properties],
+                    start_to_close_timeout=timedelta(minutes=20),
+                    retry_policy=RetryPolicy(maximum_attempts=1)
+                )
+                
+                # Commit results
+                workflow.logger.info("Committing results to API")
+                api_config = {
+                    "url": os.environ.get("EXECUTION_BACKEND_API_URL", "http://localhost:8000"),
+                    "username": os.environ.get("EXECUTION_BACKEND_API_USER", "admin"),
+                    "password": os.environ.get("EXECUTION_BACKEND_API_PASSWORD", "admin")
                 }
-            )
-            
-        except Exception as e:
-            workflow.logger.error(f"Student testing failed: {str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=str(e),
-                metadata={
-                    "workflow_type": "student_testing",
-                    "test_job_id": job_id
-                }
-            )
+                
+                commit_success = await workflow.execute_activity(
+                    commit_test_results_activity,
+                    args=[job_id, test_results, api_config],
+                    start_to_close_timeout=timedelta(minutes=2),
+                    retry_policy=RetryPolicy(maximum_attempts=3)
+                )
+                
+                completed_at = datetime.utcnow()
+                
+                return WorkflowResult(
+                    status="completed",
+                    result={
+                        "test_job_id": job_id,
+                        "test_results": test_results,
+                        "api_commit_success": commit_success,
+                        "started_at": started_at.isoformat(),
+                        "completed_at": completed_at.isoformat(),
+                        "duration_seconds": (completed_at - started_at).total_seconds()
+                    },
+                    metadata={
+                        "workflow_type": "student_testing",
+                        "passed": test_results["passed"],
+                        "failed": test_results["failed"],
+                        "total": test_results["total"]
+                    }
+                )
+                
+            except Exception as e:
+                workflow.logger.error(f"Student testing failed: {str(e)}")
+                return WorkflowResult(
+                    status="failed",
+                    result=None,
+                    error=str(e),
+                    metadata={
+                        "workflow_type": "student_testing",
+                        "test_job_id": job_id
+                    }
+                )
 

@@ -8,7 +8,6 @@ from ctutor_backend.api.permissions import check_course_permissions
 from ctutor_backend.api.results import get_result_status
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet
-from ctutor_backend.interface.course_members import CourseMemberProperties
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.permissions import Principal
@@ -65,7 +64,6 @@ async def create_test(
         raise NotFoundException(detail="Course member not found")
 
     course_member_id = course_member.id
-    course_member_properties = CourseMemberProperties(**course_member.properties)
 
     # Subquery for counting existing results
     results_count_subquery = (
@@ -164,13 +162,19 @@ async def create_test(
             Result.version_identifier == commit
         ).all()
 
-    # Get submission group ID
-    course_submission_group_id = db.query(CourseSubmissionGroup.id) \
+    # Get submission group
+    course_submission_group = db.query(CourseSubmissionGroup) \
         .join(CourseSubmissionGroupMember, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
         .filter(
             CourseSubmissionGroupMember.course_member_id == course_member_id,
             CourseSubmissionGroup.course_content_id == assignment.id
-        ).scalar()
+        ).first()
+    
+    if not course_submission_group:
+        raise BadRequestException(detail="No submission group found for this assignment")
+    
+    course_submission_group_id = course_submission_group.id
+    submission_group_properties = course_submission_group.properties or {}
 
     if len(existing_results) > 1:
         raise InternalServerException(f"Multiple Results with commit [{commit}] for this Assignment. Database inconsistency.")
@@ -210,9 +214,10 @@ async def create_test(
 
     # Create new test execution
     # Build repository configurations for GitLab
-    if not course_member_properties.gitlab:
+    gitlab_config = submission_group_properties.get('gitlab')
+    if not gitlab_config:
         raise BadRequestException(
-            detail="Student does not have GitLab repository configured. Please ensure student has been added to GitLab."
+            detail="Student repository not configured for this assignment. Please ensure student repository has been created."
         )
     
     # Validate organization GitLab configuration
@@ -223,12 +228,14 @@ async def create_test(
     if not course_properties.gitlab or not course_properties.gitlab.full_path:
         raise BadRequestException(detail="Course GitLab configuration is missing")
     
-    if course_member_properties.gitlab != None:
+    if gitlab_config != None:
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path
         
-        # Use Example.directory if available, fallback to assignment properties
-        if example and example.directory:
+        # Use directory from submission group if available, then Example.directory, then assignment properties
+        if gitlab_config.get('directory'):
+            assignment_directory = gitlab_config['directory']
+        elif example and example.directory:
             assignment_directory = example.directory
         elif assignment_properties.gitlab and assignment_properties.gitlab.directory:
             assignment_directory = assignment_properties.gitlab.directory
@@ -237,13 +244,13 @@ async def create_test(
         
         token = decrypt_api_key(organization_properties.gitlab.token)
         
-        # Validate that course member has GitLab repository set up
-        if not course_member_properties.gitlab.full_path:
+        # Validate that submission group has GitLab repository set up
+        if not gitlab_config.get('full_path'):
             raise BadRequestException(
-                detail="Student repository not yet created. Please ensure student has been added to GitLab."
+                detail="Student repository path not configured. Please ensure student repository has been created."
             )
         
-        full_path_module = course_member_properties.gitlab.full_path
+        full_path_module = gitlab_config['full_path']
         full_path_reference = f"{full_path_course}/assignments"
 
         gitlab_path_module = f"{provider}/{full_path_module}.git"

@@ -193,7 +193,6 @@ services:
       - EXECUTION_BACKEND_API_USER=${EXECUTION_BACKEND_API_USER}
       - EXECUTION_BACKEND_API_PASSWORD=${EXECUTION_BACKEND_API_PASSWORD}
     volumes:
-      - ./src:/home/worker/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
@@ -228,7 +227,6 @@ services:
       - PYTHON_TEST_ENGINE_TOKEN=${PYTHON_TEST_ENGINE_TOKEN}
       - PYTHON_TEST_ENGINE_VERSION=${PYTHON_TEST_ENGINE_VERSION}
     volumes:
-      - ./src:/home/worker/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
@@ -266,7 +264,6 @@ services:
       - MATLAB_TEST_ENGINE_VERSION=${MATLAB_TEST_ENGINE_VERSION}
       - MLM_LICENSE_FILE=${MATLAB_MLM_LICENSE_FILE}
     volumes:
-      - ./src:/home/matlab/src:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal

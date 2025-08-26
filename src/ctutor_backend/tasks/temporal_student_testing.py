@@ -87,6 +87,9 @@ async def execute_tests_activity(
     """Execute tests comparing student and reference implementations."""
     
     import logging
+    import yaml
+    import json
+    import shutil
     logger = logging.getLogger(__name__)
     
     # Import the testing backend system
@@ -99,19 +102,62 @@ async def execute_tests_activity(
     # Determine backend type from properties or test job
     backend_type = backend_properties.get("type", "python")
     
-    # Prepare test and spec file paths based on backend type
-    if backend_type == "matlab":
-        # For MATLAB, the test file and spec file are in specific locations
-        test_file_path = os.path.join(student_path, backend_properties.get("test_file", "solution.m"))
-        spec_file_path = os.path.join(reference_path, backend_properties.get("spec_file", "test_spec.m"))
-    elif backend_type == "python":
-        # For Python, look for test scripts
-        test_file_path = os.path.join(reference_path, "tests", backend_properties.get("test_file", "test_solution.py"))
-        spec_file_path = os.path.join(reference_path, backend_properties.get("spec_file", "spec.yaml"))
-    else:
-        # Generic paths for other backends
-        test_file_path = os.path.join(reference_path, "tests", "test")
-        spec_file_path = os.path.join(reference_path, "spec")
+    # Create work directory structure within the temp directory
+    work_dir = os.path.dirname(student_path)  # Get parent temp directory
+    artifacts_path = os.path.join(work_dir, "artifacts")
+    test_files_path = os.path.join(work_dir, "test_files")
+    output_path = os.path.join(work_dir, "output")
+    
+    # Constants from old system
+    TEST_FILE_NAME = backend_properties.get("test_file", "test.py")
+    SPEC_FILE_NAME = "spec.yaml"
+    REPORT_FILE_NAME = "report.json"
+    
+    # Create spec file with directory information
+    spec_file_path = os.path.join(work_dir, SPEC_FILE_NAME)
+    specfile_json = {
+        "executionDirectory": student_path,
+        "studentDirectory": student_path,
+        "referenceDirectory": reference_path,
+        "outputDirectory": output_path,
+        "testDirectory": test_files_path,
+        "artifactDirectory": artifacts_path,
+        "studentTestCounter": 2,
+    }
+    
+    with open(spec_file_path, 'w') as yaml_file:
+        yaml.dump(specfile_json, yaml_file)
+    
+    logger.info(f"Created specification file: {spec_file_path}")
+    logger.info(f"Specification: {json.dumps(specfile_json, indent=2)}")
+    
+    # Read meta.yaml from reference repository if it exists
+    meta_info = {}
+    meta_filepath = os.path.join(reference_path, "meta.yaml")
+    if os.path.exists(meta_filepath):
+        try:
+            with open(meta_filepath, "r") as meta_file:
+                meta_info = yaml.safe_load(meta_file)
+                logger.info(f"Loaded meta.yaml: {json.dumps(meta_info, indent=2)}")
+        except Exception as e:
+            logger.warning(f"Could not read meta.yaml: {e}")
+    
+    # Copy test files if specified in meta.yaml
+    mi_properties = meta_info.get("properties", {})
+    mi_test_files = mi_properties.get("testFiles", [])
+    if mi_test_files:
+        os.makedirs(test_files_path, exist_ok=True)
+        for test_file in mi_test_files:
+            try:
+                src = os.path.join(reference_path, test_file)
+                dst = os.path.join(test_files_path, test_file)
+                shutil.copyfile(src, dst)
+                logger.info(f"Copied test file: {test_file}")
+            except Exception as e:
+                logger.warning(f"Could not copy test file {test_file}: {e}")
+    
+    # Test file path is always from reference repository
+    test_file_path = os.path.join(reference_path, TEST_FILE_NAME)
     
     logger.info(f"Executing tests with backend: {backend_type}")
     logger.info(f"Test file: {test_file_path}")
@@ -140,7 +186,46 @@ async def execute_tests_activity(
             backend_properties=backend_properties
         )
         
+        # If no results returned, check for output file (some backends write to file)
+        if test_results is None:
+            report_file_path = os.path.join(output_path, REPORT_FILE_NAME)
+            if os.path.exists(report_file_path):
+                logger.info(f"Reading results from file: {report_file_path}")
+                try:
+                    with open(report_file_path, "r") as report_file:
+                        test_results = json.load(report_file)
+                    logger.info(f"Loaded test results from file: {json.dumps(test_results, indent=2)}")
+                except Exception as e:
+                    logger.error(f"Failed to read report file: {e}")
+                    test_results = {
+                        "passed": 0,
+                        "failed": 1,
+                        "total": 1,
+                        "error": f"Failed to read report file: {e}"
+                    }
+            else:
+                test_results = {
+                    "passed": 0,
+                    "failed": 1,
+                    "total": 1,
+                    "error": "No test results returned and no report file found"
+                }
+        
         logger.info(f"Test execution completed. Results: {test_results}")
+        
+        # Calculate result value for compatibility
+        try:
+            if "summary" in test_results:
+                # Old format with summary
+                result_value = test_results["summary"]["passed"] / test_results["summary"]["total"]
+            else:
+                # New format
+                result_value = test_results.get("passed", 0) / max(test_results.get("total", 1), 1)
+            test_results["result_value"] = result_value
+        except Exception as e:
+            logger.warning(f"Could not calculate result value: {e}")
+            test_results["result_value"] = 0.0
+        
         return test_results
         
     except Exception as e:
@@ -150,7 +235,8 @@ async def execute_tests_activity(
             "failed": 1,
             "total": 1,
             "error": str(e),
-            "details": {"exception": str(e)}
+            "details": {"exception": str(e)},
+            "result_value": 0.0
         }
 
 

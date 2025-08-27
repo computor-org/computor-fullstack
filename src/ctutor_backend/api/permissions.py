@@ -750,8 +750,8 @@ def db_get_course_claims(user_id: str, db: Session):
     
     if is_lecturer == True:
         course_claims.extend([
-            ("permissions", f"{ExampleInterface.__tablename__}:upload"),
-            ("permissions", f"{ExampleInterface.__tablename__}:download")
+            ("permissions", f"{Example.__tablename__}:upload"),
+            ("permissions", f"{Example.__tablename__}:download")
         ])
 
         course_claims.extend(ExampleInterface().claim_values())

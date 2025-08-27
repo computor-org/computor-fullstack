@@ -10,7 +10,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 from ..custom_types import Ltree
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
@@ -27,9 +27,12 @@ from ..interface.example import (
     ExampleUploadRequest,
     ExampleDownloadResponse,
     ExampleFileSet,
+    ExampleInterface,
+    ExampleQuery,
 )
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 from ..api.auth import get_current_permissions
+from ..api.crud import get_id_db, list_db
 from ..api.exceptions import (
     NotFoundException,
     ForbiddenException,
@@ -57,31 +60,24 @@ CACHE_TTL_GET = 600   # 10 minutes
 
 @examples_router.get("", response_model=List[ExampleList])
 async def list_examples(
+    response: Response,
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
+    params: ExampleQuery = Depends(),
     redis_client=Depends(get_redis_client),
 ):
     """List all examples."""
-    # Check permissions
-    if not permissions.permitted("example", "read"):
-        raise ForbiddenException("You don't have permission to view examples")
+    list_result, total = await list_db(permissions, db, params, ExampleInterface)
+    response.headers["X-Total-Count"] = str(total)
     
-    # Try cache first
-    cache_key = "examples:list"
-    cached_result = await redis_client.get(cache_key)
-    if cached_result:
-        return [ExampleList.model_validate(e) for e in json.loads(cached_result)]
+    # Cache the result
+    # cache_data = {
+    #     "items": [item.model_dump(mode='json') for item in list_result],
+    #     "total": total
+    # }
+    # await cache.set(cache_key, cache_data, ttl=self.dto.cache_ttl)
     
-    # Get examples
-    examples = db.query(Example).all()
-    
-    # Cache result
-    result = [ExampleList.model_validate(e) for e in examples]
-    # Use model_dump with mode='json' to handle UUID serialization
-    serializable_data = [r.model_dump(mode='json') for r in result]
-    await redis_client.set(cache_key, json.dumps(serializable_data), ttl=CACHE_TTL_LIST)
-    
-    return result
+    return list_result
 
 
 @examples_router.get("/{example_id}", response_model=ExampleGet)
@@ -92,28 +88,7 @@ async def get_example(
     redis_client=Depends(get_redis_client),
 ):
     """Get a specific example."""
-    # Check permissions
-    if not permissions.permitted("example", "read"):
-        raise ForbiddenException("You don't have permission to view examples")
-    
-    # Try cache first
-    cache_key = f"example:{example_id}"
-    cached_result = await redis_client.get(cache_key)
-    if cached_result:
-        return ExampleGet.model_validate(json.loads(cached_result))
-    
-    # Get example
-    example = db.query(Example).filter(Example.id == example_id).first()
-    
-    if not example:
-        raise NotFoundException(f"Example {example_id} not found")
-    
-    # Cache result
-    result = ExampleGet.model_validate(example)
-    # Use model_dump with mode='json' to handle UUID serialization
-    await redis_client.set(cache_key, json.dumps(result.model_dump(mode='json')), ttl=CACHE_TTL_GET)
-    
-    return result
+    return await get_id_db(permissions, db, example_id, ExampleInterface)
 
 
 # ==============================================================================

@@ -312,7 +312,7 @@ async def upload_example(
 ):
     """Upload an example to storage (MinIO)."""
     # Check permissions
-    if not permissions.permitted("example", "create"):
+    if not permissions.permitted("example", "upload"):
         raise ForbiddenException("You don't have permission to upload examples")
     
     # Verify repository exists and is MinIO type
@@ -554,7 +554,7 @@ async def download_example_version(
 ):
     """Download a specific example version from storage, optionally with all dependencies."""
     # Check permissions
-    if not permissions.permitted("example", "read"):
+    if not permissions.permitted("example", "download"):
         raise ForbiddenException("You don't have permission to download examples")
     
     # Get version

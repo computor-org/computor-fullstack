@@ -11,6 +11,7 @@ from ctutor_backend.interface.permissions import Principal, allowed_course_role_
 from ctutor_backend.interface.roles_claims import RoleClaimInterface
 from ctutor_backend.interface.user_roles import UserRoleInterface
 from ctutor_backend.interface.users import UserInterface
+from ctutor_backend.interface.example import ExampleInterface
 from ctutor_backend.model.auth import Account, User, Profile, StudentProfile, Session
 from ctutor_backend.model.course import (
     Course, CourseContent, CourseContentKind, CourseContentType, CourseExecutionBackend, 
@@ -552,7 +553,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         if permissions.permitted(resource,action):
             return db.query(entity)
         
-        elif action in ["list","get","create"]:
+        elif action in ["list","get"]:
             query = db.query(entity)
         
         else:
@@ -566,7 +567,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         if permissions.permitted(resource,action):
             return db.query(entity)
         
-        elif action in ["list","get","create"]:
+        elif action in ["list","get"]:
             query = db.query(entity)
         
         else:
@@ -580,7 +581,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         if permissions.permitted(resource,action):
             return db.query(entity)
         
-        elif action in ["list","get","create"]:
+        elif action in ["list","get"]:
             query = db.query(entity)
         
         else:
@@ -659,6 +660,13 @@ def claims_organization_manager():
     claims.extend(CourseFamilyInterface().claim_values())
     claims.extend(CourseInterface().claim_values())
 
+    claims.extend(ExampleInterface().claim_values())
+
+    claims.extend([
+        ("permissions", f"{ExampleInterface.__tablename__}:upload"),
+        ("permissions", f"{ExampleInterface.__tablename__}:download")
+    ])
+
     return claims
 
 def db_apply_roles(role_id: str, claims: list[str], db: Session):
@@ -709,8 +717,7 @@ def db_get_claims(user_id: str, db: Session):
     # Add course_content_kind permissions for get and list
     values.extend([
         ("permissions", f"{CourseContentKind.__tablename__}:get"),
-        ("permissions", f"{CourseContentKind.__tablename__}:list"),
-        ("permissions", f"{Example.__tablename__}:create")
+        ("permissions", f"{CourseContentKind.__tablename__}:list")
     ])
 
     return values
@@ -733,7 +740,20 @@ def db_get_course_claims(user_id: str, db: Session):
 
     course_claims = []
 
+    is_lecturer = False
+
     for course_id, course_role_id in course_members:
         course_claims.append(("permissions",f"{Course.__tablename__}:{course_role_id}:{course_id}"))
+
+        if allowed_course_role_ids(course_role_id) and is_lecturer is False:
+            is_lecturer = True
+    
+    if is_lecturer == True:
+        course_claims.extend([
+            ("permissions", f"{ExampleInterface.__tablename__}:upload"),
+            ("permissions", f"{ExampleInterface.__tablename__}:download")
+        ])
+
+        course_claims.extend(ExampleInterface().claim_values())
 
     return course_claims

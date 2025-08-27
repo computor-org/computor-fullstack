@@ -663,8 +663,8 @@ def claims_organization_manager():
     claims.extend(ExampleInterface().claim_values())
 
     claims.extend([
-        ("permissions", f"{ExampleInterface.__tablename__}:upload"),
-        ("permissions", f"{ExampleInterface.__tablename__}:download")
+        ("permissions", f"{Example.__tablename__}:upload"),
+        ("permissions", f"{Example.__tablename__}:download")
     ])
 
     return claims

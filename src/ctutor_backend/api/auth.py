@@ -24,7 +24,7 @@ from ctutor_backend.redis_cache import get_redis_client
 import logging
 
 logger = logging.getLogger(__name__)
-_expiry_time_authenticated = 1800
+_expiry_time_authenticated = 10
 
 def get_user_id_from_basic(username: str, password: str, db: Session):
 

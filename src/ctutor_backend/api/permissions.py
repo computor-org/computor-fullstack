@@ -11,13 +11,19 @@ from ctutor_backend.interface.permissions import Principal, allowed_course_role_
 from ctutor_backend.interface.roles_claims import RoleClaimInterface
 from ctutor_backend.interface.user_roles import UserRoleInterface
 from ctutor_backend.interface.users import UserInterface
-from ctutor_backend.model.auth import Account, User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseContentType, CourseExecutionBackend, CourseFamily, CourseMemberComment, CourseGroup, CourseMember
+from ctutor_backend.model.auth import Account, User, Profile, StudentProfile, Session
+from ctutor_backend.model.course import (
+    Course, CourseContent, CourseContentKind, CourseContentType, CourseExecutionBackend, 
+    CourseFamily, CourseMemberComment, CourseGroup, CourseMember, CourseRole,
+    CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
+)
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
-from ctutor_backend.model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
+from ctutor_backend.model.group import Group, GroupClaim, UserGroup
+from ctutor_backend.model.message import Message, MessageRead
+from ctutor_backend.model.example import Example, ExampleRepository, ExampleVersion, ExampleDependency
 
 def check_admin(permissions: Principal):
     if permissions.is_admin == True:
@@ -83,6 +89,22 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         
         elif action in ["list","get"]:
             query = db.query(Account).join(User, User.id == Account.user_id).filter(User.id == permitted_user)
+
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+
+        return query
+    
+    elif entity == Profile:
+
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get","update"]:
+            # Users can view and edit their own profile
+            query = db.query(Profile).filter(Profile.user_id == permitted_user)
 
         else:
             raise ForbiddenException(detail={"entity": entity.__tablename__})
@@ -453,7 +475,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         if permissions.permitted(resource,action):
             return db.query(entity)
         
-        elif action in ["list","get"]:
+        elif action in ["list","get","create"]:
             query = db.query(entity)
         
         else:

@@ -474,6 +474,64 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
 
             return query
 
+    elif entity == CourseSubmissionGroup:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+
+        else:
+
+            actions_mapper = {
+                "get": "_tutor",
+                "list": "_tutor",
+                "create": "_maintainer",
+                "update": "_maintainer",
+                "delete": "_maintainer"
+            }
+
+            cm_other = aliased(CourseMember)
+
+            query = (
+                db.query(entity)
+                .select_from(User)
+                .outerjoin(cm_other, cm_other.user_id == User.id)
+                .outerjoin(entity, entity.course_id == cm_other.course_id)
+                .filter(
+                    cm_other.course_id.in_(select(user_courses(permitted_user,actions_mapper[action],db)))
+                )
+            )
+
+            return query
+
+    elif entity == CourseSubmissionGroupMember:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+
+        else:
+
+            actions_mapper = {
+                "get": "_tutor",
+                "list": "_tutor",
+                "update": "_maintainer",
+            }
+
+            cm_other = aliased(CourseMember)
+
+            query = (
+                db.query(entity)
+                .select_from(User)
+                .outerjoin(cm_other, cm_other.user_id == User.id)
+                .outerjoin(CourseSubmissionGroup, CourseSubmissionGroup.id == entity.course_submission_group_id)
+                .filter(
+                    CourseSubmissionGroup.course_id.in_(select(user_courses(permitted_user,actions_mapper[action],db)))
+                )
+            )
+
+            return query
+
     elif entity == Example:
         resource = entity.__tablename__
 
@@ -644,6 +702,15 @@ def db_get_claims(user_id: str, db: Session):
         .distinct(RoleClaim.claim_type,RoleClaim.claim_value)
         .all()
     )
+    
+    # Convert to list to allow extension
+    values = list(values)
+    
+    # Add course_content_kind permissions for get and list
+    values.extend([
+        ("permissions", f"{CourseContentKind.__tablename__}:get"),
+        ("permissions", f"{CourseContentKind.__tablename__}:list")
+    ])
 
     return values
 

@@ -19,8 +19,6 @@ async def get_result_status(result: Result):
     try:
         task_executor = get_task_executor()
         task_info = await task_executor.get_task_status(result.test_system_id)
-
-        print(f"task_info: {task_info}")
         
         # Map task status to result status
         if task_info.status == TaskStatus.QUEUED:

@@ -747,8 +747,13 @@ def db_get_course_claims(user_id: str, db: Session):
     for course_id, course_role_id in course_members:
         course_claims.append(("permissions",f"{Course.__tablename__}:{course_role_id}:{course_id}"))
 
-        if allowed_course_role_ids(course_role_id) and is_lecturer is False:
+        if course_role_id in allowed_course_role_ids("_lecturer"):
             is_lecturer = True
+
+            course_claims.extend([
+                ("permissions", f"{CourseContent.__tablename__}:create"),
+                ("permissions", f"{CourseContent.__tablename__}:update")
+            ])
     
     if is_lecturer == True:
         course_claims.extend([

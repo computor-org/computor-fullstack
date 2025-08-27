@@ -247,7 +247,9 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
 
             actions_mapper = {
                 "get": "_student",
-                "list": "_student"
+                "list": "_student",
+                "create": "_lecturer",
+                "update": "_lecturer"
             }
 
             cm_other = aliased(CourseMember)

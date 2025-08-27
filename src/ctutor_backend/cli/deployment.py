@@ -169,20 +169,20 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 user = user_client.create(user_create)
                 click.echo(f"  ✅ Created user: {user.display_name}")
                 
-                # Set password if provided
-                if user_dep.password:
-                    try:
-                        # Use get_custom_client to get the authenticated client
-                        client = get_custom_client(auth)
-                        
-                        password_payload = {
-                            "username": user_dep.username,
-                            "password": user_dep.password
-                        }
-                        client.create("users/password", password_payload)
-                        click.echo(f"  ✅ Set password for user: {user.display_name}")
-                    except Exception as e:
-                        click.echo(f"  ⚠️  Failed to set password: {e}")
+            # Set password if provided
+            if user_dep.password:
+                try:
+                    # Use get_custom_client to get the authenticated client
+                    client = get_custom_client(auth)
+                    
+                    password_payload = {
+                        "username": user_dep.username,
+                        "password": user_dep.password
+                    }
+                    client.create("password", password_payload)
+                    click.echo(f"  ✅ Set password for user: {user.display_name}")
+                except Exception as e:
+                    click.echo(f"  ⚠️  Failed to set password: {e}")
             
             # Create accounts
             for account_dep in user_deployment.accounts:

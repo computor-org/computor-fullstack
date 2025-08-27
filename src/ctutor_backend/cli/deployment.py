@@ -22,7 +22,7 @@ from ..interface.deployments_refactored import (
     EXAMPLE_DEPLOYMENT,
     EXAMPLE_MULTI_DEPLOYMENT
 )
-from .auth import authenticate, get_crud_client
+from .auth import authenticate, get_crud_client, get_custom_client
 from .config import CLIAuthConfig
 from ..client.crud_client import CustomClient
 from ..interface.users import UserCreate, UserInterface, UserQuery
@@ -168,6 +168,21 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 
                 user = user_client.create(user_create)
                 click.echo(f"  ✅ Created user: {user.display_name}")
+                
+                # Set password if provided
+                if user_dep.password:
+                    try:
+                        # Use get_custom_client to get the authenticated client
+                        client = get_custom_client(auth)
+                        
+                        password_payload = {
+                            "username": user_dep.username,
+                            "password": user_dep.password
+                        }
+                        client.create("users/password", password_payload)
+                        click.echo(f"  ✅ Set password for user: {user.display_name}")
+                    except Exception as e:
+                        click.echo(f"  ⚠️  Failed to set password: {e}")
             
             # Create accounts
             for account_dep in user_deployment.accounts:
@@ -571,13 +586,7 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
         sys.exit(1)
     
     # Setup client with authentication
-    if auth.basic != None:
-        custom_client = CustomClient(url_base=auth.api_url, auth=(auth.basic.username, auth.basic.password))
-    elif auth.gitlab != None:
-        custom_client = CustomClient(url_base=auth.api_url, glp_auth_header=auth.gitlab.model_dump())
-    else:
-        click.echo("❌ No valid authentication method found", err=True)
-        sys.exit(1)
+    custom_client = get_custom_client(auth)
     
     # Deploy execution backends first (before hierarchy)
     if config.execution_backends:

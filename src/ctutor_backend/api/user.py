@@ -36,7 +36,7 @@ def set_user_password(permissions: Annotated[Principal, Depends(get_current_perm
     if permissions.is_admin == False:
         raise NotFoundException()
 
-    if len(payload.password) < 12:
+    if len(payload.password) < 6:
         raise BadRequestException()
 
     if payload.username == None or len(payload.username) < 3:

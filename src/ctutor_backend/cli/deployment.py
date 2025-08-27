@@ -179,7 +179,7 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                         "username": user_dep.username,
                         "password": user_dep.password
                     }
-                    client.create("password", password_payload)
+                    client.create("/user/password", password_payload)
                     click.echo(f"  ✅ Set password for user: {user.display_name}")
                 except Exception as e:
                     click.echo(f"  ⚠️  Failed to set password: {e}")

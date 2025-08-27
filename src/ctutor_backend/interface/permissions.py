@@ -9,8 +9,9 @@ def allowed_course_role_ids(course_role_id: str | None = None):
     hierarchy = {
         "_owner": ["_owner"],
         "_maintainer": ["_maintainer", "_owner"],
-        "_tutor": ["_tutor", "_maintainer", "_owner"],
-        "_student": ["_student", "_tutor", "_maintainer", "_owner"],
+        "_lecturer": ["_lecturer", "_maintainer", "_owner"],
+        "_tutor": ["_tutor", "_lecturer", "_maintainer", "_owner"],
+        "_student": ["_student", "_tutor", "_lecturer", "_maintainer", "_owner"],
     }
 
     return hierarchy.get(course_role_id, [])

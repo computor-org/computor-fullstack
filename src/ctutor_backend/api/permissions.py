@@ -12,7 +12,7 @@ from ctutor_backend.interface.roles_claims import RoleClaimInterface
 from ctutor_backend.interface.user_roles import UserRoleInterface
 from ctutor_backend.interface.users import UserInterface
 from ctutor_backend.model.auth import Account, User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseExecutionBackend, CourseFamily, CourseMemberComment, CourseGroup, CourseMember
+from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseContentType, CourseExecutionBackend, CourseFamily, CourseMemberComment, CourseGroup, CourseMember
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
@@ -235,6 +235,15 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
             )
 
             return query
+
+    elif entity == CourseContentKind:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get"]:
+            query = db.query(entity)
 
     elif entity == CourseGroup:
         resource = entity.__tablename__

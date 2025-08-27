@@ -11,21 +11,25 @@ from ctutor_backend.model.result import Result
 from ctutor_backend.tasks import get_task_executor
 from sqlalchemy.orm import Session
 
+from ctutor_backend.tasks.base import TaskStatus
+
 # TODO: if result status is missing, ResultStatus.NOT_AVAILABLE should be returned
 async def get_result_status(result: Result):
     # Use Temporal task executor
     try:
         task_executor = get_task_executor()
         task_info = await task_executor.get_task_status(result.test_system_id)
+
+        print(f"task_info: {task_info}")
         
         # Map task status to result status
-        if task_info.status == "QUEUED":
+        if task_info.status == TaskStatus.QUEUED:
             return ResultStatus.PENDING
-        elif task_info.status == "STARTED":
+        elif task_info.status == TaskStatus.STARTED:
             return ResultStatus.RUNNING
-        elif task_info.status == "FINISHED":
+        elif task_info.status == TaskStatus.FINISHED:
             return ResultStatus.COMPLETED
-        elif task_info.status == "FAILED":
+        elif task_info.status == TaskStatus.FAILED:
             return ResultStatus.FAILED
         else:
             return ResultStatus.NOT_AVAILABLE

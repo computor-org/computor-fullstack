@@ -119,6 +119,9 @@ services:
       DEBUG_MODE: ${DEBUG_MODE}
       TOKEN_SECRET: ${TOKEN_SECRET}
       REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL}
+      TEMPORAL_HOST: temporal
+      TEMPORAL_PORT: 7233
+      TEMPORAL_NAMESPACE: default
     # depends_on:
     #   postgres:
     #     condition: service_healthy

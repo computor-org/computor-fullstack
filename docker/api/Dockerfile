@@ -16,8 +16,11 @@ RUN chown -R uvicorn:uvicorn /home/uvicorn
 # Switch to uvicorn user
 USER uvicorn
 
-# Install dependencies first
-RUN pip install --no-cache-dir --upgrade -r src/requirements.txt
+# Set PATH to include local pip install directory
+ENV PATH="/home/uvicorn/.local/bin:${PATH}"
+
+# Install dependencies first (--user flag is implicit when running as non-root)
+RUN pip install --user -r src/requirements.txt
 
 # Install the package in editable mode so CLI commands work
-RUN cd src && pip install -e .
+RUN cd src && pip install --user -e .

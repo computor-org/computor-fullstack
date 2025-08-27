@@ -61,12 +61,14 @@ def run_migrations_online() -> None:
 
     """
 
-    POSTGRES_URL = os.environ.get("POSTGRES_URL")
+    POSTGRES_HOST = os.environ.get("POSTGRES_HOST")
+    POSTGRES_PORT = os.environ.get("POSTGRES_PORT")
     POSTGRES_USER = os.environ.get("POSTGRES_USER")
     POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
     POSTGRES_DB = os.environ.get("POSTGRES_DB")
 
-    connectable = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_URL}/{POSTGRES_DB}")
+    connectable = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}")
+    #connectable = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_URL}/{POSTGRES_DB}")
                             
     # connectable = engine_from_config(
     #     config.get_section(config.config_ini_section, {}),

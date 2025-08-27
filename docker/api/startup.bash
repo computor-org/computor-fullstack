@@ -1,15 +1,14 @@
 #!/bin/bash
 
-# Set working directory
-cd /home/uvicorn
 
 # Run Alembic migrations  
+echo "Applying Alembic migrations..."
 cd src/ctutor_backend && alembic upgrade head
+#export PYTHONPATH=$PWD:$PYTHONPATH
 
-cd /home/uvicorn
+echo "Initializing system data..."
+python scripts/initialize_system_data.py
 
-# Initialize system data (roles, admin user, etc.)
-python src/ctutor_backend/scripts/initialize_system_data.py
-
+cd ..
 # Start the server
-cd src && python server.py
+python server.py

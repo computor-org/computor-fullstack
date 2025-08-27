@@ -21,19 +21,19 @@ services:
   postgres:
     image: postgres:16
     ports:
-      - 5432:${POSTGRES_PORT}
-    healthcheck:
-      test: ["CMD-SHELL", "PGUSER=${POSTGRES_USER}", "pg_isready"]
-      interval: 1s
-      timeout: 10s
-      retries: 5
+      - 5432:5437
+    # healthcheck:
+    #   test: ["CMD-SHELL", "PGUSER=${POSTGRES_USER}", "pg_isready"]
+    #   interval: 1s
+    #   timeout: 10s
+    #   retries: 5
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/postgres:/var/lib/postgresql/data
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
-      - PGPORT=${POSTGRES_PORT}
+      - PGPORT=5437
       
   # Temporal PostgreSQL database
   temporal-postgres:
@@ -63,7 +63,7 @@ services:
     ports:
       - 7233:7233
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5433
       - POSTGRES_USER=temporal
       - POSTGRES_PWD=temporal
@@ -119,17 +119,19 @@ services:
       DEBUG_MODE: ${DEBUG_MODE}
       TOKEN_SECRET: ${TOKEN_SECRET}
       REACT_APP_BACKEND_URL: ${REACT_APP_BACKEND_URL}
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+    #   traefik:
+    #     condition: service_started
     depends_on:
-      postgres:
-        condition: service_healthy
-      traefik:
-        condition: service_started
+      - postgres
     labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
-    - "traefik.http.routers.uvicorn.entrypoints=web"
-    - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
-    - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
+      - "traefik.enable=true"
+      - "traefik.http.routers.uvicorn.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.uvicorn.entrypoints=web"
+      - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
   
   # Simple static file server (replaces nginx)
   static-server:
@@ -218,6 +220,8 @@ services:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
+    labels:
+      - traefik.enable=false
 
   # MATLAB Testing Worker (for testing-matlab queue)
   temporal-worker-matlab:
@@ -250,6 +254,8 @@ services:
       - ${SYSTEM_DEPLOYMENT_PATH}/execution-backend:${API_ROOT_PATH}
     depends_on:
       - temporal
+    labels:
+      - traefik.enable=false
 
   # MinIO Object Storage Service
   minio:

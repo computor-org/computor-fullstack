@@ -9,8 +9,10 @@ WORKDIR /home/worker
 USER worker
 
 # Install dependencies first (this will be cached if requirements.txt doesn't change)
-COPY --chown=worker:worker src/requirements.txt /home/worker/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+#COPY --chown=worker:worker src/requirements.txt /home/worker/requirements.txt
+ADD src /home/worker/src
+
+RUN pip install --no-cache-dir --upgrade -r src/requirements.txt
 
 # The source code will be mounted as a volume for hot reload
 # We'll add the source to PYTHONPATH instead of using editable install

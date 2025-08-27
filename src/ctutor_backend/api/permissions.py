@@ -111,6 +111,38 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
 
         return query
     
+    elif entity == StudentProfile:
+
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get","update"]:
+            # Users can view and edit their own student profile
+            query = db.query(StudentProfile).filter(StudentProfile.user_id == permitted_user)
+
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+
+        return query
+    
+    elif entity == Session:
+
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get","create"]:
+            # Users can manage their own sessions
+            query = db.query(Session).filter(Session.user_id == permitted_user)
+
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+
+        return query
+    
     elif entity == ExecutionBackend:
         resource = entity.__tablename__
 
@@ -266,6 +298,21 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
             return db.query(entity)
         
         elif action in ["list","get"]:
+            query = db.query(entity)
+        
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+        
+        return query
+
+    elif entity == CourseRole:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get"]:
+            # CourseRole is a read-only lookup table
             query = db.query(entity)
         
         else:
@@ -447,7 +494,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         if permissions.permitted(resource,action):
             return db.query(entity)
         
-        elif action in ["list","get"]:
+        elif action in ["list","get","create"]:
             query = db.query(entity)
         
         else:
@@ -461,7 +508,7 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         if permissions.permitted(resource,action):
             return db.query(entity)
         
-        elif action in ["list","get"]:
+        elif action in ["list","get","create"]:
             query = db.query(entity)
         
         else:

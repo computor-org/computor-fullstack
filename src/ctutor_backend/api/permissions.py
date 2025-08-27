@@ -17,6 +17,7 @@ from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
+from ctutor_backend.model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
 
 def check_admin(permissions: Principal):
     if permissions.is_admin == True:
@@ -403,6 +404,62 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
             )
 
             return query
+
+    elif entity == Example:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get"]:
+            query = db.query(entity)
+        
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+        
+        return query
+
+    elif entity == ExampleRepository:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get"]:
+            query = db.query(entity)
+        
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+        
+        return query
+
+    elif entity == ExampleVersion:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get"]:
+            query = db.query(entity)
+        
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+        
+        return query
+
+    elif entity == ExampleDependency:
+        resource = entity.__tablename__
+
+        if permissions.permitted(resource,action):
+            return db.query(entity)
+        
+        elif action in ["list","get"]:
+            query = db.query(entity)
+        
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+        
+        return query
 
     else:
         print(f"Type: {entity} is something else")

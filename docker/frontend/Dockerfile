@@ -2,17 +2,16 @@ FROM node:20 AS build
 
 WORKDIR /app
 
-COPY frontend/package.json ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json* frontend/yarn.lock* ./
+RUN npm install --legacy-peer-deps
 
 COPY frontend .
+COPY docker/frontend/nginx.conf ./nginx.conf
 
 ARG REACT_APP_BACKEND_URL
 ENV REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
 
-RUN yarn
-
-RUN yarn build
+RUN npm run build
 
 FROM nginx:latest
 

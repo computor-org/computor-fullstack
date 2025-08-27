@@ -709,7 +709,8 @@ def db_get_claims(user_id: str, db: Session):
     # Add course_content_kind permissions for get and list
     values.extend([
         ("permissions", f"{CourseContentKind.__tablename__}:get"),
-        ("permissions", f"{CourseContentKind.__tablename__}:list")
+        ("permissions", f"{CourseContentKind.__tablename__}:list"),
+        ("permissions", f"{Example.__tablename__}:create")
     ])
 
     return values

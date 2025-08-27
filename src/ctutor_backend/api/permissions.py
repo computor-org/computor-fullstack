@@ -244,6 +244,11 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
         
         elif action in ["list","get"]:
             query = db.query(entity)
+        
+        else:
+            raise ForbiddenException(detail={"entity": entity.__tablename__})
+        
+        return query
 
     elif entity == CourseGroup:
         resource = entity.__tablename__

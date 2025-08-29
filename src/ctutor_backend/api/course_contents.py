@@ -8,10 +8,9 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.permissions.integration import (
-    adaptive_check_course_permissions as check_course_permissions,
-    Principal
-)
+from ctutor_backend.permissions.core import check_course_permissions
+from ctutor_backend.permissions.principal import Principal
+
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
 from ctutor_backend.database import get_db
@@ -59,7 +58,6 @@ async def get_course_content_meta(permissions: Annotated[Principal, Depends(get_
         else:
             return {"content": content}
 
-
 async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
     try:
         await mirror_entity_to_filesystem(str(entity.id),CourseContentInterface,db)
@@ -69,11 +67,9 @@ async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Prin
 course_content_router.on_created.append(event_wrapper)
 course_content_router.on_updated.append(event_wrapper)
 
-
 # Note: We don't need to track CourseContent deletion in ExampleDeployment
 # The deployment tracks what's actually in the student-template repository,
 # not what CourseContent intends to deploy
-
 
 # DTOs for Example Assignment
 
@@ -82,7 +78,6 @@ class AssignExampleRequest(BaseModel):
     example_id: str = Field(description="UUID of the Example to assign")
     example_version: str = Field(default="latest", description="Version to assign (default: latest)")
 
-
 class CourseContentExampleResponse(BaseModel):
     """Response for course content with example information."""
     id: str
@@ -90,7 +85,6 @@ class CourseContentExampleResponse(BaseModel):
     title: str
     example: Optional[Dict[str, Any]] = None
     deployment_status: str = Field(description="pending_release, released, modified")
-
 
 # Example Assignment Endpoints
 
@@ -192,7 +186,6 @@ async def assign_example_to_content(
         deployment_status=content.deployment_status
     )
 
-
 @course_content_router.router.delete("/{content_id}/example")
 async def remove_example_assignment(
     content_id: str,
@@ -236,7 +229,6 @@ async def remove_example_assignment(
         await cache.delete(f"course:{content.course_id}:contents")
     
     return {"status": "removed"}
-
 
 @course_content_router.router.get(
     "/courses/{course_id}/contents-with-examples",
@@ -319,7 +311,6 @@ async def get_course_contents_with_examples(
         await cache.set(cache_key, result, ttl=300)  # Cache for 5 minutes
     
     return result
-
 
 @course_content_router.router.get(
     "/courses/{course_id}/available-examples",
@@ -443,7 +434,6 @@ async def get_available_examples(
         await cache.set(cache_key, result, ttl=300)  # Cache for 5 minutes
     
     return result
-
 
 @course_content_router.router.get(
     "/courses/{course_id}/examples/{example_id}/deployment-preview",

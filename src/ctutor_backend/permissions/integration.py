@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 import logging
 
 # Environment variable to control which system to use
-USE_NEW_PERMISSION_SYSTEM = os.getenv("USE_NEW_PERMISSION_SYSTEM", "false").lower() == "true"
+USE_NEW_PERMISSION_SYSTEM = os.getenv("USE_NEW_PERMISSION_SYSTEM", "true").lower() == "true"
 
 logger = logging.getLogger(__name__)
 

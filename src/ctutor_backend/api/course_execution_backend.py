@@ -2,14 +2,13 @@ from typing import Annotated
 from fastapi import Depends, Response
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
-from ctutor_backend.api.auth import get_current_permissions
+
 from ctutor_backend.api.crud import create_db, list_db
-from ctutor_backend.api.permissions import check_course_permissions
+from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.model.course import CourseExecutionBackend
 from ctutor_backend.interface.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendGet, CourseExecutionBackendInterface, CourseExecutionBackendList, CourseExecutionBackendQuery
-
 course_execution_backend_router = APIRouter()
 
 @course_execution_backend_router.post("", response_model=CourseExecutionBackendGet)

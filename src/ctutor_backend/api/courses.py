@@ -4,18 +4,17 @@ from fastapi import Depends
 from sqlalchemy import exc
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
-from ctutor_backend.api.auth import get_current_permissions
+
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.crud import update_db
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
-from ctutor_backend.api.permissions import check_permissions
+from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.integration import adaptive_check_permissions as check_permissions, Principal
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.course_execution_backends import CourseExecutionBackendGet, CourseExecutionBackendUpdate
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseExecutionBackend
 from ctutor_backend.interface.courses import CourseGet, CourseInterface
-
 course_router = CrudRouter(CourseInterface)
 
 @course_router.router.patch("/{course_id}/execution-backends/{execution_backend_id}", response_model=CourseExecutionBackendGet)

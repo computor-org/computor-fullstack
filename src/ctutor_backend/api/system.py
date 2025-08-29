@@ -6,11 +6,17 @@ from typing import Annotated, Optional, List, Dict, Any
 from fastapi import BackgroundTasks, Depends, APIRouter, File, UploadFile, HTTPException, status
 from datetime import datetime, timezone
 import logging
-from ctutor_backend.api.auth import get_current_permissions
+
 from ctutor_backend.api.crud import get_id_db
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
-from ctutor_backend.api.permissions import check_admin, check_course_permissions, get_permitted_course_ids
+from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.integration import (
+    adaptive_check_admin as check_admin, 
+    adaptive_check_course_permissions as check_course_permissions, 
+    adaptive_get_permitted_course_ids as get_permitted_course_ids,
+    Principal
+)
 from ctutor_backend.api.utils import get_course_id_from_url, sync_dependent_items
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_groups import CourseGroupCreate
@@ -18,7 +24,6 @@ from ctutor_backend.interface.course_members import CourseMemberCreate, CourseMe
 from ctutor_backend.interface.courses import CourseInterface, CourseUpdate
 from ctutor_backend.interface.deployments import ComputorDeploymentConfig, CourseConfig, CourseFamilyConfig, GitLabConfig, OrganizationConfig
 from ctutor_backend.interface.organizations import OrganizationProperties
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.student_profile import StudentProfileCreate
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserCreate, UserGet, UserTypeEnum
@@ -431,7 +436,6 @@ async def system_job_status(task_id: UUID | str, permissions: Annotated[Principa
             "message": f"Task not found: {str(e)}"
         }
 
-
 # SYSTEM RESPONSE ROUTES - NOT CALLABLE FROM NON-SYSTEM CLIENTS
 
 @system_router.patch("/release/courses/{course_id}/callback", response_model=bool)
@@ -499,7 +503,6 @@ async def release_course_response(
        print(e.with_traceback())
        raise BadRequestException(e.args)
 
-
 # HIERARCHY TASK ENDPOINTS
 
 def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: Optional[int], path: str) -> dict:
@@ -512,7 +515,6 @@ def convert_to_gitlab_config(gitlab: GitLabCredentials, parent_group_id: Optiona
     if parent_group_id is not None:
         config["parent"] = parent_group_id
     return config
-
 
 @system_router.post("/hierarchy/organizations/create", response_model=TaskResponse)
 async def create_organization_async(
@@ -563,7 +565,6 @@ async def create_organization_async(
     except Exception as e:
         logger.error(f"Error submitting organization creation task: {e}")
         raise BadRequestException(f"Failed to submit organization creation task: {str(e)}")
-
 
 @system_router.post("/hierarchy/course-families/create", response_model=TaskResponse)
 async def create_course_family_async(
@@ -621,7 +622,6 @@ async def create_course_family_async(
         logger.error(f"Error submitting course family creation task: {e}")
         raise BadRequestException(f"Failed to submit course family creation task: {str(e)}")
 
-
 @system_router.post("/hierarchy/courses/create", response_model=TaskResponse)
 async def create_course_async(
     request: CourseTaskRequest,
@@ -677,7 +677,6 @@ async def create_course_async(
     except Exception as e:
         logger.error(f"Error submitting course creation task: {e}")
         raise BadRequestException(f"Failed to submit course creation task: {str(e)}")
-
 
 # GitLab Release System Endpoints
 
@@ -767,7 +766,6 @@ async def get_pending_changes(
         changes=changes,
         last_release=last_release
     )
-
 
 @system_router.post(
     "/courses/{course_id}/generate-student-template",
@@ -900,7 +898,6 @@ async def generate_student_template(
         contents_to_process=contents_with_examples or 0
     )
 
-
 @system_router.post(
     "/courses/{course_id}/assign-examples",
     response_model=Dict[str, Any]
@@ -980,7 +977,6 @@ async def bulk_assign_examples(
         "updated": updated,
         "failed": failed
     }
-
 
 @system_router.get(
     "/courses/{course_id}/gitlab-status",
@@ -1072,7 +1068,6 @@ async def get_course_gitlab_status(
     
     return status
 
-
 # DEPLOYMENT CONFIGURATION ENDPOINTS
 
 @system_router.post("/hierarchy/create", response_model=dict)
@@ -1145,7 +1140,6 @@ async def create_hierarchy(
         "message": f"Deployment started for {org_name}"
     }
 
-
 @system_router.get("/hierarchy/status/{workflow_id}", response_model=dict)
 async def get_hierarchy_status(
     workflow_id: str,
@@ -1190,5 +1184,3 @@ async def get_hierarchy_status(
             "status": "error",
             "error": str(e)
         }
-
-

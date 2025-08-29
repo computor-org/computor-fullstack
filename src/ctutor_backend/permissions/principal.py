@@ -1,7 +1,7 @@
 import base64
 from collections import defaultdict
 from typing import Optional, Dict, List, Set, Tuple
-from pydantic import BaseModel, model_validator, Field
+from pydantic import BaseModel, model_validator, Field, PrivateAttr
 from ctutor_backend.api.exceptions import NotFoundException
 from functools import lru_cache
 
@@ -112,8 +112,8 @@ class Principal(BaseModel):
     roles: List[str] = Field(default_factory=list)
     claims: Claims = Field(default_factory=Claims)
     
-    # Cache for permission checks
-    _permission_cache: Dict[str, bool] = Field(default_factory=dict, exclude=True)
+    # Cache for permission checks (using private attribute)
+    _permission_cache: Dict[str, bool] = PrivateAttr(default_factory=dict)
     
     class Config:
         arbitrary_types_allowed = True

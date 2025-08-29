@@ -13,7 +13,7 @@ from ctutor_backend.interface.auth import GLPAuthConfig
 from ctutor_backend.interface.course_content_types import CourseContentTypeList
 from ctutor_backend.interface.course_member_comments import CourseMemberCommentList
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberInterface, CourseMemberProperties, CourseMemberQuery
-from ctutor_backend.interface.permissions import Principal
+from ctutor_backend.permissions.integration import Principal
 from ctutor_backend.api.auth import HeaderAuthCredentials, get_auth_credentials, get_current_permissions
 from ctutor_backend.api.permissions import allowed_course_role_ids, check_course_permissions
 from ctutor_backend.api.exceptions import BadRequestException, ForbiddenException, InternalServerException, NotFoundException
@@ -266,7 +266,6 @@ def tutor_list_course_members(permissions: Annotated[Principal, Depends(get_curr
         response_list.append(tutor_course_member)
 
     return response_list
-
 
 async def tutor_course_content_messages_cached(course_content_id: str, course_member_id: str, cache: BaseCache, db: Session) -> tuple[CourseMemberProperties,str,str]:
 

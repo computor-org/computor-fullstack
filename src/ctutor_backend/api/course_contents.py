@@ -8,12 +8,14 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.integration import (
+    adaptive_check_course_permissions as check_course_permissions,
+    Principal
+)
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
-from ctutor_backend.api.permissions import check_course_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet, CourseContentInterface
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseContent, Course
 from ctutor_backend.model.example import Example, ExampleVersion, ExampleDependency

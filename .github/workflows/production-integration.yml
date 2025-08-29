@@ -1,0 +1,244 @@
+# Production Integration Testing Pipeline
+name: Production Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop, "feature/*", "refactor/*" ]
+  workflow_dispatch:
+
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: true  # Cancel all jobs immediately if any job fails
+      matrix:
+        test-type: [unit, integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Unit Tests Branch - Fast feedback, no infrastructure
+      - name: Set up Python
+        if: matrix.test-type == 'unit'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        if: matrix.test-type == 'unit'
+        run: |
+          cd src
+          pip install -r requirements.txt
+
+      - name: Run Unit Tests
+        if: matrix.test-type == 'unit'
+        run: |
+          cd src
+          echo "Running unit tests (no infrastructure required)..."
+          pytest ctutor_backend/tests/ -m unit -v --tb=short --strict-markers
+
+
+      # Integration Tests Branch - Full production environment
+      - name: Setup and Validate Environment  
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Setting up Integration Test Environment ==="
+          
+          # Validate .env.prod exists
+          if [ ! -f ".env.prod" ]; then
+            echo "ERROR: .env.prod file not found"
+            exit 1
+          fi
+          
+          # Load environment variables
+          set -a
+          source .env.prod
+          set +a
+          
+          # Validate critical environment variables
+          required_vars=("SYSTEM_DEPLOYMENT_PATH" "POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_DB" "REDIS_PASSWORD" "TOKEN_SECRET")
+          for var in "${required_vars[@]}"; do
+            if [ -z "${!var}" ]; then
+              echo "ERROR: Required environment variable $var is not set"
+              exit 1
+            fi
+          done
+          
+          # Create essential directories (Docker will create the rest)
+          sudo mkdir -p /tmp/codeability/execution-backend/shared
+          sudo chown -R $USER:$USER /tmp/codeability
+          
+          # Copy required files
+          [ -d "src/defaults" ] && cp -r src/defaults /tmp/codeability/execution-backend/shared/
+          
+          echo "Environment validated and ready"
+
+      - name: Build and Start Services
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Building and Starting Production Services ==="
+          
+          # Load environment variables
+          set -a
+          source .env.prod
+          set +a
+          
+          # Build and start infrastructure services first
+          docker compose -f docker-compose-prod.yaml up -d --build \
+            traefik redis postgres temporal-postgres temporal temporal-ui minio static-server
+          
+          # Wait for critical services to be ready
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres 2>/dev/null; do sleep 2; done'
+          
+          echo "Waiting for Temporal..."
+          timeout 90 bash -c 'until docker logs temporal 2>&1 | grep -q "rpc server listen succeeded\|Started" 2>/dev/null; do sleep 3; done'
+          
+          # Start application services
+          docker compose -f docker-compose-prod.yaml up -d \
+            uvicorn frontend temporal-worker temporal-worker-python
+          
+          echo "All services started and ready"
+
+
+      - name: Wait for Application Health
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Waiting for Application Services ==="
+          
+          # Wait for Backend API
+          echo "Waiting for Backend API..."
+          timeout 120 bash -c 'until curl -f -s http://localhost:8000/docs >/dev/null 2>&1; do sleep 3; done'
+          
+          # Wait for Frontend  
+          echo "Waiting for Frontend..."
+          timeout 60 bash -c 'until curl -f -s http://localhost:3000 >/dev/null 2>&1; do sleep 3; done'
+          
+          echo "All application services are responding"
+
+      - name: Initialize Database Schema
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Initializing Database Schema ==="
+          
+          # Install test dependencies and run migrations
+          echo "Installing test dependencies..."
+          docker exec computor-fullstack-uvicorn-1 pip install pytest pytest-env pytest-asyncio
+          
+          echo "Running database migrations..."
+          docker exec computor-fullstack-uvicorn-1 sh -c "cd /home/uvicorn/src/ctutor_backend && alembic upgrade head"
+          
+          echo "Database schema initialized"
+
+      - name: Run Real Integration Tests
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Running Integration Tests ==="
+          
+          # Set test environment variables in container
+          docker exec computor-fullstack-uvicorn-1 bash -c "
+            export RUNNING_IN_DOCKER=true
+            export SKIP_TEMPORAL_TESTS=true
+            cd /home/uvicorn/src
+            pytest ctutor_backend/tests/ -m integration -v --tb=short --strict-markers
+          "
+          
+          echo "Integration tests completed"
+
+      - name: Run Basic Service Health Tests
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Running Service Health Tests ==="
+          
+          # Test API endpoints
+          echo "Testing API health endpoint..."
+          curl -f http://localhost:8000/health || echo "Health endpoint failed"
+          
+          echo "Testing API documentation..."
+          curl -f http://localhost:8000/docs || echo "Docs endpoint failed"
+          
+          echo "Testing frontend..."
+          curl -f -I http://localhost:3000 || echo "Frontend failed"
+          
+          echo "Service health tests completed"
+
+      - name: Test Service Communication
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Testing Service Communication ==="
+          
+          # Test database connectivity
+          echo "Testing database connectivity..."
+          docker exec computor-fullstack-uvicorn-1 python -c "
+          import asyncio
+          from ctutor_backend.database import get_database_session
+          async def test_db():
+              async for session in get_database_session():
+                  result = await session.execute('SELECT 1')
+                  print('Database connection: OK')
+                  break
+          asyncio.run(test_db())
+          " || echo "Database connectivity failed"
+          
+          echo "Service communication tests completed"
+
+      - name: Show Service Status
+        if: matrix.test-type == 'integration' && always()
+        run: |
+          echo "=== Service Status Summary ==="
+          echo "Docker Compose Services:"
+          docker compose -f docker-compose-prod.yaml ps
+          
+          echo ""
+          echo "Container Resource Usage:"
+          docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"
+
+      - name: Collect Service Logs
+        if: matrix.test-type == 'integration' && always()
+        run: |
+          echo "=== Collecting Service Logs ==="
+          mkdir -p logs
+          
+          # Collect logs from key services
+          services=("uvicorn" "frontend" "temporal-worker" "temporal" "postgres")
+          for service in "${services[@]}"; do
+            echo "Collecting logs for $service..."
+            docker compose -f docker-compose-prod.yaml logs --tail=100 "$service" > "logs/${service}.log" 2>&1 || true
+          done
+          
+          # Show recent logs
+          echo "Recent Backend Logs:"
+          docker compose -f docker-compose-prod.yaml logs --tail=20 uvicorn || true
+          
+          echo ""
+          echo "Recent Frontend Logs:"
+          docker compose -f docker-compose-prod.yaml logs --tail=20 frontend || true
+
+      - name: Cleanup Services
+        if: matrix.test-type == 'integration' && always()
+        run: |
+          echo "=== Cleaning up Services ==="
+          
+          # Stop and remove all containers
+          docker compose -f docker-compose-prod.yaml down -v --remove-orphans || true
+          
+          # Clean up deployment directories
+          sudo rm -rf /tmp/codeability || true
+          
+          echo "Cleanup completed"

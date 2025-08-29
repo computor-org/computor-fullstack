@@ -113,9 +113,17 @@ jobs:
           # Wait for PostgreSQL to be ready first
           timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres; do sleep 2; done'
           
-          # Set up Python environment and run migrations using project script
-          pip install -r src/requirements.txt
-          bash migrations.sh
+          # Run migrations from within Docker network using temporary container
+          # This ensures the 'postgres' hostname can be resolved
+          docker run --rm \
+            --network computor-fullstack_default \
+            -v $(pwd):/workspace \
+            -w /workspace \
+            --env-file .env \
+            python:3.10-slim bash -c "
+              pip install -r src/requirements.txt
+              bash migrations.sh
+            "
           
           echo "Database schema initialized successfully"
 

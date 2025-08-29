@@ -9,7 +9,7 @@ access the parent GitLab group_id.
 
 import sys
 import os
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
 
 # Add src to path
@@ -29,7 +29,8 @@ from ctutor_backend.services.git_service import GitService
 from ..custom_types import Ltree
 
 
-def test_course_family_refresh_fix():
+@patch('ctutor_backend.generator.gitlab_builder.flag_modified')
+def test_course_family_refresh_fix(mock_flag_modified):
     """Test that CourseFamily objects are properly refreshed after GitLab property updates."""
     
     print("🧪 Testing Course Creation Bug Fix")
@@ -120,8 +121,13 @@ def test_course_family_refresh_fix():
     mock_db_session.refresh.assert_called_once_with(mock_course_family)
     print("✅ Database refresh was called with course_family object")
     
-    # Check that properties were updated
-    assert mock_course_family.properties["gitlab"] == gitlab_config
+    # Check that flag_modified was called
+    mock_flag_modified.assert_called_once_with(mock_course_family, "properties")
+    print("✅ flag_modified was called for properties field")
+    
+    # Check that properties were updated (properties is a dict, so check it was assigned)
+    assert "gitlab" in mock_course_family.properties
+    assert mock_course_family.properties.get("gitlab") == gitlab_config
     print("✅ GitLab properties were updated correctly")
     
     print("\n3️⃣ Testing Course GitLab properties update...")
@@ -163,15 +169,9 @@ def test_course_family_refresh_fix():
     print("   - Course object is refreshed from database")
     print("   - In-memory objects now reflect updated GitLab properties")
     print("   - Course creation can now access parent GitLab group_id")
-    
-    return True
 
 
 if __name__ == "__main__":
-    success = test_course_family_refresh_fix()
-    if success:
-        print("\n✅ All tests passed! The fix is working correctly.")
-        exit(0)
-    else:
-        print("\n❌ Tests failed!")
-        exit(1)
+    # This allows running the test directly as a script
+    import pytest
+    sys.exit(pytest.main([__file__, "-v"]))

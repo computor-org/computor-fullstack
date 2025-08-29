@@ -17,6 +17,7 @@ from ctutor_backend.model.auth import User, Account
 import pytest
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Keycloak testing is not configured yet")
 async def test_keycloak_plugin():
     """Test that the Keycloak plugin can be initialized and used"""
     print("🔧 Testing Keycloak plugin initialization...")

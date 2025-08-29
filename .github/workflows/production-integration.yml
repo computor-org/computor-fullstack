@@ -74,10 +74,10 @@ jobs:
           
           echo "Environment configured for production integration testing"
 
-      - name: Build and Start Services
+      - name: Build and Start Infrastructure Services
         if: matrix.test-type == 'integration'
         run: |
-          echo "=== Building and Starting Production Services ==="
+          echo "=== Building and Starting Infrastructure Services First ==="
           
           # Login to GitHub Container Registry for caching
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -99,11 +99,36 @@ jobs:
             docker push $MATLAB_CACHE_IMAGE || echo "Failed to push cache (permissions?)"
           fi
           
-          # Use startup.sh script for production environment with --build flag
-          bash startup.sh prod --build -d
+          # Start only infrastructure services first (database, etc.)
+          docker compose -f docker-compose-prod.yaml up -d --build traefik redis postgres temporal-postgres temporal temporal-ui minio static-server
           
-          echo "All services started and ready"
+          echo "Infrastructure services started"
 
+
+      - name: Initialize Database Schema
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Initializing Database Schema ==="
+          
+          # Wait for PostgreSQL to be ready first
+          timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres; do sleep 2; done'
+          
+          # Set up Python environment and run migrations
+          cd src
+          pip install -r requirements.txt
+          alembic upgrade head
+          
+          echo "Database schema initialized successfully"
+
+      - name: Start Application Services
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Starting Application Services ==="
+          
+          # Now start application services that depend on database
+          docker compose -f docker-compose-prod.yaml up -d uvicorn frontend temporal-worker temporal-worker-python
+          
+          echo "Application services started"
 
       - name: Wait for Application Health
         if: matrix.test-type == 'integration'
@@ -138,19 +163,15 @@ jobs:
           
           echo "All application services are responding"
 
-      - name: Initialize Database Schema
+      - name: Install Test Dependencies
         if: matrix.test-type == 'integration'
         run: |
-          echo "=== Initializing Database Schema ==="
+          echo "=== Installing Test Dependencies ==="
           
-          # Install test dependencies and run migrations - MUST work
-          echo "Installing test dependencies..."
+          # Install test dependencies in backend container
           docker exec computor-fullstack-uvicorn-1 pip install pytest pytest-env pytest-asyncio
           
-          echo "Running database migrations..."
-          docker exec computor-fullstack-uvicorn-1 sh -c "cd /home/uvicorn/src/ctutor_backend && alembic upgrade head"
-          
-          echo "Database schema initialized"
+          echo "Test dependencies installed"
 
       - name: Run Real Integration Tests
         if: matrix.test-type == 'integration'

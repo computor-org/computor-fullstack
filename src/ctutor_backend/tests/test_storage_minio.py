@@ -55,24 +55,24 @@ class TestMinIOClient:
     
     def test_minio_client_environment_config(self):
         """Test MinIO client reads environment configuration"""
-        with patch.dict(os.environ, {
-            'MINIO_ENDPOINT': 'test-endpoint:9000',
-            'MINIO_ACCESS_KEY': 'test-access-key',
-            'MINIO_SECRET_KEY': 'test-secret-key',
-            'MINIO_SECURE': 'true',
-            'MINIO_REGION': 'us-west-2'
-        }):
-            with patch('ctutor_backend.minio_client.Minio') as mock_minio:
-                reset_minio_client()
-                get_minio_client()
-                
-                mock_minio.assert_called_once_with(
-                    'test-endpoint:9000',
-                    access_key='test-access-key',
-                    secret_key='test-secret-key',
-                    secure=True,
-                    region='us-west-2'
-                )
+        # We need to patch the module-level constants, not the environment variables
+        # since they're read at import time
+        with patch('ctutor_backend.minio_client.MINIO_ENDPOINT', 'test-endpoint:9000'):
+            with patch('ctutor_backend.minio_client.MINIO_ACCESS_KEY', 'test-access-key'):
+                with patch('ctutor_backend.minio_client.MINIO_SECRET_KEY', 'test-secret-key'):
+                    with patch('ctutor_backend.minio_client.MINIO_SECURE', True):
+                        with patch('ctutor_backend.minio_client.MINIO_REGION', 'us-west-2'):
+                            with patch('ctutor_backend.minio_client.Minio') as mock_minio:
+                                reset_minio_client()
+                                get_minio_client()
+                                
+                                mock_minio.assert_called_once_with(
+                                    'test-endpoint:9000',
+                                    access_key='test-access-key',
+                                    secret_key='test-secret-key',
+                                    secure=True,
+                                    region='us-west-2'
+                                )
 
 
 class TestStorageService:

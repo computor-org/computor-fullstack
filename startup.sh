@@ -92,4 +92,4 @@ echo "=== Starting Computor Server ==="
 echo "Environment: $ENVIRONMENT"
 echo "Docker compose file: $DOCKERCFILE"
 
-docker-compose -f $DOCKERCFILE up $DOCKER_ARGS
+docker compose -f $DOCKERCFILE up $DOCKER_ARGS

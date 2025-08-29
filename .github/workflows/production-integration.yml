@@ -25,7 +25,7 @@ jobs:
       matrix:
         test-type: [unit, integration]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
@@ -105,111 +105,89 @@ jobs:
           echo "All services started and ready"
 
 
-      - name: Wait for Essential Services
+      - name: Wait for Application Health
         if: matrix.test-type == 'integration'
         run: |
-          echo "=== Waiting for Essential Services ==="
+          echo "=== Waiting for Application Services ==="
           
-          # Wait a bit for containers to start
-          sleep 10
-          
-          # Show what's actually running
+          # Show what's running for debugging
           echo "Docker containers status:"
           docker ps
           
-          # Wait for PostgreSQL
+          # Wait for PostgreSQL - MUST work
           echo "Waiting for PostgreSQL..."
-          timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres 2>/dev/null; do sleep 2; done' || echo "PostgreSQL timeout - continuing anyway"
+          timeout 90 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres; do sleep 2; done'
           
-          # Wait for Temporal (be more flexible with container name)
-          echo "Waiting for Temporal..."
-          TEMPORAL_CONTAINER=$(docker ps --format "{{.Names}}" | grep temporal | head -1)
-          if [ ! -z "$TEMPORAL_CONTAINER" ]; then
-            timeout 60 bash -c "until docker logs $TEMPORAL_CONTAINER 2>&1 | grep -q \"rpc server listen succeeded\\|Started\" 2>/dev/null; do sleep 3; done" || echo "Temporal timeout - continuing anyway"
-          else
-            echo "No Temporal container found - skipping check"
-          fi
+          # Wait for Temporal - MUST work
+          echo "Waiting for Temporal..."  
+          timeout 120 bash -c 'until docker logs temporal 2>&1 | grep -q "rpc server listen succeeded\|Started"; do sleep 3; done'
           
-          echo "Essential services check completed"
+          # Wait for Backend API - MUST work
+          echo "Waiting for Backend API..."
+          timeout 180 bash -c 'until curl -f -s http://localhost:8000/docs >/dev/null; do sleep 3; done'
+          
+          # Wait for Frontend - MUST work  
+          echo "Waiting for Frontend..."
+          timeout 120 bash -c 'until curl -f -s http://localhost:3000 >/dev/null; do sleep 3; done'
+          
+          echo "All application services are responding"
 
       - name: Initialize Database Schema
         if: matrix.test-type == 'integration'
         run: |
           echo "=== Initializing Database Schema ==="
           
-          # Find the backend container
-          BACKEND_CONTAINER=$(docker ps --format "{{.Names}}" | grep uvicorn | head -1)
+          # Install test dependencies and run migrations - MUST work
+          echo "Installing test dependencies..."
+          docker exec computor-fullstack-uvicorn-1 pip install pytest pytest-env pytest-asyncio
           
-          if [ ! -z "$BACKEND_CONTAINER" ]; then
-            echo "Using backend container: $BACKEND_CONTAINER"
-            
-            # Install test dependencies and run migrations
-            echo "Installing test dependencies..."
-            docker exec "$BACKEND_CONTAINER" pip install pytest pytest-env pytest-asyncio || echo "Failed to install dependencies"
-            
-            echo "Running database migrations..."
-            docker exec "$BACKEND_CONTAINER" sh -c "cd /home/uvicorn/src/ctutor_backend && alembic upgrade head" || echo "Migration failed"
-          else
-            echo "No backend container found - trying local migration"
-            cd src
-            pip install -r requirements.txt
-            alembic upgrade head || echo "Local migration failed"
-          fi
+          echo "Running database migrations..."
+          docker exec computor-fullstack-uvicorn-1 sh -c "cd /home/uvicorn/src/ctutor_backend && alembic upgrade head"
           
-          echo "Database schema initialization attempted"
+          echo "Database schema initialized"
 
       - name: Run Real Integration Tests
         if: matrix.test-type == 'integration'
         run: |
           echo "=== Running Integration Tests ==="
           
-          # Find the backend container
-          BACKEND_CONTAINER=$(docker ps --format "{{.Names}}" | grep uvicorn | head -1)
-          
-          if [ ! -z "$BACKEND_CONTAINER" ]; then
-            echo "Running tests in container: $BACKEND_CONTAINER"
-            docker exec "$BACKEND_CONTAINER" bash -c "
-              export RUNNING_IN_DOCKER=true
-              export SKIP_TEMPORAL_TESTS=true
-              cd /home/uvicorn/src
-              pytest ctutor_backend/tests/ -m integration -v --tb=short --strict-markers
-            " || echo "Container tests failed"
-          else
-            echo "No backend container found - running tests locally"
-            cd src
+          # Set test environment variables in container and run tests - MUST pass
+          docker exec computor-fullstack-uvicorn-1 bash -c "
+            export RUNNING_IN_DOCKER=true
             export SKIP_TEMPORAL_TESTS=true
-            pytest ctutor_backend/tests/ -m integration -v --tb=short --strict-markers || echo "Local tests failed"
-          fi
+            cd /home/uvicorn/src
+            pytest ctutor_backend/tests/ -m integration -v --tb=short --strict-markers
+          "
           
-          echo "Integration tests attempted"
+          echo "Integration tests completed successfully"
 
       - name: Run Basic Service Health Tests
         if: matrix.test-type == 'integration'
         run: |
           echo "=== Running Service Health Tests ==="
           
-          # Check what ports are actually exposed
-          echo "Checking exposed ports:"
-          netstat -tlnp 2>/dev/null | grep LISTEN | head -10 || echo "netstat not available"
+          # Test API endpoints - MUST work
+          echo "Testing API health endpoint..."
+          curl -f http://localhost:8000/health
           
-          # Test database connectivity directly
+          echo "Testing API documentation..."
+          curl -f http://localhost:8000/docs
+          
+          echo "Testing frontend..."
+          curl -f -I http://localhost:3000
+          
+          # Test database connectivity - MUST work
           echo "Testing PostgreSQL connection..."
-          docker exec computor-fullstack-postgres-1 pg_isready -U postgres 2>/dev/null || echo "PostgreSQL check failed"
+          docker exec computor-fullstack-postgres-1 pg_isready -U postgres
           
-          # Test if services are accessible (with flexible port checking)
-          for port in 8000 3000 8088; do
-            echo "Testing port $port..."
-            timeout 5 bash -c "curl -f -s http://localhost:$port >/dev/null 2>&1" && echo "Port $port: OK" || echo "Port $port: Not accessible"
-          done
-          
-          echo "Service health tests completed"
+          echo "Service health tests completed successfully"
 
       - name: Test Service Communication
         if: matrix.test-type == 'integration'
         run: |
           echo "=== Testing Service Communication ==="
           
-          # Test database connectivity
+          # Test database connectivity - MUST work
           echo "Testing database connectivity..."
           docker exec computor-fullstack-uvicorn-1 python -c "
           import asyncio
@@ -220,9 +198,9 @@ jobs:
                   print('Database connection: OK')
                   break
           asyncio.run(test_db())
-          " || echo "Database connectivity failed"
+          "
           
-          echo "Service communication tests completed"
+          echo "Service communication tests completed successfully"
 
       - name: Show Service Status
         if: matrix.test-type == 'integration' && always()

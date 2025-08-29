@@ -42,7 +42,7 @@ class TestUserValidation:
                 given_name="John",
                 email="invalid-email"
             )
-        assert "value is not a valid email address" in str(exc_info.value)
+        assert "Email must contain @ symbol" in str(exc_info.value)
     
     def test_user_create_invalid_username(self):
         """Test UserCreate with invalid username (special characters)"""

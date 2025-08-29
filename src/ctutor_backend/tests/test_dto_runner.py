@@ -29,12 +29,9 @@ def run_property_tests():
 
 
 def run_caching_tests():
-    """Run Redis caching tests"""
-    return pytest.main([
-        "src/ctutor_backend/tests/test_redis_caching.py",
-        "-v", 
-        "--tb=short"
-    ])
+    """Run Redis caching tests (disabled - caching removed)"""
+    print("Redis caching tests have been removed")
+    return 0
 
 
 def run_edge_case_tests():
@@ -51,7 +48,6 @@ def run_all_dto_tests():
     test_files = [
         "src/ctutor_backend/tests/test_dto_validation.py",
         "src/ctutor_backend/tests/test_dto_properties.py", 
-        "src/ctutor_backend/tests/test_redis_caching.py",
         "src/ctutor_backend/tests/test_dto_edge_cases.py"
     ]
     

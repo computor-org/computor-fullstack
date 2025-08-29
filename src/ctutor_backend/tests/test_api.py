@@ -24,10 +24,14 @@ class TestAPIImports:
         import ctutor_backend.api.organizations
         assert ctutor_backend.api.organizations is not None
     
-    def test_import_permissions_api(self):
-        """Test importing permissions API module."""
-        import ctutor_backend.api.permissions
-        assert ctutor_backend.api.permissions is not None
+    def test_import_permissions_module(self):
+        """Test importing permissions module."""
+        import ctutor_backend.permissions
+        import ctutor_backend.permissions.core
+        import ctutor_backend.permissions.auth
+        assert ctutor_backend.permissions is not None
+        assert ctutor_backend.permissions.core is not None
+        assert ctutor_backend.permissions.auth is not None
 
 
 @pytest.mark.unit

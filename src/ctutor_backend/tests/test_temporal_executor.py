@@ -23,6 +23,22 @@ class MockWorkflow:
     @classmethod
     def get_task_queue(cls):
         return "test-queue"
+    
+    @classmethod
+    def get_execution_timeout(cls):
+        from datetime import timedelta
+        return timedelta(minutes=10)
+    
+    @classmethod
+    def get_retry_policy(cls):
+        from temporalio.common import RetryPolicy
+        from datetime import timedelta
+        return RetryPolicy(
+            initial_interval=timedelta(seconds=1),
+            backoff_coefficient=2.0,
+            maximum_interval=timedelta(seconds=100),
+            maximum_attempts=3,
+        )
 
 
 class TestTemporalTaskExecutor:
@@ -62,15 +78,15 @@ class TestTemporalTaskExecutor:
                 
                 # Verify workflow was started
                 mock_client.start_workflow.assert_called_once()
-                call_args = mock_client.start_workflow.call_args
+                call_kwargs = mock_client.start_workflow.call_args.kwargs
                 
                 # Check workflow type
-                assert call_args[0][0] == MockWorkflow
+                assert call_kwargs['workflow'] == MockWorkflow
                 
                 # Check parameters
-                assert call_args[1]['arg'] == task_submission.parameters
-                assert call_args[1]['id'] == task_id
-                assert call_args[1]['task_queue'] == "test-queue"
+                assert call_kwargs['arg'] == task_submission.parameters
+                assert call_kwargs['id'] == task_id
+                assert call_kwargs['task_queue'] == "test-queue"
 
     @pytest.mark.asyncio
     async def test_submit_task_with_default_queue(self, executor, mock_client):
@@ -91,8 +107,8 @@ class TestTemporalTaskExecutor:
                 task_id = await executor.submit_task(submission)
                 
                 # Should use workflow's default queue
-                call_args = mock_client.start_workflow.call_args
-                assert call_args[1]['task_queue'] == "test-queue"
+                call_kwargs = mock_client.start_workflow.call_args.kwargs
+                assert call_kwargs['task_queue'] == "test-queue"
 
     @pytest.mark.asyncio
     async def test_submit_task_workflow_not_found(self, executor, mock_client):
@@ -128,7 +144,7 @@ class TestTemporalTaskExecutor:
         describe_result.history_length = 10
         
         workflow_handle.describe.return_value = describe_result
-        mock_client.get_workflow_handle.return_value = workflow_handle
+        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get status
@@ -160,7 +176,7 @@ class TestTemporalTaskExecutor:
         describe_result.history_length = 20
         
         workflow_handle.describe.return_value = describe_result
-        mock_client.get_workflow_handle.return_value = workflow_handle
+        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get status
@@ -183,7 +199,7 @@ class TestTemporalTaskExecutor:
         workflow_handle.result = AsyncMock(return_value=expected_result)
         workflow_handle.describe = AsyncMock()
         
-        mock_client.get_workflow_handle.return_value = workflow_handle
+        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get result
@@ -211,7 +227,7 @@ class TestTemporalTaskExecutor:
         describe_result.close_time = datetime.utcnow()
         workflow_handle.describe = AsyncMock(return_value=describe_result)
         
-        mock_client.get_workflow_handle.return_value = workflow_handle
+        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get result
@@ -231,7 +247,7 @@ class TestTemporalTaskExecutor:
         workflow_handle.id = task_id
         workflow_handle.cancel = AsyncMock()
         
-        mock_client.get_workflow_handle.return_value = workflow_handle
+        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Cancel task
@@ -267,12 +283,15 @@ class TestTemporalTaskExecutor:
         """Test listing tasks."""
         # Mock workflow executions
         mock_execution = MagicMock()
-        mock_execution.workflow_id = "test-id"
-        mock_execution.workflow_type = MagicMock()
-        mock_execution.workflow_type.name = "test_workflow"
+        mock_execution.id = "test-id"
+        mock_execution.workflow_type = "test_workflow"
         mock_execution.status = WorkflowExecutionStatus.RUNNING
         mock_execution.start_time = datetime.utcnow()
+        mock_execution.close_time = None
         mock_execution.task_queue = "test-queue"
+        mock_execution.run_id = "test-run-id"
+        mock_execution.execution_time = datetime.utcnow()
+        mock_execution.history_length = 10
         
         # Create async iterator for list_workflows
         async def mock_list_workflows(**kwargs):
@@ -289,7 +308,7 @@ class TestTemporalTaskExecutor:
             assert len(tasks) == 1
             assert tasks[0]["task_id"] == "test-id"
             assert tasks[0]["task_name"] == "test_workflow"
-            assert tasks[0]["status"] == "STARTED"
+            assert tasks[0]["status"] == "started"
 
     @pytest.mark.asyncio
     async def test_status_mapping(self, executor):

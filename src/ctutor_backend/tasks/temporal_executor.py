@@ -40,6 +40,12 @@ class TemporalTaskExecutor:
             # Task is still running, calculate duration from start to now
             end_time = datetime.now(timezone.utc)
         
+        # Ensure both times are timezone-aware
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+        
         duration = end_time - start_time
         total_seconds = int(duration.total_seconds())
         
@@ -69,7 +75,10 @@ class TemporalTaskExecutor:
             Exception: If task submission fails
         """
         # Validate task exists
-        workflow_class = task_registry.get_task(submission.task_name)
+        try:
+            workflow_class = task_registry.get_task(submission.task_name)
+        except KeyError:
+            raise ValueError(f"Workflow '{submission.task_name}' not found in task registry")
         
         # Get Temporal client
         client = await get_temporal_client()
@@ -83,7 +92,7 @@ class TemporalTaskExecutor:
         
         # Start workflow
         handle = await client.start_workflow(
-            workflow=submission.task_name,
+            workflow=workflow_class,
             arg=submission.parameters,
             id=workflow_id,
             task_queue=task_queue,

@@ -55,39 +55,21 @@ jobs:
 
 
       # Integration Tests Branch - Full production environment
-      - name: Setup and Validate Environment  
+      - name: Setup Environment
         if: matrix.test-type == 'integration'
         run: |
-          echo "=== Setting up Integration Test Environment ==="
+          echo "=== Setting up Production Integration Test Environment ==="
           
-          # Validate .env.prod exists
+          # Use .env.prod for production testing
           if [ ! -f ".env.prod" ]; then
             echo "ERROR: .env.prod file not found"
             exit 1
           fi
           
-          # Load environment variables
-          set -a
-          source .env.prod
-          set +a
+          # Copy to .env (expected by startup.sh script)
+          cp .env.prod .env
           
-          # Validate critical environment variables
-          required_vars=("SYSTEM_DEPLOYMENT_PATH" "POSTGRES_USER" "POSTGRES_PASSWORD" "POSTGRES_DB" "REDIS_PASSWORD" "TOKEN_SECRET")
-          for var in "${required_vars[@]}"; do
-            if [ -z "${!var}" ]; then
-              echo "ERROR: Required environment variable $var is not set"
-              exit 1
-            fi
-          done
-          
-          # Create essential directories (Docker will create the rest)
-          sudo mkdir -p /tmp/codeability/execution-backend/shared
-          sudo chown -R $USER:$USER /tmp/codeability
-          
-          # Copy required files
-          [ -d "src/defaults" ] && cp -r src/defaults /tmp/codeability/execution-backend/shared/
-          
-          echo "Environment validated and ready"
+          echo "Environment configured for production integration testing"
 
       - name: Build and Start Services
         if: matrix.test-type == 'integration'

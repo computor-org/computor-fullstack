@@ -124,7 +124,13 @@ jobs:
           
           # Wait for Backend API - MUST work
           echo "Waiting for Backend API..."
-          timeout 180 bash -c 'until curl -f -s http://localhost:8000/docs >/dev/null; do sleep 3; done'
+          echo "Backend container logs:"
+          docker logs computor-fullstack-uvicorn-1 --tail=20
+          timeout 300 bash -c 'until curl -f -s http://localhost:8000/docs >/dev/null; do 
+            echo "Still waiting for backend... checking logs:"
+            docker logs computor-fullstack-uvicorn-1 --tail=5
+            sleep 5
+          done'
           
           # Wait for Frontend - MUST work  
           echo "Waiting for Frontend..."

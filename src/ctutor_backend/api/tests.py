@@ -5,15 +5,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-from ctutor_backend.api.auth import get_current_permissions
+
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
-from ctutor_backend.api.permissions import check_course_permissions
+from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
 from ctutor_backend.api.results import get_result_status
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.results import ResultCreate, ResultStatus
 from ctutor_backend.interface.tests import TestCreate, TestJob
@@ -26,14 +26,10 @@ from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.example import Example
 from ..custom_types import Ltree
 from ctutor_backend.tasks import get_task_executor, TaskSubmission
-
-
 class TestRunResponse(ResultCreate):
     id: str
 
-
 tests_router = APIRouter()
-
 
 @tests_router.post("", response_model=TestRunResponse)
 async def create_test(

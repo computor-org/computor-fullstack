@@ -7,10 +7,11 @@ from fastapi import Depends
 # from gitlab import Gitlab
 # from gitlab.v4.objects import ProjectCommit
 from sqlalchemy.orm import Session, aliased
-from ctutor_backend.api.auth import get_current_permissions
+
 from ctutor_backend.api.exceptions import NotFoundException
 # from ctutor_backend.api.exceptions import BadRequestException, InternalServerException
-from ctutor_backend.api.permissions import check_course_permissions
+from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
 # from ctutor_backend.api.queries import latest_result_subquery, results_count_subquery
 from ctutor_backend.database import get_db
 # from ctutor_backend.generator.git_helper import clone_or_pull_and_checkout
@@ -19,7 +20,6 @@ from ctutor_backend.interface.course_members import CourseMemberGet, CourseMembe
 from ctutor_backend.interface.courses import CourseGet
 # from ctutor_backend.interface.git import get_git_commits
 # from ctutor_backend.interface.organizations import OrganizationProperties
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.api_builder import CrudRouter
 # from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.interface.users import UserGet
@@ -31,7 +31,6 @@ from ctutor_backend.model.auth import User
 from sqlalchemy import func
 
 from ctutor_backend.settings import settings
-
 course_member_router = CrudRouter(CourseMemberInterface)
 
 @course_member_router.router.get("/{course_member_id}/protocol", response_model=dict)

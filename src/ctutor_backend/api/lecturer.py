@@ -4,12 +4,10 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.courses import CourseGet, CourseInterface, CourseList, CourseQuery
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.api.permissions import check_course_permissions
+from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import Course
-
 lecturer_router = APIRouter()
 
 @lecturer_router.get("/courses/{course_id}", response_model=CourseGet)

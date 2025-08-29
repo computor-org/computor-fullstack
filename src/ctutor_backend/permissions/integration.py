@@ -19,10 +19,10 @@ from ctutor_backend.api.permissions import (
     check_admin as old_check_admin,
     check_course_permissions as old_check_course_permissions,
     get_permitted_course_ids as old_get_permitted_course_ids,
+    db_get_claims as old_db_get_claims,
+    db_get_course_claims as old_db_get_course_claims,
 )
-from ctutor_backend.api.auth import (
-    get_current_permissions as old_get_current_permissions,
-)
+# Note: get_current_permissions remains in api.auth to avoid circular imports
 from ctutor_backend.interface.permissions import (
     Principal as OldPrincipal,
     build_claim_actions as old_build_claim_actions,
@@ -34,11 +34,11 @@ from ctutor_backend.permissions.core import (
     check_admin as new_check_admin,
     check_course_permissions as new_check_course_permissions,
     get_permitted_course_ids as new_get_permitted_course_ids,
+    db_get_claims as new_db_get_claims,
+    db_get_course_claims as new_db_get_course_claims,
     initialize_permission_handlers,
 )
-from ctutor_backend.permissions.auth import (
-    get_current_principal as new_get_current_permissions,
-)
+# Auth functions remain in their original modules to avoid circular imports
 from ctutor_backend.permissions.principal import (
     Principal as NewPrincipal,
     build_claims as new_build_claim_actions,
@@ -113,7 +113,8 @@ if USE_NEW_PERMISSION_SYSTEM:
     check_admin = new_check_admin
     check_course_permissions = new_check_course_permissions
     get_permitted_course_ids = new_get_permitted_course_ids
-    get_current_permissions = new_get_current_permissions
+    db_get_claims = new_db_get_claims
+    db_get_course_claims = new_db_get_course_claims
     Principal = NewPrincipal
     build_claim_actions = new_build_claim_actions
     
@@ -125,7 +126,8 @@ else:
     check_admin = old_check_admin
     check_course_permissions = old_check_course_permissions
     get_permitted_course_ids = old_get_permitted_course_ids
-    get_current_permissions = old_get_current_permissions
+    db_get_claims = old_db_get_claims
+    db_get_course_claims = old_db_get_course_claims
     Principal = OldPrincipal
     build_claim_actions = old_build_claim_actions
     
@@ -173,7 +175,8 @@ __all__ = [
     "check_admin", 
     "check_course_permissions",
     "get_permitted_course_ids",
-    "get_current_permissions",
+    "db_get_claims",
+    "db_get_course_claims",
     "Principal",
     "build_claim_actions",
     

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.mappers import course_member_course_content_result_mapper
 from ctutor_backend.api.messages import get_submission_mergerequest
-from ctutor_backend.api.permissions import check_course_permissions
+from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
 from ctutor_backend.api.queries import user_course_content_list_query, user_course_content_query
 from ctutor_backend.interface.auth import GLPAuthConfig
 from ctutor_backend.interface.course_contents import CourseContentGet
@@ -16,13 +16,11 @@ from ctutor_backend.interface.course_members import CourseMemberProperties
 from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery
 from ctutor_backend.api.auth import HeaderAuthCredentials, get_auth_credentials, get_current_permissions
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseMember
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
-
 student_router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -236,5 +234,3 @@ async def get_signup_init_data(permissions: Annotated[Principal, Depends(get_cur
         repositories.append(f"{props.gitlab.url}/{props.gitlab.full_path}")
 
     return repositories
-
-

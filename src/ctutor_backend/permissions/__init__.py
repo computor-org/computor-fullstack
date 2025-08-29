@@ -77,6 +77,8 @@ from .integration import (
     get_active_system,
     toggle_system,
     USE_NEW_PERMISSION_SYSTEM,
+    # Note: get_current_permissions is not re-exported to avoid circular imports
+    # It should be imported directly from ctutor_backend.api.auth
 )
 
 __all__ = [

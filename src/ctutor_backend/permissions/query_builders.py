@@ -73,17 +73,33 @@ class CoursePermissionQueryBuilder:
         """Build a query filtered by course membership"""
         cm_other = aliased(CourseMember)
         
-        query = (
-            db.query(entity)
-            .select_from(User)
-            .outerjoin(cm_other, cm_other.user_id == User.id)
-            .outerjoin(entity, entity.course_id == cm_other.course_id)
-            .filter(
-                cm_other.course_id.in_(
-                    select(cls.user_courses_subquery(user_id, minimum_role, db))
+        # Check if entity is Course or has course_id
+        if entity.__name__ == 'Course':
+            # For Course entity, use id field
+            query = (
+                db.query(entity)
+                .select_from(User)
+                .outerjoin(cm_other, cm_other.user_id == User.id)
+                .outerjoin(entity, entity.id == cm_other.course_id)
+                .filter(
+                    cm_other.course_id.in_(
+                        select(cls.user_courses_subquery(user_id, minimum_role, db))
+                    )
                 )
             )
-        )
+        else:
+            # For other entities with course_id field
+            query = (
+                db.query(entity)
+                .select_from(User)
+                .outerjoin(cm_other, cm_other.user_id == User.id)
+                .outerjoin(entity, entity.course_id == cm_other.course_id)
+                .filter(
+                    cm_other.course_id.in_(
+                        select(cls.user_courses_subquery(user_id, minimum_role, db))
+                    )
+                )
+            )
         
         return query
 

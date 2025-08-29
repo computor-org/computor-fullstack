@@ -168,6 +168,11 @@ def mock_check_permissions(monkeypatch):
     import ctutor_backend.api.courses
     monkeypatch.setattr(ctutor_backend.api.courses, 'check_permissions', _mock_check_permissions)
     
+    # Also need to handle User endpoint which has special query builder logic
+    import ctutor_backend.api.user
+    if hasattr(ctutor_backend.api.user, 'check_permissions'):
+        monkeypatch.setattr(ctutor_backend.api.user, 'check_permissions', _mock_check_permissions)
+    
     return _mock_check_permissions
 
 
@@ -292,6 +297,56 @@ class TestCoursePermissions:
                 assert response.status_code in [201, 400, 404, 422, 500]  # Various error codes possible
             else:
                 assert response.status_code in [403, 400, 404, 422]  # May fail validation or routing first
+        finally:
+            client.cleanup()
+
+
+class TestUserPermissions:
+    """Test user endpoint permissions with fully mocked dependencies"""
+    
+    @pytest.mark.parametrize("user_type,expected_can_list", [
+        ("admin", True),
+        ("student", True),  # Can see limited user list
+        ("lecturer", True),
+        ("unauthorized", True),  # Can see limited list
+    ])
+    def test_list_users(self, test_client_factory, user_type, expected_can_list):
+        """Test listing users with different user roles"""
+        client = test_client_factory(user_type)
+        
+        try:
+            response = client.get("/users")
+            
+            if expected_can_list:
+                assert response.status_code in [200, 404]  # 404 if no users exist
+            else:
+                assert response.status_code == 403
+        finally:
+            client.cleanup()
+    
+    @pytest.mark.parametrize("user_type,expected_can_create", [
+        ("admin", True),
+        ("student", False),
+        ("lecturer", False),
+        ("unauthorized", False),
+    ])
+    def test_create_user(self, test_client_factory, user_type, expected_can_create):
+        """Test creating users with different user roles"""
+        client = test_client_factory(user_type)
+        
+        try:
+            user_data = {
+                "username": "testuser",
+                "email": "test@example.com",
+                "password": "password123"
+            }
+            
+            response = client.post("/users", json=user_data)
+            
+            if expected_can_create:
+                assert response.status_code in [201, 400, 404, 422, 500]  # Various error codes possible
+            else:
+                assert response.status_code in [403, 400, 404, 422]  # May fail validation first
         finally:
             client.cleanup()
 

@@ -364,12 +364,17 @@ class TestUserPermissions:
     ])
     def test_list_users(self, user_type, expected_status):
         """Test listing users with different roles"""
-        client = create_test_client(user_type)
-        response = client.get("/users")
+        import ctutor_backend.permissions.core
+        original_check_permissions = ctutor_backend.permissions.core.check_permissions
         
-        assert response.status_code in [expected_status, 404]
-        
-        app.dependency_overrides.clear()
+        try:
+            client = create_test_client(user_type)
+            response = client.get("/users")
+            
+            assert response.status_code in [expected_status, 404]
+        finally:
+            app.dependency_overrides.clear()
+            ctutor_backend.permissions.core.check_permissions = original_check_permissions
 
 
 # ============================================================================

@@ -224,14 +224,10 @@ jobs:
           # Test database connectivity - MUST work
           echo "Testing database connectivity..."
           docker exec computor-fullstack-uvicorn-1 python -c "
-          import asyncio
-          from ctutor_backend.database import get_database_session
-          async def test_db():
-              async for session in get_database_session():
-                  result = await session.execute('SELECT 1')
-                  print('Database connection: OK')
-                  break
-          asyncio.run(test_db())
+          from ctutor_backend.database import get_db
+          with next(get_db()) as session:
+              result = session.execute('SELECT 1')
+              print('Database connection: OK')
           "
           
           echo "Service communication tests completed successfully"

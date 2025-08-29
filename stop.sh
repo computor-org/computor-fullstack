@@ -14,4 +14,4 @@ DOCKERCFILE="docker-compose-${ENVIRONMENT}.yaml"
 
 echo "[Stopping Computor Server]"
 
-docker-compose -f $DOCKERCFILE down
+docker compose -f $DOCKERCFILE down

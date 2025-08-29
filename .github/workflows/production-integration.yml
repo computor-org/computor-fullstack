@@ -1,0 +1,278 @@
+# Production Integration Testing Pipeline
+name: Production Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop, "feature/*", "refactor/*" ]
+  workflow_dispatch:
+
+# Cancel in-progress runs when new commits are pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+jobs:
+  tests:
+    strategy:
+      fail-fast: true  # Cancel all jobs immediately if any job fails
+      matrix:
+        test-type: [unit, integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Unit Tests Branch - Fast feedback, no infrastructure
+      - name: Set up Python
+        if: matrix.test-type == 'unit'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        if: matrix.test-type == 'unit'
+        run: |
+          cd src
+          pip install -r requirements.txt
+
+      - name: Run Unit Tests
+        if: matrix.test-type == 'unit'
+        run: |
+          cd src
+          echo "Running unit tests (no infrastructure required)..."
+          pytest ctutor_backend/tests/ -m unit -v --tb=short --strict-markers
+
+
+      # Integration Tests Branch - Full production environment
+      - name: Setup Environment
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Setting up Production Integration Test Environment ==="
+          
+          # Use .env.prod for production testing
+          if [ ! -f ".env.prod" ]; then
+            echo "ERROR: .env.prod file not found"
+            exit 1
+          fi
+          
+          # Copy to .env (expected by startup.sh script)
+          cp .env.prod .env
+          
+          echo "Environment configured for production integration testing"
+
+      - name: Build and Start Infrastructure Services
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Building and Starting Infrastructure Services First ==="
+          
+          # Login to GitHub Container Registry for caching
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # Login to GitLab container registry
+          echo $GITLAB_TOKEN | docker login registry.gitlab.tugraz.at -u gitlab-ci-token --password-stdin
+          
+          # Try to pull cached MATLAB image from GitHub first
+          MATLAB_CACHE_IMAGE="ghcr.io/${{ github.repository_owner }}/matlab-r2024b:latest"
+          MATLAB_SOURCE_IMAGE="registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing/matlab:r2024b"
+          
+          if docker pull $MATLAB_CACHE_IMAGE 2>/dev/null; then
+            echo "Using cached MATLAB image from GitHub"
+            docker tag $MATLAB_CACHE_IMAGE $MATLAB_SOURCE_IMAGE
+          else
+            echo "Caching MATLAB image from TU Graz to GitHub"
+            docker pull $MATLAB_SOURCE_IMAGE
+            docker tag $MATLAB_SOURCE_IMAGE $MATLAB_CACHE_IMAGE
+            docker push $MATLAB_CACHE_IMAGE || echo "Failed to push cache (permissions?)"
+          fi
+          
+          # Start only infrastructure services first (database, etc.)
+          docker compose -f docker-compose-prod.yaml up -d --build traefik redis postgres temporal-postgres temporal temporal-ui minio static-server
+          
+          echo "Infrastructure services started"
+
+
+      - name: Initialize Database Schema
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Initializing Database Schema ==="
+          
+          # Wait for PostgreSQL to be ready first
+          timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres; do sleep 2; done'
+          
+          # Run migrations from within Docker network using temporary container
+          # This ensures the 'postgres' hostname can be resolved
+          docker run --rm \
+            --network computor-fullstack_default \
+            -v $(pwd):/workspace \
+            -w /workspace \
+            --env-file .env \
+            python:3.10-slim bash -c "
+              pip install -r src/requirements.txt
+              bash migrations.sh
+            "
+          
+          echo "Database schema initialized successfully"
+
+      - name: Start Application Services
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Starting Application Services ==="
+          
+          # Now start application services that depend on database
+          docker compose -f docker-compose-prod.yaml up -d uvicorn frontend temporal-worker temporal-worker-python
+          
+          echo "Application services started"
+
+      - name: Wait for Application Health
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Waiting for Application Services ==="
+          
+          # Show what's running for debugging
+          echo "Docker containers status:"
+          docker ps
+          
+          # Wait for PostgreSQL - MUST work
+          echo "Waiting for PostgreSQL..."
+          timeout 90 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres; do sleep 2; done'
+          
+          # Wait for Temporal - MUST work
+          echo "Waiting for Temporal..."  
+          timeout 120 bash -c 'until docker logs temporal 2>&1 | grep -q "rpc server listen succeeded\|Started"; do sleep 3; done'
+          
+          # Wait for Backend API - MUST work
+          echo "Waiting for Backend API..."
+          echo "Backend container logs:"
+          docker logs computor-fullstack-uvicorn-1 --tail=20
+          timeout 300 bash -c 'until curl -f -s http://localhost:8000/docs >/dev/null; do 
+            echo "Still waiting for backend... checking logs:"
+            docker logs computor-fullstack-uvicorn-1 --tail=5
+            sleep 5
+          done'
+          
+          # Wait for Frontend - MUST work  
+          echo "Waiting for Frontend..."
+          timeout 120 bash -c 'until curl -f -s http://localhost:3000 >/dev/null; do sleep 3; done'
+          
+          echo "All application services are responding"
+
+      - name: Install Test Dependencies
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Installing Test Dependencies ==="
+          
+          # Install test dependencies in backend container
+          docker exec computor-fullstack-uvicorn-1 pip install pytest pytest-env pytest-asyncio
+          
+          echo "Test dependencies installed"
+
+      - name: Run Real Integration Tests
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Running Integration Tests ==="
+          
+          # Set test environment variables in container and run tests - MUST pass
+          docker exec computor-fullstack-uvicorn-1 bash -c "
+            export RUNNING_IN_DOCKER=true
+            export SKIP_TEMPORAL_TESTS=true
+            cd /home/uvicorn/src
+            pytest ctutor_backend/tests/ -m integration -v --tb=short --strict-markers
+          "
+          
+          echo "Integration tests completed successfully"
+
+      - name: Run Basic Service Health Tests
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Running Service Health Tests ==="
+          
+          # Test API endpoints - MUST work
+          echo "Testing API root endpoint..."
+          curl -f -I http://localhost:8000/
+          
+          echo "Testing API documentation..."
+          curl -f http://localhost:8000/docs
+          
+          echo "Testing frontend..."
+          curl -f -I http://localhost:3000
+          
+          # Test database connectivity - MUST work
+          echo "Testing PostgreSQL connection..."
+          docker exec computor-fullstack-postgres-1 pg_isready -U postgres
+          
+          echo "Service health tests completed successfully"
+
+      - name: Test Service Communication
+        if: matrix.test-type == 'integration'
+        run: |
+          echo "=== Testing Service Communication ==="
+          
+          # Test database connectivity - MUST work
+          echo "Testing database connectivity..."
+          docker exec computor-fullstack-uvicorn-1 python -c "
+          from ctutor_backend.database import get_db
+          with next(get_db()) as session:
+              result = session.execute('SELECT 1')
+              print('Database connection: OK')
+          "
+          
+          echo "Service communication tests completed successfully"
+
+      - name: Show Service Status
+        if: matrix.test-type == 'integration' && always()
+        run: |
+          echo "=== Service Status Summary ==="
+          echo "Docker Compose Services:"
+          docker compose -f docker-compose-prod.yaml ps
+          
+          echo ""
+          echo "Container Resource Usage:"
+          docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"
+
+      - name: Collect Service Logs
+        if: matrix.test-type == 'integration' && always()
+        run: |
+          echo "=== Collecting Service Logs ==="
+          mkdir -p logs
+          
+          # Collect logs from key services
+          services=("uvicorn" "frontend" "temporal-worker" "temporal" "postgres")
+          for service in "${services[@]}"; do
+            echo "Collecting logs for $service..."
+            docker compose -f docker-compose-prod.yaml logs --tail=100 "$service" > "logs/${service}.log" 2>&1 || true
+          done
+          
+          # Show recent logs
+          echo "Recent Backend Logs:"
+          docker compose -f docker-compose-prod.yaml logs --tail=20 uvicorn || true
+          
+          echo ""
+          echo "Recent Frontend Logs:"
+          docker compose -f docker-compose-prod.yaml logs --tail=20 frontend || true
+
+      - name: Cleanup Services
+        if: matrix.test-type == 'integration' && always()
+        run: |
+          echo "=== Cleaning up Services ==="
+          
+          # Use stop.sh script for production environment
+          bash stop.sh prod || true
+          
+          # Clean up deployment directories
+          sudo rm -rf /tmp/codeability || true
+          
+          echo "Cleanup completed"

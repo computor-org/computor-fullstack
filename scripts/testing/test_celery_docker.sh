@@ -13,8 +13,8 @@ echo "========================================"
 
 # Function to check if Docker Compose is available
 check_docker_compose() {
-    if ! command -v docker-compose &> /dev/null; then
-        echo "❌ docker-compose not found. Please install Docker Compose."
+    if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+        echo "❌ docker compose not found. Please install Docker Compose V2."
         exit 1
     fi
     echo "✅ Docker Compose found"
@@ -23,13 +23,13 @@ check_docker_compose() {
 # Function to start Docker services
 start_services() {
     echo "🐳 Starting Docker Compose services..."
-    docker-compose -f docker-compose-dev.yaml up -d redis celery-worker-high celery-worker-default flower
+    docker compose -f docker-compose-dev.yaml up -d redis celery-worker-high celery-worker-default flower
     
     echo "⏳ Waiting for services to be ready..."
     sleep 15
     
     echo "📋 Service status:"
-    docker-compose -f docker-compose-dev.yaml ps
+    docker compose -f docker-compose-dev.yaml ps
     
     echo ""
     echo "🌸 Flower UI available at:"
@@ -41,7 +41,7 @@ start_services() {
 # Function to stop Docker services
 stop_services() {
     echo "🛑 Stopping Docker Compose services..."
-    docker-compose -f docker-compose-dev.yaml down
+    docker compose -f docker-compose-dev.yaml down
 }
 
 # Function to run tests
@@ -62,7 +62,7 @@ run_tests() {
 # Function to show logs
 show_logs() {
     echo "📋 Showing Celery worker and Flower logs..."
-    docker-compose -f docker-compose-dev.yaml logs celery-worker-high celery-worker-default flower
+    docker compose -f docker-compose-dev.yaml logs celery-worker-high celery-worker-default flower
 }
 
 # Function to show UI information

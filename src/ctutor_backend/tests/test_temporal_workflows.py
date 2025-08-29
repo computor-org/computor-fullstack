@@ -22,7 +22,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_long_running_workflow(self):
         """Test the ExampleLongRunningWorkflow execution."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             # Define parameters
             params = {
                 "duration": 5,
@@ -48,7 +48,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_long_running_workflow_with_string_duration(self):
         """Test workflow with string duration parameter."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             # Define parameters with string duration
             params = {
                 "duration": "10",
@@ -69,7 +69,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_data_processing_workflow(self):
         """Test the ExampleDataProcessingWorkflow execution."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             # Define parameters
             params = {
                 "data_size": 50,
@@ -96,7 +96,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_data_processing_workflow_count_operation(self):
         """Test data processing workflow with count operation."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             params = {
                 "data_size": 30,
                 "chunk_size": 5,
@@ -115,7 +115,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_data_processing_workflow_max_operation(self):
         """Test data processing workflow with max operation."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             params = {
                 "data_size": 20,
                 "chunk_size": 4,
@@ -134,7 +134,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_error_handling_workflow_success(self):
         """Test error handling workflow with successful execution."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             params = {
                 "should_fail": False,
                 "retry_count": 0,
@@ -155,7 +155,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_error_handling_workflow_with_retry(self):
         """Test error handling workflow with retries."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             params = {
                 "should_fail": True,
                 "retry_count": 2,
@@ -175,7 +175,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_example_error_handling_workflow_failure(self):
         """Test error handling workflow with ultimate failure."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             params = {
                 "should_fail": True,
                 "retry_count": 1,
@@ -209,7 +209,7 @@ class TestTemporalWorkflows:
         # Test get_execution_timeout
         assert ExampleLongRunningWorkflow.get_execution_timeout() == timedelta(minutes=5)
         assert ExampleDataProcessingWorkflow.get_execution_timeout() == timedelta(minutes=10)
-        assert ExampleErrorHandlingWorkflow.get_execution_timeout() == timedelta(minutes=10)
+        assert ExampleErrorHandlingWorkflow.get_execution_timeout() == timedelta(hours=1)  # Uses default from BaseWorkflow
 
     @pytest.mark.asyncio
     async def test_activity_simulate_processing(self):
@@ -255,9 +255,9 @@ class TestTemporalWorkflows:
         from ctutor_backend.tasks.registry import task_registry
         
         # Verify workflows are in registry
-        assert task_registry.get("example_long_running") == ExampleLongRunningWorkflow
-        assert task_registry.get("example_data_processing") == ExampleDataProcessingWorkflow
-        assert task_registry.get("example_error_handling") == ExampleErrorHandlingWorkflow
+        assert task_registry.get_task("example_long_running") == ExampleLongRunningWorkflow
+        assert task_registry.get_task("example_data_processing") == ExampleDataProcessingWorkflow
+        assert task_registry.get_task("example_error_handling") == ExampleErrorHandlingWorkflow
 
     @pytest.mark.asyncio
     async def test_workflow_with_custom_queue(self):
@@ -273,7 +273,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_workflow_parameter_validation(self):
         """Test workflow parameter handling and validation."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             # Test with missing parameters (should use defaults)
             params = {}
             
@@ -291,7 +291,7 @@ class TestTemporalWorkflows:
     @pytest.mark.asyncio
     async def test_boolean_string_conversion(self):
         """Test boolean string conversion in error handling workflow."""
-        async with WorkflowEnvironment() as env:
+        async with await WorkflowEnvironment.start_local() as env:
             # Test various string representations of boolean
             for bool_str in ['true', 'True', '1', 'yes']:
                 params = {

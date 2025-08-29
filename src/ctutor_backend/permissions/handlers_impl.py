@@ -237,6 +237,10 @@ class CourseFamilyPermissionHandler(PermissionHandler):
             
             cm_other = aliased(CourseMember)
             
+            subquery = CoursePermissionQueryBuilder.user_courses_subquery(
+                principal.user_id, min_role, db
+            )
+            
             query = (
                 db.query(self.entity)
                 .select_from(User)
@@ -244,11 +248,7 @@ class CourseFamilyPermissionHandler(PermissionHandler):
                 .outerjoin(Course, cm_other.course_id == Course.id)
                 .outerjoin(self.entity, self.entity.id == Course.course_family_id)
                 .filter(
-                    cm_other.course_id.in_(
-                        select(CoursePermissionQueryBuilder.user_courses_subquery(
-                            principal.user_id, min_role, db
-                        ))
-                    )
+                    cm_other.course_id.in_(subquery)
                 )
             )
             
@@ -398,17 +398,17 @@ class CourseContentPermissionHandler(PermissionHandler):
             
             cm_other = aliased(CourseMember)
             
+            subquery = CoursePermissionQueryBuilder.user_courses_subquery(
+                principal.user_id, min_role, db
+            )
+            
             query = (
                 db.query(self.entity)
                 .select_from(User)
                 .outerjoin(cm_other, cm_other.user_id == User.id)
                 .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
                 .filter(
-                    cm_other.course_id.in_(
-                        select(CoursePermissionQueryBuilder.user_courses_subquery(
-                            principal.user_id, min_role, db
-                        ))
-                    )
+                    cm_other.course_id.in_(subquery)
                 )
             )
             
@@ -463,9 +463,9 @@ class CourseMemberPermissionHandler(PermissionHandler):
                 .filter(
                     or_(
                         cm_other.course_id.in_(
-                            select(CoursePermissionQueryBuilder.user_courses_subquery(
+                            CoursePermissionQueryBuilder.user_courses_subquery(
                                 principal.user_id, min_role, db
-                            ))
+                            )
                         ),
                         and_(
                             User.id == principal.user_id,

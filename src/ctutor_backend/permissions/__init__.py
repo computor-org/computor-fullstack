@@ -59,27 +59,7 @@ from .handlers import (
     permission_registry,
 )
 
-from .migration import (
-    MigrationHelper,
-    PrincipalAdapter,
-    enable_new_system,
-    disable_new_system,
-    get_system_status,
-    verify_entity_handler_coverage,
-    run_migration_tests,
-)
-
-from .integration import (
-    adaptive_check_permissions,
-    adaptive_check_admin,
-    adaptive_check_course_permissions,
-    adaptive_get_permitted_course_ids,
-    get_active_system,
-    toggle_system,
-    USE_NEW_PERMISSION_SYSTEM,
-    # Note: get_current_permissions is not re-exported to avoid circular imports
-    # It should be imported directly from ctutor_backend.api.auth
-)
+# Migration and integration modules removed - using new system only
 
 __all__ = [
     # Principal and Claims
@@ -118,21 +98,6 @@ __all__ = [
     "PermissionRegistry",
     "permission_registry",
     
-    # Migration
-    "MigrationHelper",
-    "enable_new_system",
-    "disable_new_system",
-    "get_system_status",
-    
     # Initialization
     "initialize_permission_handlers",
-    
-    # Integration helpers
-    "adaptive_check_permissions",
-    "adaptive_check_admin",
-    "adaptive_check_course_permissions",
-    "adaptive_get_permitted_course_ids",
-    "get_active_system",
-    "toggle_system",
-    "USE_NEW_PERMISSION_SYSTEM",
 ]

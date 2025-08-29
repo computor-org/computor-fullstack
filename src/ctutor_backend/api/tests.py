@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
+from ctutor_backend.permissions.core import check_course_permissions
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.results import get_result_status
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet

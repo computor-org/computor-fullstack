@@ -9,7 +9,8 @@ from ctutor_backend.api.exceptions import BadRequestException, InternalServerExc
 from ctutor_backend.api.crud import update_db
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.permissions.integration import adaptive_check_permissions as check_permissions, Principal
+from ctutor_backend.permissions.core import check_permissions
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_execution_backends import CourseExecutionBackendGet, CourseExecutionBackendUpdate
 from ctutor_backend.api.api_builder import CrudRouter

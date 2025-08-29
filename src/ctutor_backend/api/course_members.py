@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session, aliased
 from ctutor_backend.api.exceptions import NotFoundException
 # from ctutor_backend.api.exceptions import BadRequestException, InternalServerException
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
+from ctutor_backend.permissions.core import check_course_permissions
+from ctutor_backend.permissions.principal import Principal
 # from ctutor_backend.api.queries import latest_result_subquery, results_count_subquery
 from ctutor_backend.database import get_db
 # from ctutor_backend.generator.git_helper import clone_or_pull_and_checkout

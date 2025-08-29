@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session
 from fastapi.security import HTTPBasicCredentials
 from gitlab import Gitlab
 from fastapi import Depends, Request
-from ctutor_backend.api.permissions import db_get_claims, db_get_course_claims
+from ctutor_backend.permissions.core import db_get_claims, db_get_course_claims
 from ctutor_backend.database import get_db
 from ctutor_backend.gitlab_utils import gitlab_current_user
+
 from ctutor_backend.interface.auth import GLPAuthConfig
-from ctutor_backend.interface.permissions import Principal, build_claim_actions
+from ctutor_backend.permissions.principal import Principal, build_claims as build_claim_actions
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import Account, User
 from ctutor_backend.api.exceptions import NotFoundException, UnauthorizedException

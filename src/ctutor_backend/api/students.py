@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
 from ctutor_backend.api.mappers import course_member_course_content_result_mapper
 from ctutor_backend.api.messages import get_submission_mergerequest
-from ctutor_backend.permissions.integration import adaptive_check_course_permissions as check_course_permissions, Principal
+from ctutor_backend.permissions.core import check_course_permissions
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.queries import user_course_content_list_query, user_course_content_query
 from ctutor_backend.interface.auth import GLPAuthConfig
 from ctutor_backend.interface.course_contents import CourseContentGet

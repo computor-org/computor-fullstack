@@ -6,10 +6,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, InternalServerException
-from ctutor_backend.permissions.integration import (
-    adaptive_check_permissions as check_permissions,
-    Principal
-)
+from ctutor_backend.permissions.core import check_permissions
+from ctutor_backend.permissions.principal import Principal
+
 from ctutor_backend.interface.filter import apply_filters
 from ctutor_backend.interface.base import EntityInterface, ListQuery
 from sqlalchemy.inspection import inspect

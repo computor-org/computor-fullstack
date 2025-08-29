@@ -11,12 +11,9 @@ from ctutor_backend.api.crud import get_id_db
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
 from ctutor_backend.api.auth import get_current_permissions
-from ctutor_backend.permissions.integration import (
-    adaptive_check_admin as check_admin, 
-    adaptive_check_course_permissions as check_course_permissions, 
-    adaptive_get_permitted_course_ids as get_permitted_course_ids,
-    Principal
-)
+from ctutor_backend.permissions.core import check_admin, check_course_permissions, get_permitted_course_ids
+from ctutor_backend.permissions.principal import Principal
+
 from ctutor_backend.api.utils import get_course_id_from_url, sync_dependent_items
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_groups import CourseGroupCreate

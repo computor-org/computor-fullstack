@@ -16,6 +16,7 @@ concurrency:
 permissions:
   contents: read
   actions: read
+  packages: write
 
 jobs:
   tests:
@@ -78,8 +79,25 @@ jobs:
         run: |
           echo "=== Building and Starting Production Services ==="
           
+          # Login to GitHub Container Registry for caching
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
           # Login to GitLab container registry
           echo $GITLAB_TOKEN | docker login registry.gitlab.tugraz.at -u gitlab-ci-token --password-stdin
+          
+          # Try to pull cached MATLAB image from GitHub first
+          MATLAB_CACHE_IMAGE="ghcr.io/${{ github.repository_owner }}/matlab-r2024b:latest"
+          MATLAB_SOURCE_IMAGE="registry.gitlab.tugraz.at/codeability/testing-frameworks/itp-matlab-testing/matlab:r2024b"
+          
+          if docker pull $MATLAB_CACHE_IMAGE 2>/dev/null; then
+            echo "Using cached MATLAB image from GitHub"
+            docker tag $MATLAB_CACHE_IMAGE $MATLAB_SOURCE_IMAGE
+          else
+            echo "Caching MATLAB image from TU Graz to GitHub"
+            docker pull $MATLAB_SOURCE_IMAGE
+            docker tag $MATLAB_SOURCE_IMAGE $MATLAB_CACHE_IMAGE
+            docker push $MATLAB_CACHE_IMAGE || echo "Failed to push cache (permissions?)"
+          fi
           
           # Use startup.sh script for production environment with --build flag
           bash startup.sh prod --build -d

@@ -9,7 +9,7 @@ from datetime import datetime
 # Import all our refactored DTOs
 from ctutor_backend.interface.users import UserCreate, UserGet, UserUpdate, UserList
 from ctutor_backend.interface.organizations import OrganizationCreate, OrganizationGet, OrganizationType
-from ctutor_backend.interface.accounts import AccountCreate, AccountGet, AccountType
+from ctutor_backend.interface.accounts import AccountCreate, AccountGet
 from ctutor_backend.interface.roles import RoleGet, RoleList
 from ctutor_backend.interface.groups import GroupCreate, GroupGet, GroupType
 from ctutor_backend.interface.group_claims import GroupClaimCreate, GroupClaimGet

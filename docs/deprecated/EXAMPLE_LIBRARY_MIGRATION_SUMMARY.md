@@ -38,17 +38,17 @@ The new system separates database operations from Git operations:
 
 #### New Endpoints
 ```
-POST   /api/v1/course-contents/{content_id}/assign-example
-POST   /api/v1/courses/{course_id}/assign-examples (bulk)
-DELETE /api/v1/course-contents/{content_id}/example
-GET    /api/v1/courses/{course_id}/pending-changes
-POST   /api/v1/courses/{course_id}/generate-student-template
-GET    /api/v1/courses/{course_id}/contents-with-examples
+POST   /course-contents/{content_id}/assign-example
+POST   /courses/{course_id}/assign-examples (bulk)
+DELETE /course-contents/{content_id}/example
+GET    /courses/{course_id}/pending-changes
+POST   /courses/{course_id}/generate-student-template
+GET    /courses/{course_id}/contents-with-examples
 ```
 
 #### Deprecated Endpoints
 ```
-POST   /api/v1/courses/{course_id}/deploy-examples (old workflow)
+POST   /courses/{course_id}/deploy-examples (old workflow)
 ```
 
 ### 4. Workflow Changes

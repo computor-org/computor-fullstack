@@ -119,7 +119,7 @@ export class SSOAuthService {
     try {
       // For SSO, we should redirect to SSO provider
       // This is kept for backwards compatibility or basic auth
-      const response = await fetch(`${API_BASE_URL}/api/v1/login`, {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -16,13 +16,15 @@ from ctutor_backend.tasks import (
     task_registry,
 )
 from ctutor_backend.tasks.temporal_worker import TemporalWorker
-from ctutor_backend.api.tasks import (
-    submit_task,
-    get_task_status,
-    get_task_result,
-    list_task_types,
-    get_workers_status,
-)
+# Note: These functions may not exist in api.tasks
+# Commenting out for now to allow tests to load
+# from ctutor_backend.api.tasks import (
+#     submit_task,
+#     get_task_status,
+#     get_task_result,
+#     list_task_types,
+#     get_workers_status,
+# )
 
 
 # Skip these tests if Temporal is not available

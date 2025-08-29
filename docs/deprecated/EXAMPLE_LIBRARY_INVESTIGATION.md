@@ -386,21 +386,21 @@ graph TD
 
 ```
 # Repository Management
-POST   /api/v1/example-repositories
-GET    /api/v1/example-repositories
-PUT    /api/v1/example-repositories/{id}
-DELETE /api/v1/example-repositories/{id}
-POST   /api/v1/example-repositories/{id}/sync
+POST   /example-repositories
+GET    /example-repositories
+PUT    /example-repositories/{id}
+DELETE /example-repositories/{id}
+POST   /example-repositories/{id}/sync
 
 # Example Discovery
-GET    /api/v1/examples
-GET    /api/v1/examples/{id}
-GET    /api/v1/examples/{id}/versions
-GET    /api/v1/examples/{id}/dependencies
-GET    /api/v1/examples/search?q=python&tags=basics
+GET    /examples
+GET    /examples/{id}
+GET    /examples/{id}/versions
+GET    /examples/{id}/dependencies
+GET    /examples/search?q=python&tags=basics
 
 # Course Content Creation with Examples
-POST   /api/v1/courses/{course_id}/content
+POST   /courses/{course_id}/content
 {
     "title": "Hello World Assignment",
     "path": "week1.hello_world",
@@ -417,7 +417,7 @@ Response: {
 }
 
 # Deployment Status
-GET    /api/v1/courses/{course_id}/content/{content_id}/deployment-status
+GET    /courses/{course_id}/content/{content_id}/deployment-status
 ```
 
 ### 7. Version Management & Release Workflow

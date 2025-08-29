@@ -972,7 +972,7 @@ async def process_example_for_student_template(
 
 ```python
 # Assign example to CourseContent
-POST /api/v1/course-contents/{content_id}/assign-example
+POST /course-contents/{content_id}/assign-example
 {
     "example_id": "uuid",
     "example_version": "v1.2"  # or "latest"
@@ -985,7 +985,7 @@ Response: {
 }
 
 # Bulk assign examples
-POST /api/v1/courses/{course_id}/assign-examples
+POST /courses/{course_id}/assign-examples
 {
     "assignments": [
         {
@@ -1005,7 +1005,7 @@ Response: {
 
 ```python
 # Generate student template from assigned examples
-POST /api/v1/courses/{course_id}/generate-student-template
+POST /courses/{course_id}/generate-student-template
 {
     "commit_message": "Release week 1-3 assignments"  # optional
 }
@@ -1016,7 +1016,7 @@ Response: {
 }
 
 # Check template generation status
-GET /api/v1/courses/{course_id}/template-generation-status/{workflow_id}
+GET /courses/{course_id}/template-generation-status/{workflow_id}
 Response: {
     "status": "running|completed|failed",
     "progress": {
@@ -1028,7 +1028,7 @@ Response: {
 }
 
 # Get pending changes (what will be in next release)
-GET /api/v1/courses/{course_id}/pending-changes
+GET /courses/{course_id}/pending-changes
 Response: {
     "total_changes": 5,
     "changes": [
@@ -1054,11 +1054,11 @@ Response: {
 }
 
 # Clear example assignment
-DELETE /api/v1/course-contents/{content_id}/example
+DELETE /course-contents/{content_id}/example
 Response: 204 No Content
 
 # Get course content with example status
-GET /api/v1/courses/{course_id}/contents-with-examples
+GET /courses/{course_id}/contents-with-examples
 Response: {
     "contents": [
         {
@@ -1082,7 +1082,7 @@ Response: {
 
 ```python
 # Browse examples for course content assignment
-GET /api/v1/examples/for-course/{course_id}?content_type=assignment&search=python
+GET /examples/for-course/{course_id}?content_type=assignment&search=python
 Response: {
     "examples": [...],
     "total": 45,
@@ -1094,7 +1094,7 @@ Response: {
 }
 
 # Get example deployment preview
-GET /api/v1/examples/{example_id}/deployment-preview?version=v1.2&target_path=week1.functions
+GET /examples/{example_id}/deployment-preview?version=v1.2&target_path=week1.functions
 Response: {
     "example": {...},
     "version": {...},

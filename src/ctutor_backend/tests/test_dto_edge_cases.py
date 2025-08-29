@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ctutor_backend.interface.users import UserCreate, UserGet, UserUpdate
 from ctutor_backend.interface.organizations import OrganizationCreate, OrganizationType
-from ctutor_backend.interface.accounts import AccountCreate, AccountType, AccountUpdate
+from ctutor_backend.interface.accounts import AccountCreate, AccountUpdate
 from ctutor_backend.interface.profiles import ProfileCreate, ProfileUpdate
 from ctutor_backend.interface.sessions import SessionCreate
 from ctutor_backend.interface.groups import GroupCreate

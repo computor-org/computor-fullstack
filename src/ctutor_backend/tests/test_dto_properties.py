@@ -241,7 +241,7 @@ class TestComputedProperties:
         account = AccountGet(
             id="123",
             provider="google",
-            type=AccountType.oauth,
+            type="oauth",
             provider_account_id="google-user-12345",
             user_id="user-123"
         )

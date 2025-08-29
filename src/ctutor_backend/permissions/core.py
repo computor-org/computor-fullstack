@@ -158,7 +158,7 @@ def db_get_claims(user_id: str, db: Session) -> List[tuple]:
     return values
 
 
-def db_get_course_claims(user_id: str, db: Session) -> List[tuple]:
+def db_get_course_claims(user_id: str, db: Session) -> List[tuple]: #TODO: PERMISSIONS
     """Get course-specific claims for a user"""
     from ctutor_backend.model.auth import User
     

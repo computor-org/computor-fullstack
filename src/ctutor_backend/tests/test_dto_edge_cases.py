@@ -171,7 +171,7 @@ class TestDataTypeEdgeCases:
         # Explicit boolean values
         account = AccountCreate(
             provider="test",
-            type=AccountType.oauth,
+            type="oauth",
             provider_account_id="123",
             user_id="user-123"
         )
@@ -428,11 +428,11 @@ class TestCornerCases:
         """Test enum validation edge cases"""
         # Valid enum values
         valid_account_types = [
-            AccountType.oauth,
-            AccountType.saml,
-            AccountType.ldap,
-            AccountType.local,
-            AccountType.token
+            "oauth",
+            "saml",
+            "ldap",
+            "local",
+            "token"
         ]
         
         for acc_type in valid_account_types:

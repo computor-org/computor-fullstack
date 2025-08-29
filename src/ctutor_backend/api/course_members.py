@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, aliased
 
 from ctutor_backend.api.exceptions import NotFoundException
 # from ctutor_backend.api.exceptions import BadRequestException, InternalServerException
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 # from ctutor_backend.api.queries import latest_result_subquery, results_count_subquery

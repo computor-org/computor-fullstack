@@ -4,7 +4,7 @@ import httpx
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 import starlette
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.api.exceptions import NotFoundException, ServiceUnavailableException
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal

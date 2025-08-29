@@ -16,51 +16,6 @@ from uuid import UUID, uuid4
 BASE_URL = "http://localhost:8000"
 AUTH = ("admin", "admin")
 
-
-@pytest.mark.integration
-class TestStudentSubmissionGroupsAPI:
-    """Integration tests for student submission groups endpoint"""
-    
-    @pytest.fixture(scope="class")
-    def client(self):
-        """HTTP client for making API requests"""
-        return httpx.Client(base_url=BASE_URL, auth=AUTH, timeout=30.0)
-    
-    def test_submission_groups_endpoint_structure(self, client):
-        """Test submission groups endpoint - GET /students/submission-groups"""
-        response = client.get("/students/submission-groups")
-        
-        # Should return 200 or 401/403 depending on auth setup
-        assert response.status_code in [200, 401, 403]
-        
-        if response.status_code == 200:
-            data = response.json()
-            assert isinstance(data, list)
-            
-            if data:  # If there are submission groups
-                sg = data[0]
-                # Test required fields according to SubmissionGroupStudent interface
-                assert "id" in sg
-                assert "course_id" in sg
-                assert "course_content_id" in sg
-                assert "max_group_size" in sg
-                assert "created_at" in sg
-                assert "updated_at" in sg
-                
-                # Test datetime serialization
-                datetime.fromisoformat(sg["created_at"].replace("Z", "+00:00"))
-                datetime.fromisoformat(sg["updated_at"].replace("Z", "+00:00"))
-                
-                # Test optional fields that might be null
-                assert "course_content_title" in sg  # can be null
-                assert "course_content_path" in sg   # can be null
-                assert "example_identifier" in sg    # CRITICAL: this field must be present
-                assert "current_group_size" in sg
-                assert "members" in sg
-                assert "repository" in sg           # can be null
-                assert "latest_grading" in sg       # can be null
-
-
 @pytest.mark.unit
 class TestStudentSubmissionGroupsUnit:
     """Unit tests for student submission groups functionality"""

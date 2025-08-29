@@ -10,7 +10,7 @@ import logging
 from ctutor_backend.api.crud import get_id_db
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, NotImplementedException
 from ctutor_backend.api.filesystem import mirror_entity_to_filesystem
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_admin, check_course_permissions, get_permitted_course_ids
 from ctutor_backend.permissions.principal import Principal
 

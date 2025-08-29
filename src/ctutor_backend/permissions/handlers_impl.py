@@ -9,7 +9,7 @@ from ctutor_backend.permissions.query_builders import (
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.exceptions import ForbiddenException
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseMember
+from ctutor_backend.model.course import Course, CourseMember, CourseContentType
 
 
 class UserPermissionHandler(PermissionHandler):
@@ -253,6 +253,109 @@ class CourseFamilyPermissionHandler(PermissionHandler):
             )
             
             return query
+        
+        raise ForbiddenException(detail={"entity": self.resource_name})
+
+
+class CourseContentTypePermissionHandler(PermissionHandler):
+    
+    def _check_role_hierarchy(self, user_roles: set, required_role: str) -> bool:
+        """Check if user roles meet the required role in hierarchy"""
+        from ctutor_backend.permissions.principal import course_role_hierarchy
+        
+        if not user_roles:
+            return False
+        
+        # Check if any user role has permission for the required role
+        for role in user_roles:
+            if course_role_hierarchy.has_role_permission(role, required_role):
+                return True
+        
+        return False
+    
+    """Permission handler for CourseContentType entity
+    
+    CourseContentType can be created, updated, and deleted by lecturers and higher roles.
+    Lower roles can only get and list.
+    """
+    
+    ACTION_ROLE_MAP = {
+        "get": "_student",      # Students and higher can view
+        "list": "_student",     # Students and higher can list
+        "create": "_lecturer",  # Lecturers and higher can create
+        "update": "_lecturer",  # Lecturers and higher can update
+        "delete": "_lecturer"   # Lecturers and higher can delete
+    }
+    
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+        if self.check_admin(principal):
+            return True
+        
+        if self.check_general_permission(principal, action):
+            return True
+        
+        min_role = self.ACTION_ROLE_MAP.get(action)
+        if min_role:
+            # For read operations, allow if user has any course membership
+            if action in ["get", "list"]:
+                return True  # Will be filtered by query
+            
+            # For write operations, check if user has required role in any course
+            # Check if user has the required course role in their claims
+            if principal.claims and principal.claims.dependent:
+                for course_id, roles in principal.claims.dependent.items():
+                    if self._check_role_hierarchy(roles, min_role):
+                        return True
+            return False
+        
+        return False
+    
+    def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        if self.check_admin(principal):
+            return db.query(self.entity)
+        
+        if self.check_general_permission(principal, action):
+            return db.query(self.entity)
+        
+        min_role = self.ACTION_ROLE_MAP.get(action)
+        if min_role:
+            # For CourseContentType, we need to check if the user has the required role
+            # in at least one course that uses this content type
+            from sqlalchemy.orm import aliased
+            from sqlalchemy import select, exists
+            
+            # For read operations, return all content types if user has any course membership
+            if action in ["get", "list"]:
+                # Check if user has any course membership
+                has_membership = db.query(
+                    exists().where(
+                        CourseMember.user_id == principal.user_id
+                    )
+                ).scalar()
+                
+                if has_membership:
+                    return db.query(self.entity)
+                else:
+                    # Return empty query if no membership
+                    return db.query(self.entity).filter(self.entity.id == None)
+            
+            # For write operations, check role hierarchy
+            user_courses = CoursePermissionQueryBuilder.user_courses_subquery(
+                principal.user_id, min_role, db
+            )
+            
+            # Check if user has required role in any course
+            has_required_role = db.query(
+                exists().where(
+                    CourseMember.course_id.in_(select(user_courses))
+                )
+            ).scalar()
+            
+            if has_required_role:
+                return db.query(self.entity)
+            else:
+                # Return empty query if insufficient permissions
+                return db.query(self.entity).filter(self.entity.id == None)
         
         raise ForbiddenException(detail={"entity": self.resource_name})
 

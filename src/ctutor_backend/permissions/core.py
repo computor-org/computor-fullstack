@@ -16,6 +16,7 @@ from ctutor_backend.permissions.handlers_impl import (
     CoursePermissionHandler,
     OrganizationPermissionHandler,
     CourseFamilyPermissionHandler,
+    CourseContentTypePermissionHandler,
     CourseContentPermissionHandler,
     CourseMemberPermissionHandler,
     ReadOnlyPermissionHandler
@@ -61,6 +62,7 @@ def initialize_permission_handlers():
     permission_registry.register(Course, CoursePermissionHandler(Course))
     
     # Course-related entities
+    permission_registry.register(CourseContentType, CourseContentTypePermissionHandler(CourseContentType))
     permission_registry.register(CourseContent, CourseContentPermissionHandler(CourseContent))
     permission_registry.register(CourseMember, CourseMemberPermissionHandler(CourseMember))
     permission_registry.register(CourseGroup, CourseMemberPermissionHandler(CourseGroup))
@@ -72,7 +74,6 @@ def initialize_permission_handlers():
     # Read-only entities
     permission_registry.register(CourseRole, ReadOnlyPermissionHandler(CourseRole))
     permission_registry.register(CourseContentKind, ReadOnlyPermissionHandler(CourseContentKind))
-    permission_registry.register(CourseContentType, ReadOnlyPermissionHandler(CourseContentType))
     
     # Example entities (read-only for most users)
     permission_registry.register(Example, ReadOnlyPermissionHandler(Example))

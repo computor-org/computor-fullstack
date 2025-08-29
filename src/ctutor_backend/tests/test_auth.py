@@ -14,7 +14,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 from ctutor_backend.plugins.registry import get_plugin_registry, initialize_plugin_registry
 from ctutor_backend.database import get_db
 from ctutor_backend.model.auth import User, Account
+import pytest
 
+@pytest.mark.asyncio
 async def test_keycloak_plugin():
     """Test that the Keycloak plugin can be initialized and used"""
     print("🔧 Testing Keycloak plugin initialization...")

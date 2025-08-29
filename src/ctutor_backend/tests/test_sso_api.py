@@ -5,11 +5,15 @@ Test script to demonstrate SSO authentication with API calls.
 This script shows how to:
 1. Login via SSO and get a session token
 2. Use the token to make authenticated API calls
+
+NOTE: This is not a pytest test - it's a standalone script.
+Run directly with: python test_sso_api.py
 """
 
 import requests
 import sys
 from urllib.parse import urlparse, parse_qs
+import pytest
 
 # API base URL
 API_BASE = "http://localhost:8000"
@@ -38,7 +42,12 @@ def test_sso_login():
     
     return token
 
-def test_api_with_token(token):
+@pytest.mark.skip(reason="Not a pytest test - standalone script for manual SSO testing")
+def test_api_with_token():
+    """Placeholder for pytest collection - actual test requires manual token input"""
+    pass
+
+def _test_api_with_token(token):
     """Test API calls using the SSO token."""
     print(f"\nTesting API with token: {token[:20]}...")
     
@@ -68,7 +77,12 @@ def test_api_with_token(token):
         except Exception as e:
             print(f"Request failed: {e}")
 
-def test_protected_endpoint(token):
+@pytest.mark.skip(reason="Not a pytest test - standalone script for manual SSO testing")
+def test_protected_endpoint():
+    """Placeholder for pytest collection - actual test requires manual token input"""
+    pass
+
+def _test_protected_endpoint(token):
     """Test a protected admin endpoint."""
     print("\n\nTesting protected admin endpoint...")
     

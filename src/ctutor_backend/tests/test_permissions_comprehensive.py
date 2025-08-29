@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 # Import permission components from new system directly
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.permissions.core import check_permissions, check_admin, check_course_permissions
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
 
 

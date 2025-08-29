@@ -3,7 +3,7 @@ from fastapi import Depends
 from fastapi import APIRouter
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal

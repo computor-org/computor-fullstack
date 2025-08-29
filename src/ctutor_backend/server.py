@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.api.sso import sso_router
 from ctutor_backend.plugins.registry import initialize_plugin_registry, PluginConfig
 from sqlalchemy.orm import Session

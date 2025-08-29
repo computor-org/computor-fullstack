@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 

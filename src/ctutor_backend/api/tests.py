@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.results import get_result_status

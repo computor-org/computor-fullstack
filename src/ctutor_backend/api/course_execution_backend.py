@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from sqlalchemy.orm import Session
 
 from ctutor_backend.api.crud import create_db, list_db
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.database import get_db

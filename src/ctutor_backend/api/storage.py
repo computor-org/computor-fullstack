@@ -23,7 +23,7 @@ from ..interface.storage import (
     StorageInterface
 )
 from ..services.storage_service import get_storage_service
-from ..api.auth import get_current_permissions
+from ..permissions.auth import get_current_permissions
 from ..api.exceptions import BadRequestException, NotFoundException, ForbiddenException
 from ..redis_cache import get_redis_client
 from ..storage_security import sanitize_filename, perform_full_file_validation

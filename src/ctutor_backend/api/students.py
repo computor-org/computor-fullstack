@@ -15,7 +15,7 @@ from ctutor_backend.interface.auth import GLPAuthConfig
 from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.course_members import CourseMemberProperties
 from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery
-from ctutor_backend.api.auth import HeaderAuthCredentials, get_auth_credentials, get_current_permissions
+from ctutor_backend.permissions.auth import HeaderAuthCredentials, get_auth_credentials, get_current_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
 from ctutor_backend.model.auth import User

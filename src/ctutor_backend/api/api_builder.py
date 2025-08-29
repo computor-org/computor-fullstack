@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 from ctutor_backend.api.crud import archive_db, create_db, filter_db, get_id_db, list_db, update_db, delete_db
 from typing import Annotated, Optional
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.permissions import Principal
 from ctutor_backend.interface.base import EntityInterface

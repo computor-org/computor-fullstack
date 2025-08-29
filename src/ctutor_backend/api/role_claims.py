@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ctutor_backend.permissions.core import check_permissions
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.roles_claims import RoleClaimList, RoleClaimQuery, role_claim_search
 from ctutor_backend.model.role import RoleClaim

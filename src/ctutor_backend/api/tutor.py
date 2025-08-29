@@ -14,7 +14,7 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeList
 from ctutor_backend.interface.course_member_comments import CourseMemberCommentList
 from ctutor_backend.interface.course_members import CourseMemberGet, CourseMemberInterface, CourseMemberProperties, CourseMemberQuery
 from ctutor_backend.permissions.principal import Principal
-from ctutor_backend.api.auth import HeaderAuthCredentials, get_auth_credentials, get_current_permissions
+from ctutor_backend.permissions.auth import HeaderAuthCredentials, get_auth_credentials, get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import allowed_course_role_ids
 from ctutor_backend.api.exceptions import BadRequestException, ForbiddenException, InternalServerException, NotFoundException

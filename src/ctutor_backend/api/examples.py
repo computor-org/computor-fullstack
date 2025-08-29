@@ -31,7 +31,7 @@ from ..interface.example import (
     ExampleQuery,
 )
 from ..model.example import ExampleRepository, Example, ExampleVersion, ExampleDependency
-from ..api.auth import get_current_permissions
+from ..permissions.auth import get_current_permissions
 from ..api.crud import get_id_db, list_db
 from ..api.exceptions import (
     NotFoundException,

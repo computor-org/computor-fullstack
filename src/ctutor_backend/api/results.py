@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import Depends
 from ctutor_backend.api.api_builder import CrudRouter
 
-from ctutor_backend.api.auth import get_current_permissions
+from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_permissions
 from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.database import get_db

@@ -13,8 +13,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from ctutor_backend.model import Base
 
-# Import all fixtures from fixtures.py to make them available to all tests
-from ctutor_backend.tests.fixtures import *
+# Import specific fixtures from fixtures.py to make them available to all tests
+from ctutor_backend.tests.fixtures import (
+    test_db,
+    mock_db,
+    admin_principal,
+    student_principal,
+    lecturer_principal,
+    unauthorized_principal,
+    test_client_factory,
+    sample_organization,
+    sample_course,
+    sample_course_content,
+    event_loop_policy
+)
 
 
 @pytest.fixture(scope="session")
@@ -64,18 +76,5 @@ def setup_test_database(engine):
     pass
 
 
-# Configure pytest markers
-def pytest_configure(config):
-    """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "asyncio: mark test as async"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test requiring live services"
-    )
-    config.addinivalue_line(
-        "markers", "unit: mark test as unit test"
-    )
-    config.addinivalue_line(
-        "markers", "skipif: skip test conditionally"
-    )
+# Note: pytest_configure is also defined in fixtures.py, so we don't redefine it here
+# The markers are already configured there

@@ -25,6 +25,8 @@ jobs:
         test-type: [unit, integration]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
     steps:
       - name: Checkout Code

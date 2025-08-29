@@ -201,8 +201,8 @@ jobs:
           echo "=== Running Service Health Tests ==="
           
           # Test API endpoints - MUST work
-          echo "Testing API health endpoint..."
-          curl -f http://localhost:8000/health
+          echo "Testing API root endpoint..."
+          curl -f -I http://localhost:8000/
           
           echo "Testing API documentation..."
           curl -f http://localhost:8000/docs

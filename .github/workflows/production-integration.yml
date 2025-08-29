@@ -24,7 +24,7 @@ jobs:
       matrix:
         test-type: [unit, integration]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
 
@@ -78,6 +78,9 @@ jobs:
         run: |
           echo "=== Building and Starting Production Services ==="
           
+          # Login to GitLab container registry
+          echo $GITLAB_TOKEN | docker login registry.gitlab.tugraz.at -u gitlab-ci-token --password-stdin
+          
           # Use startup.sh script for production environment with --build flag
           bash startup.sh prod --build -d
           
@@ -88,6 +91,14 @@ jobs:
         if: matrix.test-type == 'integration'
         run: |
           echo "=== Waiting for Application Services ==="
+          
+          # Wait for PostgreSQL
+          echo "Waiting for PostgreSQL..."
+          timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres 2>/dev/null; do sleep 2; done'
+          
+          # Wait for Temporal
+          echo "Waiting for Temporal..."
+          timeout 90 bash -c 'until docker logs temporal 2>&1 | grep -q "rpc server listen succeeded\|Started" 2>/dev/null; do sleep 3; done'
           
           # Wait for Backend API
           echo "Waiting for Backend API..."

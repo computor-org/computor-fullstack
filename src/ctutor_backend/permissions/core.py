@@ -115,7 +115,7 @@ def get_permitted_course_ids(permissions: Principal, minimum_role: str, db: Sess
 
 def check_course_permissions(permissions: Principal, entity: Any, course_role_id: str, db: Session):
     """Check permissions for course-related entities"""
-    from ctutor_backend.api.permission_query_builders import CoursePermissionQueryBuilder
+    from ctutor_backend.permissions.query_builders import CoursePermissionQueryBuilder
     
     if permissions.is_admin:
         return db.query(entity)

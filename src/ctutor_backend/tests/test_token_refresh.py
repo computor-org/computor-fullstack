@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 """
 Test script to demonstrate SSO token refresh functionality.
+
+NOTE: This is not a pytest test - it's a standalone script.
+Run directly with: python test_token_refresh.py
 """
 
 import requests
 import json
 import sys
 import time
+import pytest
 
 API_BASE = "http://localhost:8000"
 
-def test_token_refresh(refresh_token, provider="keycloak"):
+@pytest.mark.skip(reason="Not a pytest test - standalone script for manual token testing")
+def test_token_refresh():
+    """Placeholder for pytest collection - actual test requires manual token input"""
+    pass
+
+def _test_token_refresh(refresh_token, provider="keycloak"):
     """Test the token refresh endpoint."""
     
     print(f"\nTesting token refresh for provider: {provider}")
@@ -51,7 +60,12 @@ def test_token_refresh(refresh_token, provider="keycloak"):
         print(f"\n❌ Request failed: {e}")
         return None
 
-def test_api_with_new_token(token):
+@pytest.mark.skip(reason="Not a pytest test - standalone script for manual token testing")
+def test_api_with_new_token():
+    """Placeholder for pytest collection - actual test requires manual token input"""
+    pass
+
+def _test_api_with_new_token(token):
     """Test API call with the refreshed token."""
     
     print("\n\nTesting API call with refreshed token...")

@@ -18,8 +18,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from ctutor_backend.auth.keycloak import KeycloakAuthPlugin, KeycloakConfig
 from ctutor_backend.plugins.base import AuthStatus
+import pytest
 
-
+@pytest.mark.asyncio
+@pytest.mark.skipif(os.environ.get("SKIP_KEYCLOAK_TESTS", "true").lower() == "true", 
+                    reason="Keycloak service not available")
 async def test_keycloak_auth():
     """Test Keycloak authentication functionality."""
     print("Testing Keycloak Authentication Integration")

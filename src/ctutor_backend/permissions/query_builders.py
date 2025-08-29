@@ -76,28 +76,26 @@ class CoursePermissionQueryBuilder:
         # Check if entity is Course or has course_id
         if entity.__name__ == 'Course':
             # For Course entity, use id field
+            subquery = cls.user_courses_subquery(user_id, minimum_role, db)
             query = (
                 db.query(entity)
                 .select_from(User)
                 .outerjoin(cm_other, cm_other.user_id == User.id)
                 .outerjoin(entity, entity.id == cm_other.course_id)
                 .filter(
-                    cm_other.course_id.in_(
-                        select(cls.user_courses_subquery(user_id, minimum_role, db))
-                    )
+                    cm_other.course_id.in_(subquery)
                 )
             )
         else:
             # For other entities with course_id field
+            subquery = cls.user_courses_subquery(user_id, minimum_role, db)
             query = (
                 db.query(entity)
                 .select_from(User)
                 .outerjoin(cm_other, cm_other.user_id == User.id)
                 .outerjoin(entity, entity.course_id == cm_other.course_id)
                 .filter(
-                    cm_other.course_id.in_(
-                        select(cls.user_courses_subquery(user_id, minimum_role, db))
-                    )
+                    cm_other.course_id.in_(subquery)
                 )
             )
         
@@ -113,6 +111,8 @@ class OrganizationPermissionQueryBuilder:
         """Filter organizations based on course membership"""
         cm_other = aliased(CourseMember)
         
+        subquery = CoursePermissionQueryBuilder.user_courses_subquery(user_id, minimum_role, db)
+        
         query = (
             db.query(entity)
             .select_from(User)
@@ -120,9 +120,7 @@ class OrganizationPermissionQueryBuilder:
             .outerjoin(Course, cm_other.course_id == Course.id)
             .outerjoin(entity, entity.id == Course.organization_id)
             .filter(
-                cm_other.course_id.in_(
-                    select(CoursePermissionQueryBuilder.user_courses_subquery(user_id, minimum_role, db))
-                )
+                cm_other.course_id.in_(subquery)
             )
         )
         
@@ -137,6 +135,9 @@ class UserPermissionQueryBuilder:
         """Filter users that are visible to the current user"""
         cm_other = aliased(CourseMember)
         
+        # Get the subquery for courses where user is at least a tutor
+        subquery = CoursePermissionQueryBuilder.user_courses_subquery(user_id, "_tutor", db)
+        
         # User can see themselves and other users in courses where they're at least a tutor
         query = (
             db.query(User)
@@ -144,9 +145,7 @@ class UserPermissionQueryBuilder:
             .filter(
                 or_(
                     User.id == user_id,
-                    cm_other.course_id.in_(
-                        select(CoursePermissionQueryBuilder.user_courses_subquery(user_id, "_tutor", db))
-                    )
+                    cm_other.course_id.in_(subquery)
                 )
             )
             .distinct()

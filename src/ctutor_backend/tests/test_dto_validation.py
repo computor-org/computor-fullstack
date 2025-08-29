@@ -182,12 +182,12 @@ class TestAccountValidation:
         """Test AccountCreate with valid data"""
         account = AccountCreate(
             provider="google",
-            type=AccountType.oauth,
+            type="oauth",
             provider_account_id="google123456",
             user_id="user-123"
         )
         assert account.provider == "google"
-        assert account.type == AccountType.oauth
+        assert account.type == "oauth"
         assert account.provider_account_id == "google123456"
     
     def test_account_create_empty_provider(self):
@@ -195,7 +195,7 @@ class TestAccountValidation:
         with pytest.raises(ValidationError) as exc_info:
             AccountCreate(
                 provider="   ",
-                type=AccountType.oauth,
+                type="oauth",
                 provider_account_id="123",
                 user_id="user-123"
             )
@@ -205,7 +205,7 @@ class TestAccountValidation:
         """Test AccountCreate provider normalization"""
         account = AccountCreate(
             provider="  GOOGLE  ",
-            type=AccountType.oauth,
+            type="oauth",
             provider_account_id="123",
             user_id="user-123"
         )

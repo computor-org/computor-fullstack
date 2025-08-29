@@ -104,7 +104,7 @@ class TestGitLabBuilder:
         """Test GitLab builder initialization."""
         # Setup mocks
         mock_gitlab_instance = Mock()
-        mock_gitlab_instance.auth = Mock()
+        mock_gitlab_instance.version = Mock()
         mock_gitlab_class.return_value = mock_gitlab_instance
         
         mock_repo_instance = Mock()
@@ -121,21 +121,24 @@ class TestGitLabBuilder:
         assert builder.db == mock_db_session
         assert builder.gitlab_url == "http://localhost:8084"
         assert builder.gitlab_token == "test-token"
-        mock_gitlab_instance.auth.assert_called_once()
+        mock_gitlab_instance.version.assert_called_once()
         mock_repo_class.assert_called_once_with(mock_db_session)
     
+    @patch('ctutor_backend.interface.tokens.encrypt_api_key')
     @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
     @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_create_deployment_hierarchy_success(
         self,
         mock_repo_class,
         mock_gitlab_class,
+        mock_encrypt,
         mock_db_session,
         sample_deployment,
         mock_gitlab_group
     ):
         """Test successful deployment hierarchy creation."""
         # Setup mocks
+        mock_encrypt.return_value = "encrypted-token"
         mock_gitlab_instance = Mock()
         mock_gitlab_instance.auth = Mock()
         mock_gitlab_instance.groups.list.return_value = []
@@ -150,7 +153,12 @@ class TestGitLabBuilder:
         mock_org = Mock(spec=Organization)
         mock_org.id = uuid4()
         mock_org.path = "test-org"
-        mock_org.properties = {}
+        mock_org.properties = {
+            'gitlab': {
+                'group_id': 1,
+                'full_path': 'test-org'
+            }
+        }
         mock_repo_instance.create.return_value = mock_org
         mock_repo_class.return_value = mock_repo_instance
         
@@ -178,17 +186,20 @@ class TestGitLabBuilder:
         mock_db_session.commit.assert_called_once()
         mock_db_session.rollback.assert_not_called()
     
+    @patch('ctutor_backend.interface.tokens.encrypt_api_key')
     @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
     @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_create_deployment_hierarchy_gitlab_error(
         self,
         mock_repo_class,
         mock_gitlab_class,
+        mock_encrypt,
         mock_db_session,
         sample_deployment
     ):
         """Test deployment creation with GitLab error."""
         # Setup mocks
+        mock_encrypt.return_value = "encrypted-token"
         mock_gitlab_instance = Mock()
         mock_gitlab_instance.auth = Mock()
         mock_gitlab_instance.groups.list.return_value = []
@@ -218,18 +229,21 @@ class TestGitLabBuilder:
         mock_db_session.rollback.assert_called()
         mock_db_session.commit.assert_not_called()
     
+    @patch('ctutor_backend.interface.tokens.encrypt_api_key')
     @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
     @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_create_deployment_hierarchy_database_error(
         self,
         mock_repo_class,
         mock_gitlab_class,
+        mock_encrypt,
         mock_db_session,
         sample_deployment,
         mock_gitlab_group
     ):
         """Test deployment creation with database error."""
         # Setup mocks
+        mock_encrypt.return_value = "encrypted-token"
         mock_gitlab_instance = Mock()
         mock_gitlab_instance.auth = Mock()
         mock_gitlab_instance.groups.list.return_value = []
@@ -310,18 +324,21 @@ class TestGitLabBuilder:
         # Should not create new organization in database
         mock_repo_instance.create.assert_not_called()
     
+    @patch('ctutor_backend.interface.tokens.encrypt_api_key')
     @patch('ctutor_backend.generator.gitlab_builder.Gitlab')
     @patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository')
     def test_validate_and_recreate_missing_gitlab_group(
         self,
         mock_repo_class,
         mock_gitlab_class,
+        mock_encrypt,
         mock_db_session,
         sample_deployment,
         mock_gitlab_group
     ):
         """Test recreation of missing GitLab group."""
         # Setup mocks
+        mock_encrypt.return_value = "encrypted-token"
         mock_gitlab_instance = Mock()
         mock_gitlab_instance.auth = Mock()
         # First get fails (group missing), then create succeeds
@@ -343,9 +360,14 @@ class TestGitLabBuilder:
                 "full_path": "parent-group/test-org"
             }
         }
+        # Add SQLAlchemy attribute to avoid error
+        mock_existing_org._sa_instance_state = Mock()
+        # Mock update method
+        mock_existing_org.update = Mock(return_value=mock_existing_org)
         
         mock_repo_instance = Mock()
         mock_repo_instance.find_by_path.return_value = mock_existing_org
+        mock_repo_instance.update = Mock(return_value=mock_existing_org)
         mock_repo_class.return_value = mock_repo_instance
         
         # Mock course family query
@@ -367,24 +389,26 @@ class TestGitLabBuilder:
     
     def test_create_enhanced_config(self, mock_db_session, mock_gitlab_group):
         """Test enhanced GitLab config creation."""
-        with patch('ctutor_backend.generator.gitlab_builder.Gitlab'):
-            with patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository'):
-                builder = GitLabBuilder(
-                    db_session=mock_db_session,
-                    gitlab_url="http://localhost:8084",
-                    gitlab_token="test-token"
-                )
-                
-                config = builder._create_enhanced_config(mock_gitlab_group)
-                
-                assert config["group_id"] == 100
-                assert config["full_path"] == "parent-group/test-org"
-                assert config["parent_id"] == 2
-                assert config["namespace_id"] == 50
-                assert config["namespace_path"] == "parent-group"
-                assert config["web_url"] == "http://localhost:8084/parent-group/test-org"
-                assert config["visibility"] == "private"
-                assert "last_synced_at" in config
+        with patch('ctutor_backend.interface.tokens.encrypt_api_key') as mock_encrypt:
+            mock_encrypt.return_value = "encrypted-token"
+            with patch('ctutor_backend.generator.gitlab_builder.Gitlab'):
+                with patch('ctutor_backend.generator.gitlab_builder.OrganizationRepository'):
+                    builder = GitLabBuilder(
+                        db_session=mock_db_session,
+                        gitlab_url="http://localhost:8084",
+                        gitlab_token="test-token"
+                    )
+                    
+                    config = builder._create_organization_gitlab_config(mock_gitlab_group)
+                    
+                    assert config["group_id"] == 100
+                    assert config["full_path"] == "parent-group/test-org"
+                    assert config["parent_id"] == 2
+                    assert config["namespace_id"] == 50
+                    assert config["namespace_path"] == "parent-group"
+                    assert config["web_url"] == "http://localhost:8084/groups/parent-group/test-org"
+                    assert config["visibility"] == "private"
+                    assert "last_synced_at" in config
     
     @patch('ctutor_backend.generator.gitlab_builder.logger')
     def test_logging(self, mock_logger, mock_db_session):

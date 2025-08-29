@@ -27,9 +27,26 @@ class UserCreate(BaseModel):
     def validate_email(cls, v):
         if v is None:
             return v
-        # Basic email validation - just check for @ symbol and non-empty
-        if v and '@' not in v:
+        # Basic email validation
+        if not v:
+            raise ValueError('Email cannot be empty')
+        if '@' not in v:
             raise ValueError('Email must contain @ symbol')
+        # Check for basic structure: something@something
+        parts = v.split('@')
+        if len(parts) != 2:
+            raise ValueError('Email must have exactly one @ symbol')
+        local, domain = parts
+        if not local:
+            raise ValueError('Email must have local part before @')
+        if not domain:
+            raise ValueError('Email must have domain after @')
+        # Check for spaces
+        if ' ' in v:
+            raise ValueError('Email cannot contain spaces')
+        # Check for consecutive dots
+        if '..' in v:
+            raise ValueError('Email cannot contain consecutive dots')
         return v
 
 
@@ -117,9 +134,26 @@ class UserUpdate(BaseModel):
     def validate_email(cls, v):
         if v is None:
             return v
-        # Basic email validation - just check for @ symbol and non-empty
-        if v and '@' not in v:
+        # Basic email validation
+        if not v:
+            raise ValueError('Email cannot be empty')
+        if '@' not in v:
             raise ValueError('Email must contain @ symbol')
+        # Check for basic structure: something@something
+        parts = v.split('@')
+        if len(parts) != 2:
+            raise ValueError('Email must have exactly one @ symbol')
+        local, domain = parts
+        if not local:
+            raise ValueError('Email must have local part before @')
+        if not domain:
+            raise ValueError('Email must have domain after @')
+        # Check for spaces
+        if ' ' in v:
+            raise ValueError('Email cannot contain spaces')
+        # Check for consecutive dots
+        if '..' in v:
+            raise ValueError('Email cannot contain consecutive dots')
         return v
     
     @field_validator('username')

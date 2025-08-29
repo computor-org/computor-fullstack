@@ -127,7 +127,7 @@ This document tracks the current implementation status, pending tasks, and impor
   - Key endpoints: `/examples/{id}/download`, `/examples/download/{version_id}`
   - Dependency support with `?with_dependencies=true`
 - **Student API**: `/home/theta/computor/computor-fullstack/src/ctutor_backend/api/students.py`
-  - Implemented: `/students/submission-groups` endpoint
+  - Implemented: `/students/course-contents` endpoint
 - **Interface Definitions**: `/home/theta/computor/computor-fullstack/src/ctutor_backend/interface/`
   - `example.py` - Example and repository DTOs
   - `student_courses.py` - Student course interfaces
@@ -192,7 +192,7 @@ This document tracks the current implementation status, pending tasks, and impor
    ```
 
 3. **Key Integration Points**:
-   - Student endpoints: `/students/courses`, `/students/submission-groups`
+   - Student endpoints: `/students/courses`, `/students/course-contents`
    - Example endpoints: `/examples`, `/examples/{id}/download`
    - Authentication: JWT token via ComputorAuthenticationProvider
    - Caching: Multi-tier cache in ComputorApiService

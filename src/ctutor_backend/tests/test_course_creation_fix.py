@@ -64,6 +64,8 @@ def test_course_family_refresh_fix():
     mock_course_family.path = Ltree("test_family")
     mock_course_family.organization_id = "org-123"
     mock_course_family.properties = {}  # Initially empty
+    # Add SQLAlchemy attribute to avoid error
+    mock_course_family._sa_instance_state = Mock()
     
     # Create mock organization with GitLab properties
     mock_organization = Mock(spec=Organization)

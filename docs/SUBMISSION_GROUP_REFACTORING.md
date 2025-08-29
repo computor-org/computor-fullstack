@@ -161,15 +161,6 @@ The migration (`366a83771631_refactor_submission_groups_add_grading_.py`) handle
 - `GET /course-members/{id}/gradings` - Get all grades given by a member
 - `PATCH /course-submission-group-gradings/{id}` - Update a grade
 
-### Student Endpoints Implemented
-- ✅ `GET /students/submission-groups` - Get all submission groups for student with repository URLs
-  - Supports filtering by `course_id`, `course_content_id`, `has_repository`, `is_graded`
-  - Returns complete submission group data including:
-    - Repository information (GitLab URLs, clone URLs)
-    - Team members for group assignments
-    - Latest grading information
-    - Course content details
-
 ### Modified Responses
 - CourseSubmissionGroup responses should include:
   - Latest grading information (joined from grading table)

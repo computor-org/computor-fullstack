@@ -113,10 +113,9 @@ jobs:
           # Wait for PostgreSQL to be ready first
           timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres; do sleep 2; done'
           
-          # Set up Python environment and run migrations
-          cd src
-          pip install -r requirements.txt
-          alembic upgrade head
+          # Set up Python environment and run migrations using project script
+          pip install -r src/requirements.txt
+          bash migrations.sh
           
           echo "Database schema initialized successfully"
 

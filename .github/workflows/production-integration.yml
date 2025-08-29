@@ -76,25 +76,8 @@ jobs:
         run: |
           echo "=== Building and Starting Production Services ==="
           
-          # Load environment variables
-          set -a
-          source .env.prod
-          set +a
-          
-          # Build and start infrastructure services first
-          docker compose -f docker-compose-prod.yaml up -d --build \
-            traefik redis postgres temporal-postgres temporal temporal-ui minio static-server
-          
-          # Wait for critical services to be ready
-          echo "Waiting for PostgreSQL..."
-          timeout 60 bash -c 'until docker exec computor-fullstack-postgres-1 pg_isready -U postgres 2>/dev/null; do sleep 2; done'
-          
-          echo "Waiting for Temporal..."
-          timeout 90 bash -c 'until docker logs temporal 2>&1 | grep -q "rpc server listen succeeded\|Started" 2>/dev/null; do sleep 3; done'
-          
-          # Start application services
-          docker compose -f docker-compose-prod.yaml up -d \
-            uvicorn frontend temporal-worker temporal-worker-python
+          # Use startup.sh script for production environment with --build flag
+          bash startup.sh prod --build -d
           
           echo "All services started and ready"
 
@@ -217,8 +200,8 @@ jobs:
         run: |
           echo "=== Cleaning up Services ==="
           
-          # Stop and remove all containers
-          docker compose -f docker-compose-prod.yaml down -v --remove-orphans || true
+          # Use stop.sh script for production environment
+          bash stop.sh prod || true
           
           # Clean up deployment directories
           sudo rm -rf /tmp/codeability || true

@@ -87,9 +87,18 @@ def mock_db_session():
     def mock_query(model):
         query_mock = Mock()
         query_mock.filter = Mock(return_value=query_mock)
+        query_mock.filter_by = Mock(return_value=query_mock)
+        query_mock.join = Mock(return_value=query_mock)
+        query_mock.outerjoin = Mock(return_value=query_mock)
+        query_mock.select_from = Mock(return_value=query_mock)
+        query_mock.distinct = Mock(return_value=query_mock)
+        query_mock.order_by = Mock(return_value=query_mock)
+        query_mock.limit = Mock(return_value=query_mock)
+        query_mock.offset = Mock(return_value=query_mock)
         query_mock.first = Mock(return_value=None)
         query_mock.all = Mock(return_value=[])
         query_mock.count = Mock(return_value=0)
+        query_mock.subquery = Mock(return_value=[])  # Return an empty list for IN clauses
         return query_mock
     
     session.query = Mock(side_effect=mock_query)

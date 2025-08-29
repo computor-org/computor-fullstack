@@ -12,7 +12,7 @@ from ctutor_backend.interface.profiles import ProfileGet
 from ctutor_backend.interface.sessions import SessionGet, SessionList
 from ctutor_backend.interface.user_groups import UserGroupGet
 from ctutor_backend.interface.group_claims import GroupClaimGet
-from ctutor_backend.interface.accounts import AccountGet, AccountType
+from ctutor_backend.interface.accounts import AccountGet
 
 
 class TestComputedProperties:

@@ -107,7 +107,7 @@ async def list_my_models(db = Depends(get_db)):
 4. Register router in `src/ctutor_backend/server.py`:
 ```python
 from .api.my_model import router as my_model_router
-app.include_router(my_model_router, prefix="/api/v1")
+app.include_router(my_model_router, prefix="")
 ```
 
 5. Generate migration:
@@ -251,7 +251,7 @@ def test_my_model_creation():
 ```python
 @pytest.mark.integration
 async def test_api_endpoint(client):
-    response = await client.get("/api/v1/my-models")
+    response = await client.get("/my-models")
     assert response.status_code == 200
 ```
 

@@ -27,8 +27,8 @@ class TestStudentSubmissionGroupsAPI:
         return httpx.Client(base_url=BASE_URL, auth=AUTH, timeout=30.0)
     
     def test_submission_groups_endpoint_structure(self, client):
-        """Test submission groups endpoint - GET /api/students/submission-groups"""
-        response = client.get("/api/students/submission-groups")
+        """Test submission groups endpoint - GET /students/submission-groups"""
+        response = client.get("/students/submission-groups")
         
         # Should return 200 or 401/403 depending on auth setup
         assert response.status_code in [200, 401, 403]

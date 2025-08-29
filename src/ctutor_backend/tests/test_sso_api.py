@@ -49,9 +49,9 @@ def test_api_with_token(token):
     
     # Test endpoints
     endpoints = [
-        "/api/v1/users/me",  # Get current user info
-        "/api/v1/roles",     # List roles (requires auth)
-        "/api/v1/courses",   # List courses
+        "/users/me",  # Get current user info
+        "/roles",     # List roles (requires auth)
+        "/courses",   # List courses
     ]
     
     for endpoint in endpoints:
@@ -106,7 +106,7 @@ def main():
     print("\n\n=== Test Complete ===")
     print("\nTo use the token in your own code:")
     print(f'headers = {{"Authorization": "Bearer {token[:20]}..."}}')
-    print('response = requests.get("http://localhost:8000/api/v1/users/me", headers=headers)')
+    print('response = requests.get("http://localhost:8000/users/me", headers=headers)')
 
 if __name__ == "__main__":
     main()

@@ -50,7 +50,7 @@ const DeploymentStatusChip: React.FC<DeploymentStatusChipProps> = ({
         try {
           setChecking(true);
           const response = await apiClient.get<DeploymentStatusResponse>(
-            `/api/v1/courses/${courseId}/deployment-status/${deploymentTaskId}`
+            `/courses/${courseId}/deployment-status/${deploymentTaskId}`
           );
           
           if (response.status === 'completed') {

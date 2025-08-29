@@ -111,7 +111,7 @@ class TemporalTaskExecutor:
         
         try:
             # Get workflow handle
-            handle = client.get_workflow_handle(task_id)
+            handle = await client.get_workflow_handle(task_id)
             
             # Describe workflow to get status
             description = await handle.describe()
@@ -177,7 +177,7 @@ class TemporalTaskExecutor:
         
         try:
             # Get workflow handle
-            handle = client.get_workflow_handle(task_id)
+            handle = await client.get_workflow_handle(task_id)
             
             # Get workflow result
             try:
@@ -225,7 +225,7 @@ class TemporalTaskExecutor:
         
         try:
             # Get workflow handle
-            handle = client.get_workflow_handle(task_id)
+            handle = await client.get_workflow_handle(task_id)
             
             # Cancel the workflow
             await handle.cancel()

@@ -34,6 +34,8 @@ from ..interface.organizations import OrganizationInterface, OrganizationQuery
 from ..interface.course_families import CourseFamilyInterface, CourseFamilyQuery
 from ..interface.execution_backends import ExecutionBackendCreate, ExecutionBackendInterface, ExecutionBackendQuery
 from ..interface.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendInterface, CourseExecutionBackendQuery
+from ..interface.roles import RoleInterface, RoleQuery
+from ..interface.user_roles import UserRoleCreate, UserRoleInterface, UserRoleQuery
 
 
 @click.group()
@@ -168,6 +170,38 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 
                 user = user_client.create(user_create)
                 click.echo(f"  ✅ Created user: {user.display_name}")
+                
+            # Assign system roles if provided
+            if user_dep.roles:
+                role_client = get_crud_client(auth, RoleInterface)
+                user_role_client = get_crud_client(auth, UserRoleInterface)
+                
+                for role_id in user_dep.roles:
+                    try:
+                        # Check if role exists
+                        roles = role_client.list(RoleQuery(id=role_id))
+                        if not roles:
+                            click.echo(f"  ⚠️  Role not found: {role_id}")
+                            continue
+                        
+                        # Check if user already has this role
+                        existing_user_roles = user_role_client.list(UserRoleQuery(
+                            user_id=str(user.id),
+                            role_id=role_id
+                        ))
+                        
+                        if existing_user_roles:
+                            click.echo(f"  ℹ️  User already has role: {role_id}")
+                        else:
+                            # Assign role to user
+                            user_role_create = UserRoleCreate(
+                                user_id=str(user.id),
+                                role_id=role_id
+                            )
+                            user_role_client.create(user_role_create)
+                            click.echo(f"  ✅ Assigned role: {role_id}")
+                    except Exception as e:
+                        click.echo(f"  ⚠️  Failed to assign role {role_id}: {e}")
                 
             # Set password if provided
             if user_dep.password:

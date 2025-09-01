@@ -139,8 +139,8 @@ class CoursePermissionHandler(PermissionHandler):
         if resource_id and action in self.ACTION_ROLE_MAP:
             min_role = self.ACTION_ROLE_MAP[action]
             if min_role:
-                # Check if user has required role in this course
-                return principal.permitted(self.resource_name, action, resource_id)
+                # Check if user has required role in this course via course-role claim
+                return principal.permitted("course", action, resource_id, course_role=min_role)
         
         return False
     
@@ -303,7 +303,7 @@ class CourseContentTypePermissionHandler(PermissionHandler):
             # For write operations, check if user has required role in any course
             # Check if user has the required course role in their claims
             if principal.claims and principal.claims.dependent:
-                for course_id, roles in principal.claims.dependent.items():
+                for course_id, roles in principal.claims.dependent.get("course", {}).items():
                     if self._check_role_hierarchy(roles, min_role):
                         return True
             return False
@@ -455,26 +455,30 @@ class CourseMemberPermissionHandler(PermissionHandler):
             
             cm_other = aliased(CourseMember)
             
+            # Base visibility: courses where user meets minimum role
+            base_filter = cm_other.course_id.in_(
+                CoursePermissionQueryBuilder.user_courses_subquery(
+                    principal.user_id, min_role, db
+                )
+            )
+
+            filters = [base_filter]
+            # For read actions, also allow the current student's own membership row
+            if action in ["get", "list"]:
+                filters.append(
+                    and_(
+                        User.id == principal.user_id,
+                        cm_other.course_role_id == "_student",
+                        self.entity.id == cm_other.id
+                    )
+                )
+
             query = (
                 db.query(self.entity)
                 .select_from(User)
                 .outerjoin(cm_other, cm_other.user_id == User.id)
                 .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
-                .filter(
-                    or_(
-                        cm_other.course_id.in_(
-                            CoursePermissionQueryBuilder.user_courses_subquery(
-                                principal.user_id, min_role, db
-                            )
-                        ),
-                        and_(
-                            User.id == principal.user_id,
-                            cm_other.course_role_id == "_student",
-                            action in ["get", "list"],
-                            self.entity.id == cm_other.id
-                        )
-                    )
-                )
+                .filter(or_(*filters))
             )
             
             return query

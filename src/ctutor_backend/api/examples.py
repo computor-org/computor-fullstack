@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
 from ..database import get_db
-from ..interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ..interface.example import (
     ExampleGet,
     ExampleList,
@@ -789,7 +789,6 @@ async def delete_example_dependency(
     db.commit()
     
     return {"message": "Dependency deleted successfully"}
-
 
 
 

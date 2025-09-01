@@ -2,25 +2,18 @@ from typing import List, Type, Any
 from sqlalchemy.orm import Session, Query, aliased
 from sqlalchemy import or_, select
 from ctutor_backend.model.course import Course, CourseMember
+from ctutor_backend.permissions.principal import course_role_hierarchy
 from ctutor_backend.model.auth import User
 
 
 class CoursePermissionQueryBuilder:
     """Utility class for building course-related permission queries"""
     
-    # Course role hierarchy with inheritance
-    ROLE_HIERARCHY = {
-        "_owner": ["_owner"],
-        "_maintainer": ["_maintainer", "_owner"],
-        "_lecturer": ["_lecturer", "_maintainer", "_owner"],
-        "_tutor": ["_tutor", "_lecturer", "_maintainer", "_owner"],
-        "_student": ["_student", "_tutor", "_lecturer", "_maintainer", "_owner"],
-    }
-    
     @classmethod
     def get_allowed_roles(cls, minimum_role: str) -> List[str]:
         """Get all roles that meet or exceed the minimum required role"""
-        return cls.ROLE_HIERARCHY.get(minimum_role, [])
+        # Delegate to the shared course role hierarchy to avoid drift
+        return course_role_hierarchy.get_allowed_roles(minimum_role)
     
     @classmethod
     def user_courses_subquery(cls, user_id: str, minimum_role: str, db: Session):

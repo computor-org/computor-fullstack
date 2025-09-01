@@ -230,11 +230,11 @@ class TestComputedProperties:
         """Test GroupClaim properties"""
         claim = GroupClaimGet(
             group_id="group-123",
-            claim_type="permission",
+            claim_type="permissions",
             claim_value="read_documents"
         )
-        assert claim.display_name == "permission: read_documents"
-        assert claim.claim_identifier == "group-123:permission:read_documents"
+        assert claim.display_name == "permissions: read_documents"
+        assert claim.claim_identifier == "group-123:permissions:read_documents"
     
     def test_account_display_properties(self):
         """Test Account display properties"""

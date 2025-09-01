@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Type
 from sqlalchemy.orm import Session, Query, aliased
 from sqlalchemy import and_, or_, select
-from ctutor_backend.interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.exceptions import ForbiddenException
 
 

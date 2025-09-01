@@ -9,8 +9,9 @@ from unittest.mock import Mock, MagicMock
 from ctutor_backend.server import app
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
-from ctutor_backend.permissions.principal import Principal, Claims
+from ctutor_backend.permissions.principal import Principal, Claims, build_claims
 from ctutor_backend.permissions.core import check_permissions, check_admin
+from ctutor_backend.api.exceptions import ForbiddenException
 
 
 class TestSimplePermissions:
@@ -124,6 +125,47 @@ class TestPermissionHelpers:
         
         # Both results should be the same
         assert result1 == result2
+
+    def test_general_and_dependent_permissions(self):
+        """Test that general and dependent claims are respected."""
+        # Build claims: organizations:list and course_content:update on cc-1
+        claim_values = [
+            ("permissions", "organizations:list"),
+            ("permissions", "course_content:update:cc-1"),
+        ]
+        principal = Principal(user_id='u1', roles=['user'], claims=build_claims(claim_values))
+        
+        assert principal.permitted('organizations', 'list') is True
+        assert principal.permitted('course_content', 'update', 'cc-1') is True
+        assert principal.permitted('course_content', 'update', 'cc-2') is False
+
+    def test_course_role_permission_check(self):
+        """Test course role-based permission checks via course claims."""
+        course_id = 'course-abc'
+        claim_values = [
+            ("permissions", f"course:_tutor:{course_id}")
+        ]
+        principal = Principal(user_id='u2', roles=['tutor'], claims=build_claims(claim_values))
+        # Should pass when required role is _student (tutor >= student)
+        assert principal.permitted('course', 'get', course_id, course_role='_student') is True
+        # Should fail on another course
+        assert principal.permitted('course', 'get', 'course-other', course_role='_student') is False
+
+    def test_registry_no_handler_fallback(self, mock_db):
+        """If no handler is registered, non-admin should be forbidden, admin allowed."""
+        class Dummy:
+            __tablename__ = 'dummy'
+        
+        admin = Principal(user_id='a1', is_admin=True, roles=['system_admin'])
+        non_admin = Principal(user_id='u3', roles=['user'])
+        
+        # Admin gets a query
+        q = check_permissions(admin, Dummy, 'list', mock_db)
+        assert hasattr(q, 'filter')
+        
+        # Non-admin should raise
+        with pytest.raises(ForbiddenException):
+            check_permissions(non_admin, Dummy, 'list', mock_db)
 
 
 class TestAPIIntegration:

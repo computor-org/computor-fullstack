@@ -7,7 +7,7 @@ import starlette
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.api.exceptions import NotFoundException, ServiceUnavailableException
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.model.course import CourseMember
 
 SERVICES = {

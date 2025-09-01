@@ -16,8 +16,9 @@ class GroupClaimCreate(BaseModel):
     def validate_claim_type(cls, v):
         if not v.strip():
             raise ValueError('Claim type cannot be empty or only whitespace')
-        # Normalize claim type to lowercase
-        return v.strip().lower()
+        # Normalize claim type to lowercase and standardize plural form for permissions
+        lowered = v.strip().lower()
+        return 'permissions' if lowered == 'permission' else lowered
     
     @field_validator('claim_value')
     @classmethod

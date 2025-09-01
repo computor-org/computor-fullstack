@@ -108,8 +108,14 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
 def get_permitted_course_ids(permissions: Principal, minimum_role: str, db: Session) -> List[str]:
     """Get list of course IDs where user has at least the minimum role"""
     if permissions.is_admin:
-        # Admin has access to all courses
-        return db.query(Course.id).all()
+        # Admin has access to all courses; return flat list of string IDs
+        rows = db.query(Course.id).all()
+        try:
+            # rows may be a list of 1-tuples or Row objects; take the first column
+            return [str(row[0]) for row in rows]
+        except Exception:
+            # Fallback: try attribute access
+            return [str(getattr(row, "id", row)) for row in rows]
     
     return list(permissions.get_courses_with_role(minimum_role))
 

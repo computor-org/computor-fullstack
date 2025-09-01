@@ -5,7 +5,7 @@ from ctutor_backend.api.crud import archive_db, create_db, filter_db, get_id_db,
 from typing import Annotated, Optional
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.base import EntityInterface
 # from ctutor_backend.api.cache import cache_route
 from ctutor_backend.redis_cache import get_redis_client

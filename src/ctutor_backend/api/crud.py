@@ -6,7 +6,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, InternalServerException
-from ctutor_backend.permissions.core import check_permissions
+from ctutor_backend.permissions.core import check_permissions, can_perform_with_parents
+from ctutor_backend.permissions.handlers import permission_registry
 from ctutor_backend.permissions.principal import Principal
 
 from ctutor_backend.interface.filter import apply_filters
@@ -19,11 +20,27 @@ async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_t
     
     resource = db_type.__tablename__
 
-    if permissions.permitted(resource,"create"):
-        pass
+    # Authorization for create
+    # 1) Admin shortcut
+    if not permissions.is_admin:
+        # 2) Consult handler if registered; handlers are the source of truth
+        handler = permission_registry.get_handler(db_type)
+        # Extract context identifiers from the payload (e.g., any *_id fields)
+        if isinstance(entity, BaseModel):
+            model_dump = entity.model_dump(exclude_unset=True)
+        else:
+            model_dump = entity or {}
+        # Build a simple context dict of *_id keys for handler use
+        context = {k: str(v) for k, v in model_dump.items() if k.endswith("_id") and v is not None}
 
-    else:
-        raise NotFoundException()
+        if handler is None:
+            # Fallback behavior per permissions.md: no handler → admin-only
+            raise NotFoundException()
+
+        # Require handler to permit creation with the provided context
+        if not handler.can_perform_action(permissions, "create", resource_id=None, context=context):
+            # Explicitly deny without attempting permissive fallbacks
+            raise NotFoundException()
 
     try:
         model_dump = entity.model_dump(exclude_unset=True)

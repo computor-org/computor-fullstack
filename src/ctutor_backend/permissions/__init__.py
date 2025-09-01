@@ -31,6 +31,8 @@ from .core import (
     check_admin,
     get_permitted_course_ids,
     check_course_permissions,
+    can_perform_on_resource,
+    can_perform_with_parents,
     db_get_claims,
     db_get_course_claims,
     db_get_roles_claims,
@@ -74,6 +76,8 @@ __all__ = [
     "check_admin",
     "get_permitted_course_ids",
     "check_course_permissions",
+    "can_perform_on_resource",
+    "can_perform_with_parents",
     
     # Database functions
     "db_get_claims",

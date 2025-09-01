@@ -10,7 +10,7 @@ from ctutor_backend.server import app
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.permissions.principal import Principal, Claims, build_claims
-from ctutor_backend.permissions.core import check_permissions, check_admin
+from ctutor_backend.permissions.core import check_permissions, check_admin, can_perform_on_resource, can_perform_with_parents
 from ctutor_backend.api.exceptions import ForbiddenException
 
 
@@ -166,6 +166,33 @@ class TestPermissionHelpers:
         # Non-admin should raise
         with pytest.raises(ForbiddenException):
             check_permissions(non_admin, Dummy, 'list', mock_db)
+
+    def test_general_helpers_for_resource_and_parents(self):
+        """Test the two general helper methods for resource and parent-scoped checks."""
+        # Resource-level permission (general)
+        p1 = Principal(user_id='u10', roles=['user'], claims=build_claims([
+            ('permissions', 'widgets:create')
+        ]))
+        assert can_perform_on_resource(p1, 'widgets', 'create') is True
+        assert can_perform_on_resource(p1, 'widgets', 'delete') is False
+
+        # Parent-context permission: require course role and extra subject
+        course_id = 'c-1'
+        backend_id = 'eb-1'
+        p2 = Principal(user_id='u20', roles=['lecturer'], claims=build_claims([
+            ('permissions', f'course:_lecturer:{course_id}'),
+            ('permissions', f'execution_backend:use:{backend_id}')
+        ]))
+        context = {
+            'course_id': course_id,
+            'execution_backend_id': backend_id
+        }
+        assert can_perform_with_parents(p2, 'create', context, min_course_role='_lecturer') is True
+        # Missing extra subject permission should fail
+        p3 = Principal(user_id='u30', roles=['lecturer'], claims=build_claims([
+            ('permissions', f'course:_lecturer:{course_id}')
+        ]))
+        assert can_perform_with_parents(p3, 'create', context, min_course_role='_lecturer') is False
 
 
 class TestAPIIntegration:

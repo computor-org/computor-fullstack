@@ -14,8 +14,15 @@ class PermissionHandler(ABC):
         self.resource_name = entity.__tablename__
     
     @abstractmethod
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
-        """Check if principal can perform an action on a resource"""
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[Dict[str, str]] = None) -> bool:
+        """Check if principal can perform an action on a resource.
+
+        Args:
+            principal: Current principal
+            action: Action to perform (e.g., create, update)
+            resource_id: Optional primary context identifier (e.g., course_id)
+            context: Optional mapping of context identifiers (e.g., {"course_id": "...", "execution_backend_id": "..."})
+        """
         pass
     
     @abstractmethod
@@ -34,6 +41,49 @@ class PermissionHandler(ABC):
     def check_dependent_permission(self, principal: Principal, action: str, resource_id: str) -> bool:
         """Check if principal has specific permission for action on a specific resource"""
         return principal.permitted(self.resource_name, action, resource_id)
+
+    def _has_subject_claims(self, principal: Principal, subject: str) -> bool:
+        """Check if any claims exist for a subject (general or dependent)."""
+        general = principal.claims.general or {}
+        dependent = principal.claims.dependent or {}
+        return subject in general or subject in dependent
+
+    def check_additional_context_permissions(
+        self,
+        principal: Principal,
+        context: Optional[Dict[str, str]],
+        exclude_keys: Optional[list[str]] = None,
+        allowed_actions: Optional[list[str]] = None,
+    ) -> bool:
+        """Check permissions for additional parent context identifiers.
+
+        Enforces that, for each extra context key (e.g., execution_backend_id), if the
+        principal has any claims for that subject, then one of the allowed actions must
+        be permitted (general or dependent) for that subject. Subjects are derived by
+        stripping the trailing `_id` from the key (e.g., `execution_backend_id` → `execution_backend`).
+
+        If the principal has no claims for that subject at all, the check is skipped
+        for backward compatibility (treat as not applicable).
+        """
+        if not context:
+            return True
+        exclude = set(exclude_keys or [])
+        actions = allowed_actions or ["create", "update", "use", "link", "assign", "get"]
+        for key, value in context.items():
+            if key in exclude or not key.endswith("_id"):
+                continue
+            subject = key[:-3]
+            if not self._has_subject_claims(principal, subject):
+                # No claims for this subject → ignore constraint
+                continue
+            # Require permission on this subject; prefer dependent check by id
+            if value and principal.permitted(subject, actions, str(value)):
+                continue
+            # Fallback to any general permission
+            if principal.permitted(subject, actions):
+                continue
+            return False
+        return True
 
 
 class PermissionRegistry:

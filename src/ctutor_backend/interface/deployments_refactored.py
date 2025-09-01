@@ -66,6 +66,9 @@ class UserDeployment(BaseDeployment):
     # Password for local authentication (optional)
     password: Optional[str] = Field(None, description="Initial password for the user")
     
+    # System roles (optional) - e.g., "_admin", "_user_manager", "_organization_manager"
+    roles: Optional[List[str]] = Field(None, description="System roles to assign to the user")
+    
     # GitLab-specific properties
     gitlab_username: Optional[str] = Field(None, description="GitLab username (if different from username)")
     gitlab_email: Optional[str] = Field(None, description="GitLab email (if different from email)")

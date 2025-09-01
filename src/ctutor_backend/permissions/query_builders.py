@@ -38,8 +38,11 @@ class CoursePermissionQueryBuilder:
         
         # Check which foreign key the entity has
         table_keys = entity.__table__.columns.keys()
+
+        if entity.__tablename__ == Course.__tablename__:
+            return query.filter(entity.id.in_(select(subquery)))
         
-        if "course_id" in table_keys:
+        elif "course_id" in table_keys:
             # Direct course relationship
             return query.filter(entity.course_id.in_(select(subquery)))
         

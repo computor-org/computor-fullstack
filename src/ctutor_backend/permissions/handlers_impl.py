@@ -23,7 +23,7 @@ class UserPermissionHandler(PermissionHandler):
         "delete": ["delete"]
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         # Admin can do anything
         if self.check_admin(principal):
             return True
@@ -57,7 +57,7 @@ class UserPermissionHandler(PermissionHandler):
 class AccountPermissionHandler(PermissionHandler):
     """Permission handler for Account entity"""
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -91,7 +91,7 @@ class AccountPermissionHandler(PermissionHandler):
 class ProfilePermissionHandler(PermissionHandler):
     """Permission handler for Profile entity"""
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -128,7 +128,7 @@ class CoursePermissionHandler(PermissionHandler):
         "delete": None   # Only through general permission
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -171,7 +171,7 @@ class OrganizationPermissionHandler(PermissionHandler):
         "delete": None   # Only through general permission
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -211,7 +211,7 @@ class CourseFamilyPermissionHandler(PermissionHandler):
         "delete": None   # Only through general permission
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -371,7 +371,7 @@ class CourseContentPermissionHandler(PermissionHandler):
         "delete": "_lecturer"
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -380,7 +380,24 @@ class CourseContentPermissionHandler(PermissionHandler):
         
         # Check course-based permissions
         if action in self.ACTION_ROLE_MAP:
-            return True  # Will be filtered by query
+            min_role = self.ACTION_ROLE_MAP[action]
+            # For create/update/delete, require course context to match the specific course
+            if action in ["create", "update", "delete"]:
+                # Prefer explicit course_id from context, fallback to resource_id
+                course_id = (context or {}).get("course_id") or resource_id
+                if course_id:
+                    # Check course role
+                    if not principal.permitted("course", action, course_id, course_role=min_role):
+                        return False
+                    # Enforce additional parent context constraints when applicable
+                    if not self.check_additional_context_permissions(
+                        principal, context, exclude_keys=["course_id"]
+                    ):
+                        return False
+                    return True
+                return False
+            # For get/list, filtering is applied in build_query
+            return True
         
         return False
     
@@ -428,7 +445,7 @@ class CourseMemberPermissionHandler(PermissionHandler):
         "delete": "_maintainer"
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -438,6 +455,20 @@ class CourseMemberPermissionHandler(PermissionHandler):
         # Students can view their own membership
         if action in ["get", "list"] and resource_id == principal.user_id:
             return True
+
+        # Creation must be scoped to a specific course via resource_id (course_id)
+        if action == "create":
+            # resource_id expected to be course_id; prefer context course_id
+            course_id = (context or {}).get("course_id") or resource_id
+            if course_id:
+                if not principal.permitted("course", action, course_id, course_role="_maintainer"):
+                    return False
+                # Enforce additional parent context constraints (ignore course_id)
+                return self.check_additional_context_permissions(
+                    principal, context, exclude_keys=["course_id"]
+                )
+            # Require maintainer role or above in the target course
+            return False
         
         return False
     

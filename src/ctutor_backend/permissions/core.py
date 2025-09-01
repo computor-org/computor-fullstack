@@ -3,7 +3,7 @@ Refactored permissions module using the handler registry pattern.
 This module provides a cleaner, more maintainable approach to permission management.
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict, Iterable
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -131,6 +131,82 @@ def check_course_permissions(permissions: Principal, entity: Any, course_role_id
     return CoursePermissionQueryBuilder.filter_by_course_membership(
         db.query(entity), entity, permissions.user_id, course_role_id, db
     )
+
+
+# General helpers
+def can_perform_on_resource(
+    principal: Principal,
+    subject: str,
+    action: str | List[str],
+    resource_id: Optional[str] = None,
+) -> bool:
+    """Check permissions directly on a subject (resource) with optional resource_id.
+
+    - General permission: subject:action
+    - Dependent permission: subject:action:resource_id
+    """
+    return principal.permitted(subject, action, resource_id)
+
+
+def can_perform_with_parents(
+    principal: Principal,
+    action: str | List[str],
+    context: Optional[Dict[str, str]] = None,
+    *,
+    min_course_role: Optional[str] = None,
+    subject_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    additional_actions: Optional[Iterable[str]] = None,
+) -> bool:
+    """Check permissions that depend on parent IDs provided in `context`.
+
+    - If `min_course_role` is provided and `course_id` is present in context,
+      validate course-role permission using the role hierarchy.
+    - For other *_id keys in context, derive a subject by stripping `_id` or use
+      `subject_map` to resolve to a custom subject and action list.
+    - For each extra subject, require either dependent permission on the specific ID
+      or a general permission for any of the allowed actions.
+
+    subject_map format (optional):
+        {
+          "execution_backend_id": {"subject": "execution_backend", "actions": ["use"]},
+          "foo_id": {"subject": "foo", "actions": ["link", "get"]}
+        }
+    If a context key is not present in subject_map, the subject defaults to key[:-3]
+    and actions default to `additional_actions` or ["create", "update", "use", "link", "assign", "get"].
+    """
+    if not context:
+        # No parents to check, allow by default (caller can still require resource checks separately)
+        return True
+
+    # 1) Course role check if requested
+    if min_course_role:
+        course_id = context.get("course_id")
+        if course_id and not principal.permitted("course", action, course_id, course_role=min_course_role):
+            return False
+
+    # 2) Additional parent subjects
+    default_actions = list(additional_actions or ["create", "update", "use", "link", "assign", "get"])
+    for key, value in context.items():
+        if key == "course_id" or not key.endswith("_id"):
+            continue
+        # Resolve subject and actions
+        subject_info = (subject_map or {}).get(key) if subject_map else None
+        subject = None
+        actions = None
+        if subject_info:
+            subject = subject_info.get("subject")
+            actions = subject_info.get("actions") or default_actions
+        else:
+            subject = key[:-3]
+            actions = default_actions
+
+        if value and principal.permitted(subject, actions, str(value)):
+            continue
+        if principal.permitted(subject, actions):
+            continue
+        return False
+
+    return True
 
 
 # Database helper functions (keep existing implementations)

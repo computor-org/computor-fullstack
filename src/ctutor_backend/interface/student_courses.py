@@ -33,7 +33,6 @@ class CourseStudentList(BaseModel):
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
-    course_content_types: list[CourseContentTypeList]
 
     repository: CourseStudentRepository
 

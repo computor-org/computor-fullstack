@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ..interface.storage import (
     StorageObjectCreate,
     StorageObjectGet,

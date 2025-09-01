@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.database import get_db
-from ctutor_backend.interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.interface.tokens import encrypt_api_key
 from ctutor_backend.interface.users import UserGet
 from ctutor_backend.model.auth import User

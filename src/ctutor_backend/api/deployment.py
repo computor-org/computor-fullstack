@@ -15,7 +15,7 @@ from ..interface.deployments_refactored import (
     ComputorDeploymentConfig,
     DeploymentFactory
 )
-from ..interface.permissions import Principal
+from ctutor_backend.permissions.principal import Principal
 from ..tasks import get_task_executor, TaskSubmission
 from .auth import get_current_permissions
 from .permissions import check_admin

@@ -364,10 +364,10 @@ class TestGroupClaimValidation:
         """Test GroupClaimCreate with valid data"""
         claim = GroupClaimCreate(
             group_id="group-123",
-            claim_type="permission",
+            claim_type="permissions",
             claim_value="read_documents"
         )
-        assert claim.claim_type == "permission"
+        assert claim.claim_type == "permissions"
         assert claim.claim_value == "read_documents"
     
     def test_group_claim_create_claim_type_normalization(self):
@@ -377,7 +377,7 @@ class TestGroupClaimValidation:
             claim_type="  PERMISSION  ",
             claim_value="read_documents"
         )
-        assert claim.claim_type == "permission"
+        assert claim.claim_type == "permissions"
 
 
 class TestUserGroupValidation:

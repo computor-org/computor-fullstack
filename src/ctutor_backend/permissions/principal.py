@@ -75,7 +75,8 @@ def build_claims(claim_values: List[Tuple[str, str]]) -> Claims:
     dependent: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
     
     for claim_type, resource_string in claim_values:
-        if claim_type != "permissions":
+        # Only accept standardized "permissions" claim type
+        if claim_type is None or claim_type.lower() != "permissions":
             continue
             
         parts = resource_string.split(":")

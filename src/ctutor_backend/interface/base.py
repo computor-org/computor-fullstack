@@ -34,7 +34,8 @@ class EntityInterface(ABC):
         claims = []
         for attr, action in ACTIONS.items():
             if hasattr(self, attr):
-                claims.append(("permission", f"{model.__tablename__}:{action}"))
+                # Normalize to plural form to match new permission system
+                claims.append(("permissions", f"{model.__tablename__}:{action}"))
         return claims
     
 class BaseEntityList(BaseModel):

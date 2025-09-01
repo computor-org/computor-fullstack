@@ -3,7 +3,7 @@ Tests for Temporal task executor implementation.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock, AsyncMock, Mock
 from datetime import datetime
 from uuid import uuid4
 from temporalio.client import WorkflowExecutionStatus
@@ -144,7 +144,7 @@ class TestTemporalTaskExecutor:
         describe_result.history_length = 10
         
         workflow_handle.describe.return_value = describe_result
-        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
+        mock_client.get_workflow_handle = Mock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get status
@@ -176,7 +176,7 @@ class TestTemporalTaskExecutor:
         describe_result.history_length = 20
         
         workflow_handle.describe.return_value = describe_result
-        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
+        mock_client.get_workflow_handle = Mock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get status
@@ -199,7 +199,7 @@ class TestTemporalTaskExecutor:
         workflow_handle.result = AsyncMock(return_value=expected_result)
         workflow_handle.describe = AsyncMock()
         
-        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
+        mock_client.get_workflow_handle = Mock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get result
@@ -227,7 +227,7 @@ class TestTemporalTaskExecutor:
         describe_result.close_time = datetime.utcnow()
         workflow_handle.describe = AsyncMock(return_value=describe_result)
         
-        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
+        mock_client.get_workflow_handle = Mock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Get result
@@ -247,7 +247,7 @@ class TestTemporalTaskExecutor:
         workflow_handle.id = task_id
         workflow_handle.cancel = AsyncMock()
         
-        mock_client.get_workflow_handle = AsyncMock(return_value=workflow_handle)
+        mock_client.get_workflow_handle = Mock(return_value=workflow_handle)
         
         with patch('ctutor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
             # Cancel task

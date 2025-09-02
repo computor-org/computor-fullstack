@@ -387,7 +387,7 @@ async def system_job_status(task_id: UUID | str, permissions: Annotated[Principa
         # task metadata in Redis or database to verify ownership
         if params.course_id:
             with next(get_db()) as db:
-                if params.course_id not in get_permitted_course_ids(permissions, "_maintainer", db):
+                if params.course_id not in get_permitted_course_ids(permissions, "_lecturer", db):
                     raise NotFoundException()
     
     try:
@@ -692,7 +692,7 @@ async def get_pending_changes(
     Compares current assignments with the last release to show what will change.
     """
     # Check permissions
-    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this course"
@@ -785,7 +785,7 @@ async def generate_student_template(
     4. Commit and push the changes
     """
     # Check permissions
-    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to generate template for this course"
@@ -910,7 +910,7 @@ async def bulk_assign_examples(
     Assign multiple examples to course contents in bulk (database only).
     """
     # Check permissions
-    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this course"
@@ -990,7 +990,7 @@ async def get_course_gitlab_status(
     Returns information about GitLab integration and what's missing.
     """
     # Check permissions
-    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this course"

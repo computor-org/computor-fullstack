@@ -115,7 +115,7 @@ async def assign_example_to_content(
         )
     
     # Check permissions on the course
-    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == content.course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == content.course_id).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this course content"

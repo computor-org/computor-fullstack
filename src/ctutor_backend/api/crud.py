@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import exc
+from psycopg2.errors import NotNullViolation
 from ctutor_backend.api.exceptions import BadRequestException, NotFoundException, InternalServerException
 from ctutor_backend.permissions.core import check_permissions, can_perform_with_parents
 from ctutor_backend.permissions.handlers import permission_registry
@@ -17,8 +18,6 @@ from ..custom_types import Ltree, LtreeType
 from sqlalchemy.exc import StatementError
 
 async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_type: Any, response_type: BaseModel, post_create: Any = None):
-    
-    resource = db_type.__tablename__
 
     # Authorization for create
     # 1) Admin shortcut
@@ -187,7 +186,7 @@ def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity
 def delete_db(permissions: Principal, db: Session, id: UUID | str, db_type: Any):
 
     query = check_permissions(permissions,db_type,"delete",db)
-    
+
     entity = query.filter(db_type.id == id).first()
     
     if not entity:
@@ -196,11 +195,57 @@ def delete_db(permissions: Principal, db: Session, id: UUID | str, db_type: Any)
     try:
         db.delete(entity)
         db.commit()
+    except exc.IntegrityError as e:
+        db.rollback()
+        # Handle foreign key constraint violations
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        
+        # Parse the error message to provide user-friendly feedback
+        if 'NotNullViolation' in error_msg:
+            # This happens when deleting would cause NULL in a required foreign key
+            if 'course_content_type_id' in error_msg and 'course_content' in error_msg:
+                raise BadRequestException(
+                    detail="Cannot delete this course content type because it is still being used by course content items. Please remove or reassign all course content using this type first."
+                )
+            else:
+                # Generic not null violation message
+                raise BadRequestException(
+                    detail="Cannot delete this item because it would violate data integrity constraints. Other records depend on this item."
+                )
+        elif 'ForeignKeyViolation' in error_msg or 'violates foreign key constraint' in error_msg:
+            # Extract table name if possible for better error message
+            if 'table' in error_msg:
+                # Try to extract table name from error
+                import re
+                table_match = re.search(r'table "(\w+)"', error_msg)
+                if table_match:
+                    table_name = table_match.group(1)
+                    raise BadRequestException(
+                        detail=f"Cannot delete this {db_type.__tablename__.replace('_', ' ')} because it is referenced by records in {table_name.replace('_', ' ')}. Please remove those references first."
+                    )
+            
+            # Generic foreign key violation message
+            raise BadRequestException(
+                detail=f"Cannot delete this {db_type.__tablename__.replace('_', ' ')} because other records depend on it. Please remove all references to this item first."
+            )
+        elif 'UniqueViolation' in error_msg:
+            # This shouldn't happen on delete, but handle it just in case
+            raise BadRequestException(detail="A unique constraint violation occurred while deleting.")
+        else:
+            # Generic integrity error
+            raise BadRequestException(
+                detail=f"Cannot delete this item due to data integrity constraints. Error: {error_msg.split('DETAIL:')[0] if 'DETAIL:' in error_msg else error_msg}"
+            )
     except exc.SQLAlchemyError as e:
-        # TODO: proper error handling
-        raise InternalServerException(detail=e.args)
+        db.rollback()
+        # Handle other SQLAlchemy errors
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        print(f"SQLAlchemyError in delete_db: {error_msg}")
+        raise InternalServerException(detail="An unexpected database error occurred while deleting.")
     except Exception as e:
-        raise InternalServerException(detail=e.args)
+        db.rollback()
+        print(f"Unexpected error in delete_db: {e}")
+        raise InternalServerException(detail="An unexpected error occurred while deleting.")
 
     return {"ok": True}
 
@@ -211,16 +256,29 @@ def archive_db(permissions: Principal, db: Session, id: UUID | str | None, db_ty
     try:
         if db_item == None and id != None:
             db_item = query.filter(db_type.id == id).first()
+            
+        if not db_item:
+            raise NotFoundException(detail=f"{db_type.__name__} not found")
         
         setattr(db_item, "archived_at", datetime.now())
             
         db.commit()
         db.refresh(db_item)
+    except NotFoundException:
+        raise
+    except exc.IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        raise BadRequestException(detail=f"Cannot archive this item due to data integrity constraints.")
     except exc.SQLAlchemyError as e:
-        # TODO: proper error handling
-        raise InternalServerException(detail=e.args)
+        db.rollback()
+        error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+        print(f"SQLAlchemyError in archive_db: {error_msg}")
+        raise InternalServerException(detail="An unexpected database error occurred while archiving.")
     except Exception as e:
-        raise InternalServerException(detail=e.args)
+        db.rollback()
+        print(f"Unexpected error in archive_db: {e}")
+        raise InternalServerException(detail="An unexpected error occurred while archiving.")
     
     return {"ok": True}
 

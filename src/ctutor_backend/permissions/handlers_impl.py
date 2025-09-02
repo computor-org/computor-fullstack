@@ -123,7 +123,7 @@ class CoursePermissionHandler(PermissionHandler):
     ACTION_ROLE_MAP = {
         "get": "_student",
         "list": "_student",
-        "update": "_maintainer",
+        "update": "_lecturer",
         "create": None,  # Only through general permission
         "delete": None   # Only through general permission
     }

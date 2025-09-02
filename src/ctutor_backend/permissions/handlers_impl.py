@@ -287,7 +287,7 @@ class CourseContentTypePermissionHandler(PermissionHandler):
         "delete": "_lecturer"   # Lecturers and higher can delete
     }
     
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
         if self.check_admin(principal):
             return True
         
@@ -440,9 +440,9 @@ class CourseMemberPermissionHandler(PermissionHandler):
     ACTION_ROLE_MAP = {
         "get": "_tutor",
         "list": "_tutor", 
-        "update": "_maintainer",
-        "create": "_maintainer",
-        "delete": "_maintainer"
+        "update": "_lecturer",
+        "create": "_lecturer",
+        "delete": "_lecturer"
     }
     
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -461,7 +461,7 @@ class CourseMemberPermissionHandler(PermissionHandler):
             # resource_id expected to be course_id; prefer context course_id
             course_id = (context or {}).get("course_id") or resource_id
             if course_id:
-                if not principal.permitted("course", action, course_id, course_role="_maintainer"):
+                if not principal.permitted("course", action, course_id, course_role=self.ACTION_ROLE_MAP.get(action)):
                     return False
                 # Enforce additional parent context constraints (ignore course_id)
                 return self.check_additional_context_permissions(

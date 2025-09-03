@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-19T09:18:24.847184
+ * Generated on: 2025-09-03T14:23:27.604951
 
  * Category: Roles
 

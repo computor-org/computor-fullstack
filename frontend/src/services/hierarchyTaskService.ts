@@ -177,7 +177,7 @@ export class HierarchyTaskService {
    */
   static async createOrganization(request: OrganizationTaskRequest): Promise<TaskResponse> {
     try {
-      const response = await apiClient.post<TaskResponse>('/system/hierarchy/organizations/create', request);
+      const response = await apiClient.post<TaskResponse>('/system/deploy/organizations', request);
       return response;
     } catch (error: any) {
       console.error('Error creating organization task:', error);
@@ -190,7 +190,7 @@ export class HierarchyTaskService {
    */
   static async createCourseFamily(request: CourseFamilyTaskRequest): Promise<TaskResponse> {
     try {
-      const response = await apiClient.post<TaskResponse>('/system/hierarchy/course-families/create', request);
+      const response = await apiClient.post<TaskResponse>('/system/deploy/course-families', request);
       return response;
     } catch (error: any) {
       console.error('Error creating course family task:', error);
@@ -203,7 +203,7 @@ export class HierarchyTaskService {
    */
   static async createCourse(request: CourseTaskRequest): Promise<TaskResponse> {
     try {
-      const response = await apiClient.post<TaskResponse>('/system/hierarchy/courses/create', request);
+      const response = await apiClient.post<TaskResponse>('/system/deploy/courses', request);
       return response;
     } catch (error: any) {
       console.error('Error creating course task:', error);

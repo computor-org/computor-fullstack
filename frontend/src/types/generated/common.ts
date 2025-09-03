@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-19T09:18:24.850450
+ * Generated on: 2025-09-03T14:23:27.608344
 
  * Category: Common
 
@@ -10,7 +10,7 @@
 
 
 
-import type { CourseContentGet, CourseSignupResponse } from './courses';
+import type { CourseSignupResponse } from './courses';
 
 import type { UserGet } from './users';
 
@@ -336,17 +336,6 @@ export interface ResultUpdate {
   status?: any | null;
   test_system_id?: string | null;
   properties?: any | null;
-}
-
-export interface Submission {
-  submission: Repository;
-  provider: string;
-  full_path: string;
-  token: string;
-  assignment: CourseContentGet;
-  module: Repository;
-  result_id: string;
-  user_id: string;
 }
 
 export interface TestCreate {
@@ -947,6 +936,8 @@ export interface UserDeployment {
   properties?: Record<string, any> | null;
   /** Initial password for the user */
   password?: string | null;
+  /** System roles to assign to the user */
+  roles?: string[] | null;
   /** GitLab username (if different from username) */
   gitlab_username?: string | null;
   /** GitLab email (if different from email) */
@@ -1060,17 +1051,25 @@ export interface GitHubConfig {
 }
 
 /**
- * Execution backend configuration for courses.
+ * Full execution backend configuration for defining backends at root level.
  */
 export interface ExecutionBackendConfig {
   /** Unique identifier for the backend */
   slug: string;
-  /** Type of execution backend (e.g., python, matlab) */
+  /** Type of execution backend (e.g., temporal, prefect) */
   type: string;
-  /** Backend version */
-  version?: string | null;
-  /** Backend-specific settings */
-  settings?: Record<string, any> | null;
+  /** Backend-specific properties (e.g., task_queue, namespace, timeout settings) */
+  properties?: Record<string, any> | null;
+}
+
+/**
+ * Reference to an execution backend by slug for linking to courses.
+ */
+export interface ExecutionBackendReference {
+  /** Slug of the execution backend to link */
+  slug: string;
+  /** Course-specific overrides for this backend (optional) */
+  properties?: Record<string, any> | null;
 }
 
 /**
@@ -1151,8 +1150,8 @@ export interface CourseConfig {
   description?: string | null;
   /** Course project structure */
   projects?: CourseProjects | null;
-  /** Available execution backends for this course */
-  execution_backends?: ExecutionBackendConfig[] | null;
+  /** References to execution backends to link to this course (by slug) */
+  execution_backends?: ExecutionBackendReference[] | null;
   /** Course content types to be created (assignments, units, etc.) */
   content_types?: CourseContentTypeConfig[] | null;
   /** Course-specific settings */
@@ -1171,8 +1170,8 @@ export interface HierarchicalCourseConfig {
   description?: string | null;
   /** Course project structure */
   projects?: CourseProjects | null;
-  /** Available execution backends for this course */
-  execution_backends?: ExecutionBackendConfig[] | null;
+  /** References to execution backends to link to this course (by slug) */
+  execution_backends?: ExecutionBackendReference[] | null;
   /** Course content types to be created (assignments, units, etc.) */
   content_types?: CourseContentTypeConfig[] | null;
   /** Course-specific settings */
@@ -1221,6 +1220,8 @@ export interface HierarchicalOrganizationConfig {
  * Supports deploying multiple organizations, each with multiple course families and courses.
  */
 export interface ComputorDeploymentConfig {
+  /** List of execution backends to create or ensure exist in the system */
+  execution_backends?: ExecutionBackendConfig[] | null;
   /** List of organizations with nested course families and courses */
   organizations: HierarchicalOrganizationConfig[];
   /** List of users with their accounts and course memberships */
@@ -1311,30 +1312,6 @@ export interface VSCExtensionConfig {
   gitlab_url: string;
   file_path: string;
   download_link: string;
-}
-
-/**
- * Request model for deployment from configuration.
- */
-export interface DeploymentRequest {
-  /** Deployment configuration as dictionary */
-  deployment_config: Record<string, any>;
-  /** If true, only validate the configuration without deploying */
-  validate_only?: boolean;
-}
-
-/**
- * Response model for deployment operations.
- */
-export interface DeploymentResponse {
-  /** Temporal workflow ID */
-  workflow_id: string;
-  /** Deployment status */
-  status: string;
-  /** Status message */
-  message: string;
-  /** Full deployment path */
-  deployment_path?: string | null;
 }
 
 export interface GitlabSignup {

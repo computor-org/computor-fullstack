@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-19T09:18:24.844190
+ * Generated on: 2025-09-03T14:23:27.601704
 
  * Category: Auth
 
@@ -11,14 +11,6 @@
 
 
 export interface AuthConfig {
-}
-
-export interface OrganizationUpdateTokenQuery {
-  type: string;
-}
-
-export interface OrganizationUpdateTokenUpdate {
-  token: string;
 }
 
 /**
@@ -32,6 +24,14 @@ export interface SSOAuthCredentials {
 export interface HeaderAuthCredentials {
   type: any;
   credentials: any;
+}
+
+export interface OrganizationUpdateTokenQuery {
+  type: string;
+}
+
+export interface OrganizationUpdateTokenUpdate {
+  token: string;
 }
 
 /**

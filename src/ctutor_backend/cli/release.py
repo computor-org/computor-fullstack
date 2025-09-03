@@ -8,50 +8,50 @@ from ctutor_backend.interface.deployments import DeploymentFactory
 from ctutor_backend.interface.deployments import ComputorDeploymentConfig
 from alive_progress import alive_bar
 
-def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str = "Flow run"):
+# def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str = "Flow run"):
 
-    # click.echo(f"Flow run with id [{click.style(flow_run_id,fg='green')}] started")
+#     # click.echo(f"Flow run with id [{click.style(flow_run_id,fg='green')}] started")
 
-    with alive_bar(title=title,monitor=None, stats=None,spinner='twirls') as bar:
+#     with alive_bar(title=title,monitor=None, stats=None,spinner='twirls') as bar:
 
-      bar.text(f"[scheduled]")
+#       bar.text(f"[scheduled]")
 
-      start_time = time.time()
+#       start_time = time.time()
 
-      status = "SCHEDULED"
-      for i in range(30000):
-        time.sleep(0.1)
+#       status = "SCHEDULED"
+#       for i in range(30000):
+#         time.sleep(0.1)
         
-        elapsed_time = time.time() - start_time
+#         elapsed_time = time.time() - start_time
 
-        if elapsed_time > 4:
+#         if elapsed_time > 4:
 
-          start_time = time.time()
-          elapsed_time = 0
+#           start_time = time.time()
+#           elapsed_time = 0
 
-          try:
-            response = custom_client.get(f"system/status/{flow_run_id}")
-          except Exception as e:
-              click.echo(e)
-              return
+#           try:
+#             response = custom_client.get(f"system/status/{flow_run_id}")
+#           except Exception as e:
+#               click.echo(e)
+#               return
           
-          status = response["status"]
+#           status = response["status"]
 
-          bar.text(f"[{status}]")
+#           bar.text(f"[{status}]")
 
-          if status == "FAILED" or status == "COMPLETED" or status == "CRASHED" or status == "CANCELLED":
-             break
+#           if status == "FAILED" or status == "COMPLETED" or status == "CRASHED" or status == "CANCELLED":
+#              break
         
-        bar()
+#         bar()
       
-      if status == "COMPLETED":
-        click.echo(f"[{click.style('COMPLETED',fg='green')}]")
+#       if status == "COMPLETED":
+#         click.echo(f"[{click.style('COMPLETED',fg='green')}]")
 
-      elif status == "FAILED" or status == "CRASHED":
-        click.echo(f"[{click.style('FAILED',fg='red')}]")
+#       elif status == "FAILED" or status == "CRASHED":
+#         click.echo(f"[{click.style('FAILED',fg='red')}]")
 
-      click.echo(response.get("message"))
-      return True
+#       click.echo(response.get("message"))
+#       return True
 
           # if response["status"] == "SCHEDULED":
           #   bar.text("[SCHEDULED]")
@@ -77,114 +77,114 @@ def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str =
           #   return True
 
 
-@click.command()
-@click.option("--course-id", "-c", prompt="Course Id")
-@click.option("--descendants", "-d", prompt="Descendants", prompt_required=False, default=False)
-@authenticate
-def release_course(course_id, descendants, auth: CLIAuthConfig):
+# @click.command()
+# @click.option("--course-id", "-c", prompt="Course Id")
+# @click.option("--descendants", "-d", prompt="Descendants", prompt_required=False, default=False)
+# @authenticate
+# def release_course(course_id, descendants, auth: CLIAuthConfig):
 
-    from ctutor_backend.api.system import ReleaseCourseCreate
+#     from ctutor_backend.api.system import ReleaseCourseCreate
 
-    if auth.basic != None:
-      custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
-    elif auth.gitlab != None:
-      custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
-    else:
-      raise Exception("Not implemented yet")
+#     if auth.basic != None:
+#       custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
+#     elif auth.gitlab != None:
+#       custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
+#     else:
+#       raise Exception("Not implemented yet")
     
-    try:
-      resp = custom_client.create("/system/release/courses", ReleaseCourseCreate(descendants=descendants,course_id=course_id).model_dump())
-    except Exception as e:
-      click.echo(e)
-      return
+#     try:
+#       resp = custom_client.create("/system/release/courses", ReleaseCourseCreate(descendants=descendants,course_id=course_id).model_dump())
+#     except Exception as e:
+#       click.echo(e)
+#       return
 
-    flow_run_id = resp["flow_run_id"]
+#     flow_run_id = resp["flow_run_id"]
 
-    handle_flow_runs(flow_run_id, custom_client)
+#     handle_flow_runs(flow_run_id, custom_client)
 
-@click.command()
-@click.option("--course-id", "-c", prompt="Course Id")
-@click.option("--descendants", "-d", prompt="Descendants", prompt_required=False, default=False)
-@click.option("--ascendants", "-a", prompt="Ascendants", prompt_required=False, default=False)
-@click.option("--directory", "-r", prompt="Release directory", prompt_required=False, default=None)
-@authenticate
-def release_course_content(course_id, descendants, ascendants, directory, auth: CLIAuthConfig):
+# @click.command()
+# @click.option("--course-id", "-c", prompt="Course Id")
+# @click.option("--descendants", "-d", prompt="Descendants", prompt_required=False, default=False)
+# @click.option("--ascendants", "-a", prompt="Ascendants", prompt_required=False, default=False)
+# @click.option("--directory", "-r", prompt="Release directory", prompt_required=False, default=None)
+# @authenticate
+# def release_course_content(course_id, descendants, ascendants, directory, auth: CLIAuthConfig):
 
-    from ctutor_backend.api.system import ReleaseCourseContentCreate
+#     from ctutor_backend.api.system import ReleaseCourseContentCreate
 
-    if auth.basic != None:
-      custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
-    elif auth.gitlab != None:
-      custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
-    else:
-      raise Exception("Not implemented yet")
+#     if auth.basic != None:
+#       custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
+#     elif auth.gitlab != None:
+#       custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
+#     else:
+#       raise Exception("Not implemented yet")
 
-    try:
-      resp = custom_client.create("/system/release/course-contents", ReleaseCourseContentCreate(release_dir=directory,ascendants=ascendants,descendants=descendants,course_id=course_id).model_dump())
-    except Exception as e:
-      click.echo(e)
-      return
+#     try:
+#       resp = custom_client.create("/system/release/course-contents", ReleaseCourseContentCreate(release_dir=directory,ascendants=ascendants,descendants=descendants,course_id=course_id).model_dump())
+#     except Exception as e:
+#       click.echo(e)
+#       return
 
-    flow_run_id = resp["flow_run_id"]
+#     flow_run_id = resp["flow_run_id"]
 
-    handle_flow_runs(flow_run_id, custom_client)
+#     handle_flow_runs(flow_run_id, custom_client)
 
-@click.command()
-@click.option("--user-id", "-u", prompt="User Id")
-@click.option("--course-id", "-c", prompt="Course Id")
-@click.option("--course-group-title", "-g", prompt="Course group Title")
-@authenticate
-def release_student(user_id, course_id, course_group_title, auth: CLIAuthConfig):
+# @click.command()
+# @click.option("--user-id", "-u", prompt="User Id")
+# @click.option("--course-id", "-c", prompt="Course Id")
+# @click.option("--course-group-title", "-g", prompt="Course group Title")
+# @authenticate
+# def release_student(user_id, course_id, course_group_title, auth: CLIAuthConfig):
 
-    from ctutor_backend.api.system import StudentCreate
+#     from ctutor_backend.api.system import StudentCreate
 
-    if auth.basic != None:
-      custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
-    elif auth.gitlab != None:
-      custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
-    else:
-      raise Exception("Not implemented yet")
+#     if auth.basic != None:
+#       custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
+#     elif auth.gitlab != None:
+#       custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
+#     else:
+#       raise Exception("Not implemented yet")
 
-    try:
-      resp = custom_client.create("/system/release/students", StudentCreate(user_id=user_id,course_id=course_id,course_group_title=course_group_title).model_dump())
-    except Exception as e:
-      click.echo(e)
-      return
+#     try:
+#       resp = custom_client.create("/system/release/students", StudentCreate(user_id=user_id,course_id=course_id,course_group_title=course_group_title).model_dump())
+#     except Exception as e:
+#       click.echo(e)
+#       return
 
-    flow_run_id = resp["flow_run_id"]
+#     flow_run_id = resp["flow_run_id"]
     
-    handle_flow_runs(flow_run_id, custom_client)
+#     handle_flow_runs(flow_run_id, custom_client)
 
-@click.command()
-@click.option("--file", "-f", prompt="Directory")
-@click.option("--descendants", "-d", prompt="Descendants", prompt_required=False, default=False)
-@authenticate
-def release_deployment(file, descendants, auth: CLIAuthConfig):
+# @click.command()
+# @click.option("--file", "-f", prompt="Directory")
+# @click.option("--descendants", "-d", prompt="Descendants", prompt_required=False, default=False)
+# @authenticate
+# def release_deployment(file, descendants, auth: CLIAuthConfig):
 
-    deployment: ComputorDeploymentConfig = DeploymentFactory.read_deployment_from_file(ComputorDeploymentConfig,file)
+#     deployment: ComputorDeploymentConfig = DeploymentFactory.read_deployment_from_file(ComputorDeploymentConfig,file)
 
-    if auth.basic != None:
-      custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
-    elif auth.gitlab != None:
-      custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
-    else:
-      raise Exception("Not implemented yet")
+#     if auth.basic != None:
+#       custom_client = CustomClient(url_base=auth.api_url,auth=(auth.basic.username,auth.basic.password))
+#     elif auth.gitlab != None:
+#       custom_client = CustomClient(url_base=auth.api_url,glp_auth_header=auth.gitlab.model_dump())
+#     else:
+#       raise Exception("Not implemented yet")
 
-    try:
-      resp = custom_client.create("/system/release/courses", ReleaseCourseCreate(descendants=descendants,deployment=deployment).model_dump())
-    except Exception as e:
-      click.echo(e)
-      return
+#     try:
+#       resp = custom_client.create("/system/release/courses", ReleaseCourseCreate(descendants=descendants,deployment=deployment).model_dump())
+#     except Exception as e:
+#       click.echo(e)
+#       return
 
-    flow_run_id = resp["flow_run_id"]
+#     flow_run_id = resp["flow_run_id"]
 
-    handle_flow_runs(flow_run_id, custom_client, f"Applied deployment, flow run started [{flow_run_id}]")
+#     handle_flow_runs(flow_run_id, custom_client, f"Applied deployment, flow run started [{flow_run_id}]")
 
 @click.group()
 def release():
     pass
 
-release.add_command(release_course,"course")
-release.add_command(release_course_content,"content")
-release.add_command(release_student,"student")
+# release.add_command(release_course,"course")
+# release.add_command(release_course_content,"content")
+# release.add_command(release_student,"student")
 # release.add_command(release_deployment,"apply")

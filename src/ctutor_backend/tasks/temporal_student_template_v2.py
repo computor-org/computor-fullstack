@@ -253,6 +253,11 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     version = db.query(ExampleVersion).filter(
                         ExampleVersion.example_id == content.example_id
                     ).order_by(ExampleVersion.version_number.desc()).first()
+                    
+                    # Update the course content with the actual version used
+                    if version:
+                        logger.info(f"Updated example_version from '{content.example_version}' to '{version.version_tag}' for {content.path}")
+                        content.example_version = version.version_tag
                 
                 if not version:
                     logger.error(f"No version found for example {content.example_id}")

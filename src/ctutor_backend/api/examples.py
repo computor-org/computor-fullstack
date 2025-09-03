@@ -493,7 +493,7 @@ async def download_example_latest(
 ):
     """Download the latest version of an example from storage, optionally with all dependencies."""
     # Check permissions
-    if not permissions.permitted("example", "read"):
+    if not permissions.permitted("example", "download"):
         raise ForbiddenException("You don't have permission to download examples")
     
     # Get example with repository relationship

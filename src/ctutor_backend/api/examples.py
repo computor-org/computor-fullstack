@@ -143,7 +143,7 @@ async def list_versions(
 ):
     """List all versions of an example."""
     # Check permissions
-    if not permissions.permitted("example", "read"):
+    if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to view versions")
     
     # Try cache first
@@ -175,7 +175,7 @@ async def get_version(
 ):
     """Get a specific version."""
     # Check permissions
-    if not permissions.permitted("example", "read"):
+    if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to view versions")
     
     # Try cache first
@@ -256,7 +256,7 @@ async def list_dependencies(
 ):
     """List all dependencies of an example."""
     # Check permissions
-    if not permissions.permitted("example", "read"):
+    if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to view dependencies")
     
     # Get dependencies
@@ -698,7 +698,7 @@ async def get_example_dependencies(
 ):
     """Get all dependencies for an example with version constraints."""
     # Check permissions
-    if not permissions.permitted("example", "read"):
+    if not permissions.permitted("example", "list"):
         raise ForbiddenException("You don't have permission to read example dependencies")
     
     # Check if example exists

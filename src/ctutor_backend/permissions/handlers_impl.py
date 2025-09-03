@@ -248,7 +248,7 @@ class CourseFamilyPermissionHandler(PermissionHandler):
                 .outerjoin(Course, cm_other.course_id == Course.id)
                 .outerjoin(self.entity, self.entity.id == Course.course_family_id)
                 .filter(
-                    cm_other.course_id.in_(subquery)
+                    cm_other.course_id.in_(select(subquery))
                 )
             )
             
@@ -425,7 +425,7 @@ class CourseContentPermissionHandler(PermissionHandler):
                 .outerjoin(cm_other, cm_other.user_id == User.id)
                 .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
                 .filter(
-                    cm_other.course_id.in_(subquery)
+                    cm_other.course_id.in_(select(subquery))
                 )
             )
             

@@ -631,10 +631,6 @@ async def download_example_version(
             # Get relative filename
             filename = obj.object_name.replace(f"{ex_version.storage_path}/", "")
             
-            # Skip meta.yaml and test.yaml (returned separately)
-            # if filename in ["meta.yaml", "test.yaml"]:
-            #     continue
-            
             # Download file content
             file_data = await storage_service.download_file(
                 bucket_name=bucket_name,

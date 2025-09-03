@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-08-19T09:18:24.846500
+ * Generated on: 2025-09-03T14:23:27.604284
 
  * Category: Courses
 
@@ -249,11 +249,55 @@ export interface CourseGroupUpdate {
   properties?: any | null;
 }
 
+/**
+ * Repository information for a submission group
+ */
+export interface SubmissionGroupRepository {
+  provider?: string;
+  url: string;
+  full_path: string;
+  clone_url?: string | null;
+  web_url?: string | null;
+}
+
+/**
+ * Basic member information
+ */
+export interface SubmissionGroupMemberBasic {
+  id: string;
+  user_id: string;
+  course_member_id: string;
+  username?: string | null;
+  full_name?: string | null;
+}
+
+/**
+ * Student's view of grading
+ */
+export interface SubmissionGroupGradingStudent {
+  id: string;
+  grading: number;
+  status?: string | null;
+  graded_by?: string | null;
+  created_at: string;
+}
+
+/**
+ * Enhanced submission group data for course contents
+ */
 export interface SubmissionGroupStudentList {
   id?: string | null;
+  course_content_title?: string | null;
+  course_content_path?: string | null;
+  example_identifier?: string | null;
+  max_group_size?: number | null;
+  current_group_size?: number;
+  members?: SubmissionGroupMemberBasic[];
+  repository?: SubmissionGroupRepository | null;
+  latest_grading?: SubmissionGroupGradingStudent | null;
   status?: string | null;
   grading?: number | null;
-  count: number;
+  count?: number;
   max_submissions?: number | null;
 }
 
@@ -307,10 +351,10 @@ export interface CourseContentStudentList {
   course_content_type: CourseContentTypeList;
   result_count: number;
   max_test_runs?: number | null;
-  directory: string;
+  directory?: string | null;
   color: string;
   result?: ResultStudentList | null;
-  submission?: SubmissionGroupStudentList | null;
+  submission_group?: SubmissionGroupStudentList | null;
 }
 
 export interface CourseContentStudentUpdate {
@@ -339,7 +383,6 @@ export interface CourseStudentList {
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
-  course_content_types: CourseContentTypeList[];
   repository: CourseStudentRepository;
 }
 
@@ -499,7 +542,7 @@ export interface CourseContentCreate {
   max_submissions?: number | null;
   execution_backend_id?: string | null;
   example_id?: string | null;
-  example_version?: string | null;
+  example_version_id?: string | null;
   deployment_status?: string | null;
   deployed_at?: string | null;
 }
@@ -526,7 +569,7 @@ export interface CourseContentGet {
   max_submissions?: number | null;
   execution_backend_id?: string | null;
   example_id?: string | null;
-  example_version?: string | null;
+  example_version_id?: string | null;
   deployment_status?: string | null;
   deployed_at?: string | null;
   course_content_type?: CourseContentTypeGet | null;
@@ -545,7 +588,7 @@ export interface CourseContentList {
   max_submissions?: number | null;
   execution_backend_id?: string | null;
   example_id?: string | null;
-  example_version?: string | null;
+  example_version_id?: string | null;
   deployment_status?: string | null;
   deployed_at?: string | null;
   course_content_type?: CourseContentTypeGet | null;

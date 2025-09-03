@@ -128,7 +128,7 @@ class CourseContentCreate(BaseModel):
     execution_backend_id: Optional[str] = None
     # Example assignment fields (only for submittable content)
     example_id: Optional[str] = None
-    example_version: Optional[str] = None
+    example_version_id: Optional[str] = None
     deployment_status: Optional[str] = None
     deployed_at: Optional[datetime] = None
 
@@ -152,7 +152,7 @@ class CourseContentGet(BaseEntityGet):
     
     # Example assignment fields (only for submittable content, null otherwise)
     example_id: Optional[str] = None
-    example_version: Optional[str] = None
+    example_version_id: Optional[str] = None
     deployment_status: Optional[str] = None
     deployed_at: Optional[datetime] = None
 
@@ -180,7 +180,7 @@ class CourseContentList(BaseModel):
     
     # Example assignment fields (only for submittable content, null otherwise)
     example_id: Optional[str] = None
-    example_version: Optional[str] = None
+    example_version_id: Optional[str] = None
     deployment_status: Optional[str] = None
     deployed_at: Optional[datetime] = None
     

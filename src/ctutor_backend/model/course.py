@@ -16,6 +16,7 @@ from .base import Base
 
 if TYPE_CHECKING:
     from .result import Result
+    from .example import ExampleVersion
 
 
 class CourseContentKind(Base):
@@ -211,8 +212,8 @@ class CourseContent(Base):
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
     
     # Example integration columns
-    example_id = Column(UUID, ForeignKey('example.id'), nullable=True)
-    example_version = Column(String(64), nullable=True)
+    example_id = Column(UUID, ForeignKey('example.id', ondelete='SET NULL'), nullable=True)
+    example_version_id = Column(UUID, ForeignKey('example_version.id', ondelete='SET NULL'), nullable=True)
     
     # Deployment tracking (basic status only)
     deployed_at = Column(DateTime(True), nullable=True)
@@ -231,6 +232,7 @@ class CourseContent(Base):
     
     # Example relationships
     example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
+    example_version = relationship('ExampleVersion', foreign_keys=[example_version_id])
     
     # Deployment tracking
 

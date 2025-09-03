@@ -16,7 +16,7 @@ from ctutor_backend.api.filesystem import get_path_course_content, mirror_entity
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet, CourseContentInterface
 from ctutor_backend.api.api_builder import CrudRouter
-from ctutor_backend.model.course import CourseContent, Course
+from ctutor_backend.model.course import CourseContent, Course, CourseContentType, CourseContentKind
 from ctutor_backend.model.example import Example, ExampleVersion, ExampleDependency
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
@@ -156,10 +156,28 @@ async def assign_example_to_content(
             )
         version_tag = request.example_version
     
+    # Check if this content type is submittable before setting deployment status
+    content_type = db.query(CourseContentType).filter(
+        CourseContentType.id == content.course_content_type_id
+    ).first()
+    
+    is_submittable = False
+    if content_type:
+        content_kind = db.query(CourseContentKind).filter(
+            CourseContentKind.id == content_type.course_content_kind_id
+        ).first()
+        is_submittable = content_kind.submittable if content_kind else False
+    
+    if not is_submittable:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot assign examples to non-submittable content types"
+        )
+    
     # Note: ExampleDeployment tracking happens during student-template generation,
     # not during assignment. This just updates the CourseContent's intent.
     
-    # Update course content
+    # Update course content (only for submittable content)
     content.example_id = request.example_id
     content.example_version = version_tag
     content.deployment_status = "pending_release"
@@ -214,13 +232,29 @@ async def remove_example_assignment(
             detail="Not authorized to modify this course content"
         )
     
+    # Check if this content type is submittable
+    content_type = db.query(CourseContentType).filter(
+        CourseContentType.id == content.course_content_type_id
+    ).first()
+    
+    is_submittable = False
+    if content_type:
+        content_kind = db.query(CourseContentKind).filter(
+            CourseContentKind.id == content_type.course_content_kind_id
+        ).first()
+        is_submittable = content_kind.submittable if content_kind else False
+    
     # Note: ExampleDeployment removal happens during next student-template generation,
     # not during unassignment. This just updates the CourseContent's intent.
     
     # Clear example assignment
     content.example_id = None
     content.example_version = None
-    content.deployment_status = "unassigned"
+    # Only set deployment_status for submittable content
+    if is_submittable:
+        content.deployment_status = "unassigned"
+    else:
+        content.deployment_status = None
     
     db.commit()
     

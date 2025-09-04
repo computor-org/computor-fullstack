@@ -32,7 +32,7 @@ from ..interface.course_members import CourseMemberCreate, CourseMemberInterface
 from ..interface.course_groups import CourseGroupInterface, CourseGroupQuery, CourseGroupCreate
 from ..interface.organizations import OrganizationInterface, OrganizationQuery
 from ..interface.course_families import CourseFamilyInterface, CourseFamilyQuery
-from ..interface.execution_backends import ExecutionBackendCreate, ExecutionBackendInterface, ExecutionBackendQuery
+from ..interface.execution_backends import ExecutionBackendCreate, ExecutionBackendInterface, ExecutionBackendQuery, ExecutionBackendUpdate
 from ..interface.course_execution_backends import CourseExecutionBackendCreate, CourseExecutionBackendInterface, CourseExecutionBackendQuery
 from ..interface.roles import RoleInterface, RoleQuery
 from ..interface.user_roles import UserRoleCreate, UserRoleInterface, UserRoleQuery
@@ -391,10 +391,11 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
                 # Check if we need to update properties
                 if backend.type != backend_config.type or backend.properties != backend_config.properties:
                     # Update backend
-                    backend_update = {
-                        'type': backend_config.type,
-                        'properties': backend_config.properties or {}
-                    }
+                    backend_update = ExecutionBackendUpdate(
+                        type=backend_config.type,
+                        properties=backend_config.properties or {}
+                    )
+
                     backend_client.update(str(backend.id), backend_update)
                     click.echo(f"    ✅ Updated backend: {backend_config.slug}")
             else:

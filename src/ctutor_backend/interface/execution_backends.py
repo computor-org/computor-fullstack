@@ -14,11 +14,7 @@ class ExecutionBackendGet(BaseEntityGet,ExecutionBackendCreate):
 
     model_config = ConfigDict(from_attributes=True)
 
-class ExecutionBackendList(BaseModel):
-    id: str
-    type: str
-    slug: str
-
+class ExecutionBackendList(ExecutionBackendGet,ExecutionBackendCreate):
     model_config = ConfigDict(from_attributes=True)
 
 class ExecutionBackendUpdate(BaseModel):

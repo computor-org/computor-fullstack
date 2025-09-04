@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-03T14:23:27.602359
+ * Generated on: 2025-09-04T09:54:18.755719
 
  * Category: Users
 
@@ -13,73 +13,6 @@
 import type { StudentProfileGet } from './common';
 
 
-
-export interface UserGroupCreate {
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is a transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** User ID */
-  user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserGroupUpdate {
-  /** Whether this is transient membership */
-  transient?: boolean | null;
-}
-
-export interface UserRoleCreate {
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleList {
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleUpdate {
-  role_id: string;
-}
 
 export interface UserCreate {
   /** User ID (UUID will be generated if not provided) */
@@ -225,6 +158,73 @@ export interface AccountUpdate {
   provider_account_id?: string | null;
   /** Provider-specific properties */
   properties?: any | null;
+}
+
+export interface UserRoleCreate {
+  user_id: string;
+  role_id: string;
+}
+
+export interface UserRoleGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  user_id: string;
+  role_id: string;
+}
+
+export interface UserRoleList {
+  user_id: string;
+  role_id: string;
+}
+
+export interface UserRoleUpdate {
+  role_id: string;
+}
+
+export interface UserGroupCreate {
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is a transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupUpdate {
+  /** Whether this is transient membership */
+  transient?: boolean | null;
 }
 
 export interface UserPassword {

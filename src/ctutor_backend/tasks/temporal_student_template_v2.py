@@ -214,7 +214,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         from ..model.deployment import CourseContentDeployment
         course_contents = db.query(CourseContent).options(
             joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
-            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.repository)
+            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.repository)
         ).filter(
             CourseContent.course_id == course_id,
             CourseContent.id.in_(
@@ -255,7 +255,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 version = example_version
                 
                 # Get the repository to determine bucket name
-                repository = version.repository if version.repository else example.repository
+                repository = example.repository
                 if not repository:
                     logger.error(f"Repository not found for example {example.id}")
                     errors.append(f"Repository not found for {content.path}")
@@ -630,7 +630,7 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
         # Get course contents with deployed examples
         course_contents = db.query(CourseContent).options(
             joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
-            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.repository)
+            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.repository)
         ).filter(
             CourseContent.course_id == course_id,
             CourseContent.id.in_(
@@ -689,7 +689,7 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
                     continue
                 
                 # Download example files
-                example_files = await download_example_files(content.example.repository, version)
+                example_files = await download_example_files(example.repository, version)
                 
                 # For assignments repository, copy ALL files unmodified to preserve full example
                 content_path_str = str(content.example.identifier)

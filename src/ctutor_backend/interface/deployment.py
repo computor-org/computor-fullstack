@@ -70,6 +70,7 @@ class CourseContentDeploymentGet(BaseEntityGet):
     last_attempt_at: Optional[datetime]
     deployment_path: Optional[str]
     deployment_metadata: Optional[Dict[str, Any]]
+    workflow_id: Optional[str]  # Current/last Temporal workflow ID
     
     # Relationships (optionally loaded)
     example_version: Optional['ExampleVersionGet'] = None
@@ -236,4 +237,3 @@ class DeploymentHistoryInterface(EntityInterface):
     endpoint = "deployment-history"
     model = DeploymentHistory
     cache_ttl = 300  # Longer cache for historical data
-

@@ -121,6 +121,12 @@ class CourseContentList(BaseModel):
         None,
         description="Current deployment status if has_deployment=true"
     )
+
+    # Optional deployment summary (populated when requested)
+    deployment: Optional['CourseContentDeploymentList'] = Field(
+        None,
+        description="Deployment information if requested via include=deployment"
+    )
     
     @field_validator('path', mode='before')
     @classmethod
@@ -400,7 +406,7 @@ class CourseContentInterface(EntityInterface):
 # Rebuild models to resolve forward references
 # Import the necessary types first
 from .example import ExampleVersionGet
-from .deployment import CourseContentDeploymentGet, DeploymentHistoryGet
+from .deployment import CourseContentDeploymentGet, CourseContentDeploymentList, DeploymentHistoryGet
 
 # Rebuild all models that have forward references
 CourseContentDeploymentGet.model_rebuild()

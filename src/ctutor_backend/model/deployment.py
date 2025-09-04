@@ -215,7 +215,7 @@ class DeploymentHistory(Base):
     )
     
     # Additional data
-    metadata = Column(
+    meta = Column(
         JSONB,
         nullable=True,
         server_default=text("'{}'::jsonb"),

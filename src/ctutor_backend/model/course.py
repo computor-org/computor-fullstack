@@ -211,13 +211,8 @@ class CourseContent(Base):
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
     
-    # Example integration columns
-    example_id = Column(UUID, ForeignKey('example.id', ondelete='SET NULL'), nullable=True)
+    # Example version tracking (DEPRECATED - will be removed, use CourseContentDeployment.example_version_id)
     example_version_id = Column(UUID, ForeignKey('example_version.id', ondelete='SET NULL'), nullable=True)
-    
-    # Deployment tracking (basic status only)
-    deployed_at = Column(DateTime(True), nullable=True)
-    deployment_status = Column(String(32), server_default=text("'pending'"))  # pending, deploying, deployed, failed
     
 
     # Relationships
@@ -230,8 +225,7 @@ class CourseContent(Base):
     course_submission_groups = relationship('CourseSubmissionGroup', back_populates='course_content')
     # Removed: course_submission_group_members - relationship removed as course_content_id was removed from CourseSubmissionGroupMember
     
-    # Example relationships
-    example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
+    # Example relationships (via example_version_id - DEPRECATED)
     example_version = relationship('ExampleVersion', foreign_keys=[example_version_id])
     
     # Deployment tracking - One-to-one relationship with CourseContentDeployment

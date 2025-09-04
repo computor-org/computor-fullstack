@@ -20,13 +20,9 @@ class CoursePermissionQueryBuilder:
         """Create a subquery for courses where user has at least the minimum role"""
         cm_alias = aliased(CourseMember)
         
-        return (
-            db.query(cm_alias.course_id)
-            .filter(
-                cm_alias.user_id == user_id,
-                cm_alias.course_role_id.in_(cls.get_allowed_roles(minimum_role))
-            )
-            .subquery()
+        return select(cm_alias.course_id).where(
+            cm_alias.user_id == user_id,
+            cm_alias.course_role_id.in_(cls.get_allowed_roles(minimum_role))
         )
     
     @classmethod
@@ -40,25 +36,25 @@ class CoursePermissionQueryBuilder:
         table_keys = entity.__table__.columns.keys()
 
         if entity.__tablename__ == Course.__tablename__:
-            return query.filter(entity.id.in_(select(subquery)))
+            return query.filter(entity.id.in_(subquery))
         
         elif "course_id" in table_keys:
             # Direct course relationship
-            return query.filter(entity.course_id.in_(select(subquery)))
+            return query.filter(entity.course_id.in_(subquery))
         
         elif "course_content_id" in table_keys:
             # Indirect through CourseContent
             from ctutor_backend.model.course import CourseContent
             return (
                 query.join(CourseContent, CourseContent.id == entity.course_content_id)
-                .filter(CourseContent.course_id.in_(select(subquery)))
+                .filter(CourseContent.course_id.in_(subquery))
             )
         
         elif "course_member_id" in table_keys:
             # Indirect through CourseMember
             return (
                 query.join(CourseMember, CourseMember.id == entity.course_member_id)
-                .filter(CourseMember.course_id.in_(select(subquery)))
+                .filter(CourseMember.course_id.in_(subquery))
             )
         
         return query

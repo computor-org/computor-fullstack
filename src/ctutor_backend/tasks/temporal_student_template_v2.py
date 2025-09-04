@@ -263,7 +263,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 
                 # Extract execution backend slug from meta_yaml and link to course_content
                 if not content.execution_backend_id:
-                    backend_slug = example.get_execution_backend_slug(content.example_version)
+                    backend_slug = example.get_execution_backend_slug(example_version.version_tag)
                     if backend_slug:
                         # Find the execution backend by slug
                         exec_backend = db.query(ExecutionBackend).filter(
@@ -294,7 +294,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     continue
                 
                 # Process example for student template
-                content_path_str = str(content.example.identifier)  # Use example identifier as directory name
+                content_path_str = str(example.identifier)  # Use example identifier as directory name
                 target_path = Path(template_staging_path) / content_path_str
                 result = await process_example_for_student_template_v2(
                     example_files, target_path, content, version
@@ -385,7 +385,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 sorted_contents = sorted(course_contents, key=lambda x: str(x.path))
                 
                 for content in sorted_contents:
-                    if content.example_id and hasattr(content, 'example') and content.example:
+                    if content.deployment and content.deployment.example_version:
                         # Create tree structure visualization from ltree path
                         path_parts = str(content.path).split('.')
                         
@@ -679,22 +679,17 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
                         else:
                             logger.warning(f"Execution backend '{backend_slug}' not found in database for {content.path}")
                 
-                # Find the specific version
-                version = None
-                for v in content.example.versions:
-                    if v.version_tag == content.example_version:
-                        version = v
-                        break
-                
+                # Use the version from deployment (already loaded)
+                version = example_version
                 if not version:
-                    logger.error(f"Version {content.example_version} not found for example {content.example.identifier}")
+                    logger.error(f"No version found for deployment at {content.path}")
                     continue
                 
                 # Download example files
                 example_files = await download_example_files(example.repository, version)
                 
                 # For assignments repository, copy ALL files unmodified to preserve full example
-                content_path_str = str(content.example.identifier)
+                content_path_str = str(example.identifier)
                 assignment_path = Path(assignments_repo_path) / content_path_str
                 
                 # Process full example content for assignments repository
@@ -728,8 +723,10 @@ This repository contains the complete example content with solutions for course 
 """
         
         for content in course_contents:
-            if content.example:
-                readme_content += f"- `{content.example.identifier}/` - {content.title}\n"
+            if content.deployment and content.deployment.example_version:
+                example = content.deployment.example_version.example
+                if example:
+                    readme_content += f"- `{example.identifier}/` - {content.title}\n"
         
         readme_content += f"""
 ---

@@ -67,6 +67,9 @@ class CourseContentGet(BaseEntityGet):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    is_submittable: bool = False  # From model's column_property
+    has_deployment: Optional[bool] = None  # From model's @property
+    deployment_status: Optional[str] = None  # From model's @property
     
     # Deprecated fields - kept for backwards compatibility during migration
     # These will be removed in a future version
@@ -105,6 +108,7 @@ class CourseContentList(BaseModel):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    is_submittable: bool = False  # Add this field to list view
     
     course_content_type: Optional[CourseContentTypeGet] = None
     
@@ -122,6 +126,7 @@ class CourseContentList(BaseModel):
     @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
+    
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
@@ -162,6 +167,14 @@ class CourseContentQuery(ListQuery):
 
 def course_content_search(db: Session, query, params: Optional[CourseContentQuery]):
     """Search course content based on query parameters."""
+    from sqlalchemy.orm import joinedload
+    
+    # Always eager load deployment and course_content_type for list views
+    query = query.options(
+        joinedload(CourseContent.deployment),
+        joinedload(CourseContent.course_content_type)
+    )
+    
     if params.id != None:
         query = query.filter(CourseContent.id == params.id)
     if params.title != None:
@@ -364,6 +377,7 @@ def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Ses
             print(f"Error in post_update: {e}")
             db.rollback()
             raise
+
 
 class CourseContentInterface(EntityInterface):
     """Interface for CourseContent entity.

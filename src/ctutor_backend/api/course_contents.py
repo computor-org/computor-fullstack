@@ -1,12 +1,23 @@
+"""
+Refactored course contents API using the new deployment system.
+
+This module handles course content management with clean separation
+between content hierarchy and example deployments.
+"""
+
 import json
 import os
-from pydantic import BaseModel, Field
-import yaml
 from typing import Annotated, Optional, List, Dict, Any
 from uuid import UUID
+from datetime import datetime
+
+import yaml
 from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
+
+from pydantic import BaseModel, Field
+
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.permissions.core import check_course_permissions
 from ctutor_backend.permissions.principal import Principal
@@ -15,29 +26,48 @@ from ctutor_backend.api.exceptions import BadRequestException, NotFoundException
 from ctutor_backend.api.filesystem import get_path_course_content, mirror_entity_to_filesystem
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.course_contents import CourseContentGet, CourseContentInterface
+from ctutor_backend.interface.deployment import (
+    AssignExampleRequest,
+    DeploymentWithHistory,
+    DeploymentSummary,
+    CourseContentDeploymentCreate,
+    DeploymentHistoryCreate
+)
 from ctutor_backend.api.api_builder import CrudRouter
 from ctutor_backend.model.course import CourseContent, Course, CourseContentType, CourseContentKind
-from ctutor_backend.model.example import Example, ExampleVersion, ExampleDependency
+from ctutor_backend.model.example import Example, ExampleVersion
+from ctutor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
 
+# Create the router
 course_content_router = CrudRouter(CourseContentInterface)
 
+
+# File operations (unchanged)
 class CourseContentFileQuery(BaseModel):
     filename: Optional[str] = None
 
-@course_content_router.router.get("/files/{course_content_id}", response_model=dict)
-async def get_course_content_meta(permissions: Annotated[Principal, Depends(get_current_permissions)], course_content_id: UUID | str, file_query: CourseContentFileQuery = Depends(), db: Session = Depends(get_db)):
 
-    if check_course_permissions(permissions,CourseContent,"_tutor",db).filter(CourseContent.id == course_content_id).first() == None:
+@course_content_router.router.get("/files/{course_content_id}", response_model=dict)
+async def get_course_content_meta(
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    course_content_id: UUID | str,
+    file_query: CourseContentFileQuery = Depends(),
+    db: Session = Depends(get_db)
+):
+    """Get file content from course content directory."""
+    if check_course_permissions(permissions, CourseContent, "_tutor", db).filter(
+        CourseContent.id == course_content_id
+    ).first() is None:
         raise NotFoundException()
 
-    course_content_dir = await get_path_course_content(course_content_id,db)
+    course_content_dir = await get_path_course_content(course_content_id, db)
 
-    if file_query.filename == None:
+    if file_query.filename is None:
         raise BadRequestException()
 
-    with open(os.path.join(course_content_dir,file_query.filename),'r') as file:
+    with open(os.path.join(course_content_dir, file_query.filename), 'r') as file:
         content = file.read()
 
         if file_query.filename.endswith(".yaml") or file_query.filename.endswith(".yml"):
@@ -58,56 +88,40 @@ async def get_course_content_meta(permissions: Annotated[Principal, Depends(get_
         else:
             return {"content": content}
 
+
+# Event handlers for filesystem mirroring
 async def event_wrapper(entity: CourseContentGet, db: Session, permissions: Principal):
     try:
-        await mirror_entity_to_filesystem(str(entity.id),CourseContentInterface,db)
+        await mirror_entity_to_filesystem(str(entity.id), CourseContentInterface, db)
     except Exception as e:
         print(e)
+
 
 course_content_router.on_created.append(event_wrapper)
 course_content_router.on_updated.append(event_wrapper)
 
-# Note: We don't need to track CourseContent deletion in ExampleDeployment
-# The deployment tracks what's actually in the student-template repository,
-# not what CourseContent intends to deploy
 
-# DTOs for Example Assignment
-
-class AssignExampleRequest(BaseModel):
-    """Request to assign an example to course content."""
-    example_id: str = Field(description="UUID of the Example to assign")
-    example_version: str = Field(default="latest", description="Version to assign (default: latest)")
-
-class CourseContentExampleResponse(BaseModel):
-    """Response for course content with example information."""
-    id: str
-    path: str
-    title: str
-    example: Optional[Dict[str, Any]] = None
-    deployment_status: str = Field(description="pending_release, released, modified")
-
-# Example Assignment Endpoints
+# New deployment endpoints
 
 @course_content_router.router.post(
     "/{content_id}/assign-example",
-    response_model=CourseContentExampleResponse
+    response_model=DeploymentWithHistory
 )
 async def assign_example_to_content(
-    content_id: str,
+    content_id: UUID,
     request: AssignExampleRequest,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
 ):
     """
-    Assign an example to course content (database only).
+    Assign an example version to course content.
     
-    This is step 1 of the two-step process. It only updates the database
-    to link the example to the course content. No Git operations occur.
-    The actual deployment happens when generating the student template.
+    This creates or updates a deployment record, linking the example to the content.
+    Only submittable content (assignments) can have examples assigned.
     """
     # Get course content
-    content = db.query(CourseContent).filter(CourseContent.id == content_id).first()
+    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -115,98 +129,153 @@ async def assign_example_to_content(
         )
     
     # Check permissions on the course
-    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == content.course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(
+        Course.id == content.course_id
+    ).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this course content"
         )
     
-    # Validate example exists
-    example = db.query(Example).filter(Example.id == request.example_id).first()
-    if not example:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Example {request.example_id} not found"
-        )
-    
-    # Get the requested version
-    if request.example_version == "latest":
-        version = db.query(ExampleVersion).filter(
-            ExampleVersion.example_id == request.example_id
-        ).order_by(ExampleVersion.version_number.desc()).first()
-        
-        if not version:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No versions found for example {request.example_id}"
-            )
-        version_tag = version.version_tag
-    else:
-        version = db.query(ExampleVersion).filter(
-            and_(
-                ExampleVersion.example_id == request.example_id,
-                ExampleVersion.version_tag == request.example_version
-            )
-        ).first()
-        
-        if not version:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Version {request.example_version} not found for example"
-            )
-        version_tag = request.example_version
-    
-    # Check if this content type is submittable before setting deployment status
+    # Verify this is submittable content
     content_type = db.query(CourseContentType).filter(
         CourseContentType.id == content.course_content_type_id
     ).first()
     
-    is_submittable = False
-    if content_type:
-        content_kind = db.query(CourseContentKind).filter(
-            CourseContentKind.id == content_type.course_content_kind_id
-        ).first()
-        is_submittable = content_kind.submittable if content_kind else False
+    if not content_type:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Course content type not found"
+        )
     
-    if not is_submittable:
+    content_kind = db.query(CourseContentKind).filter(
+        CourseContentKind.id == content_type.course_content_kind_id
+    ).first()
+    
+    if not content_kind or not content_kind.submittable:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot assign examples to non-submittable content types"
         )
     
-    # Note: ExampleDeployment tracking happens during student-template generation,
-    # not during assignment. This just updates the CourseContent's intent.
+    # Validate example version exists
+    example_version = db.query(ExampleVersion).options(
+        joinedload(ExampleVersion.example)
+    ).filter(ExampleVersion.id == request.example_version_id).first()
     
-    # Update course content (only for submittable content)
-    content.example_id = request.example_id
-    content.example_version = version_tag
-    content.deployment_status = "pending_release"
+    if not example_version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Example version {request.example_version_id} not found"
+        )
+    
+    # Get or create deployment record
+    deployment = db.query(CourseContentDeployment).filter(
+        CourseContentDeployment.course_content_id == str(content_id)
+    ).first()
+    
+    if deployment:
+        # Update existing deployment (reassignment)
+        previous_version_id = deployment.example_version_id
+        deployment.example_version_id = str(request.example_version_id)
+        deployment.deployment_status = "pending"
+        deployment.deployment_message = request.deployment_message
+        deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
+        deployment.updated_at = datetime.utcnow()
+        
+        # Add history entry for reassignment
+        history_entry = DeploymentHistory(
+            deployment_id=deployment.id,
+            action="reassigned" if previous_version_id else "assigned",
+            action_details=f"Assigned {example_version.example.title} v{example_version.version_tag}",
+            example_version_id=str(request.example_version_id),
+            previous_example_version_id=str(previous_version_id) if previous_version_id else None,
+            created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
+        )
+        db.add(history_entry)
+        
+    else:
+        # Create new deployment
+        deployment = CourseContentDeployment(
+            course_content_id=str(content_id),
+            example_version_id=str(request.example_version_id),
+            deployment_status="pending",
+            deployment_message=request.deployment_message,
+            created_by=permissions.user_id if hasattr(permissions, 'user_id') else None,
+            updated_by=permissions.user_id if hasattr(permissions, 'user_id') else None
+        )
+        db.add(deployment)
+        db.flush()  # Get the ID
+        
+        # Add initial history entry
+        history_entry = DeploymentHistory(
+            deployment_id=deployment.id,
+            action="assigned",
+            action_details=f"Assigned {example_version.example.title} v{example_version.version_tag}",
+            example_version_id=str(request.example_version_id),
+            created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
+        )
+        db.add(history_entry)
     
     db.commit()
-    db.refresh(content)
+    db.refresh(deployment)
+    
+    # Load history
+    history = db.query(DeploymentHistory).filter(
+        DeploymentHistory.deployment_id == deployment.id
+    ).order_by(DeploymentHistory.created_at.desc()).all()
     
     # Clear cache
     if cache:
-        await cache.delete(f"course:{content.course_id}:contents")
+        await cache.delete(f"course:{content.course_id}:deployments")
     
-    # Return updated content with example info
-    return CourseContentExampleResponse(
-        id=str(content.id),
-        path=str(content.path),
-        title=content.title,
-        example={
-            "id": str(example.id),
-            "name": example.title,
-            "version": version_tag,
-            "latest_version": version.version_tag if version else version_tag,
-            "has_update": False
-        },
-        deployment_status=content.deployment_status
+    # Return deployment with history (exclude course_content to avoid recursion)
+    deployment_dict = {
+        "id": deployment.id,
+        "course_content_id": deployment.course_content_id,
+        "example_version_id": deployment.example_version_id,
+        "deployment_status": deployment.deployment_status,
+        "deployment_path": deployment.deployment_path,
+        "assigned_at": deployment.assigned_at,  # Required field
+        "deployed_at": deployment.deployed_at,
+        "last_attempt_at": deployment.last_attempt_at,
+        "deployment_message": deployment.deployment_message,
+        "deployment_metadata": deployment.deployment_metadata,
+        "created_at": deployment.created_at,
+        "updated_at": deployment.updated_at,
+        "created_by": deployment.created_by,
+        "updated_by": deployment.updated_by,
+        # Don't include course_content to avoid recursion
+    }
+    
+    # Convert history to dicts with correct field names
+    history_dicts = []
+    for h in history:
+        history_dicts.append({
+            "id": h.id,
+            "deployment_id": h.deployment_id,
+            "action": h.action,
+            "action_details": h.action_details,
+            "example_version_id": h.example_version_id,
+            "previous_example_version_id": h.previous_example_version_id,
+            "meta": h.meta,  # Use the correct field name
+            "workflow_id": h.workflow_id,
+            "created_at": h.created_at,
+            "created_by": h.created_by,
+        })
+    
+    return DeploymentWithHistory(
+        deployment=deployment_dict,
+        history=history_dicts
     )
 
-@course_content_router.router.delete("/{content_id}/example")
-async def remove_example_assignment(
-    content_id: str,
+
+@course_content_router.router.delete(
+    "/{content_id}/example",
+    response_model=Dict[str, str]
+)
+async def unassign_example_from_content(
+    content_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
@@ -214,11 +283,11 @@ async def remove_example_assignment(
     """
     Remove example assignment from course content.
     
-    This only clears the database assignment. The content will be
-    removed from the student template on the next generation.
+    This updates the deployment record to unassigned status.
+    The actual removal from student-template happens during next generation.
     """
     # Get course content
-    content = db.query(CourseContent).filter(CourseContent.id == content_id).first()
+    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
     if not content:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -226,374 +295,183 @@ async def remove_example_assignment(
         )
     
     # Check permissions
-    if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == content.course_id).first() is None:
+    if check_course_permissions(permissions, Course, "_maintainer", db).filter(
+        Course.id == content.course_id
+    ).first() is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to modify this course content"
         )
     
-    # Check if this content type is submittable
-    content_type = db.query(CourseContentType).filter(
-        CourseContentType.id == content.course_content_type_id
+    # Get deployment record
+    deployment = db.query(CourseContentDeployment).filter(
+        CourseContentDeployment.course_content_id == str(content_id)
     ).first()
     
-    is_submittable = False
-    if content_type:
-        content_kind = db.query(CourseContentKind).filter(
-            CourseContentKind.id == content_type.course_content_kind_id
-        ).first()
-        is_submittable = content_kind.submittable if content_kind else False
+    if not deployment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No deployment found for this content"
+        )
     
-    # Note: ExampleDeployment removal happens during next student-template generation,
-    # not during unassignment. This just updates the CourseContent's intent.
+    # Update deployment status
+    previous_version_id = deployment.example_version_id
+    deployment.example_version_id = None
+    deployment.deployment_status = "unassigned"
+    deployment.deployment_message = "Example unassigned"
+    deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
     
-    # Clear example assignment
-    content.example_id = None
-    content.example_version = None
-    # Only set deployment_status for submittable content
-    if is_submittable:
-        content.deployment_status = "unassigned"
-    else:
-        content.deployment_status = None
+    # Add history entry
+    history_entry = DeploymentHistory(
+        deployment_id=deployment.id,
+        action="unassigned",
+        action_details="Example unassigned from course content",
+        previous_example_version_id=str(previous_version_id) if previous_version_id else None,
+        created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
+    )
+    db.add(history_entry)
     
     db.commit()
     
     # Clear cache
     if cache:
-        await cache.delete(f"course:{content.course_id}:contents")
+        await cache.delete(f"course:{content.course_id}:deployments")
     
-    return {"status": "removed"}
+    return {"status": "unassigned", "message": "Example unassigned successfully"}
 
-# @course_content_router.router.get(
-#     "/courses/{course_id}/contents-with-examples",
-#     response_model=Dict[str, Any]
-# )
-# async def get_course_contents_with_examples(
-#     course_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
-#     db: Session = Depends(get_db),
-#     cache: Annotated[BaseCache, Depends(get_redis_client)] = None
-# ):
-#     """
-#     Get all course contents with their example assignment status.
-    
-#     Shows which contents have examples assigned and their deployment status.
-#     """
-#     # Check permissions
-#     if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="Not authorized to view this course"
-#         )
-    
-#     # Check cache first
-#     cache_key = f"course:{course_id}:contents-with-examples"
-#     if cache:
-#         cached = await cache.get(cache_key)
-#         if cached:
-#             return cached
-    
-#     # Get all course contents
-#     contents = db.query(CourseContent).filter(
-#         CourseContent.course_id == course_id
-#     ).order_by(CourseContent.path).all()
-    
-#     contents_list = []
-#     for content in contents:
-#         content_data = {
-#             "id": str(content.id),
-#             "path": str(content.path),
-#             "title": content.title,
-#             "example": None
-#         }
-        
-#         if content.example_id:
-#             # Get example details
-#             example = db.query(Example).filter(
-#                 Example.id == content.example_id
-#             ).first()
-            
-#             if example:
-#                 # Check for updates
-#                 latest_version = None
-#                 has_update = False
-                
-#                 if content.example_version != "latest":
-#                     latest = db.query(ExampleVersion).filter(
-#                         ExampleVersion.example_id == content.example_id
-#                     ).order_by(ExampleVersion.version_number.desc()).first()
-                    
-#                     if latest:
-#                         latest_version = latest.version_tag
-#                         has_update = latest.version_tag != content.example_version
-                
-#                 content_data["example"] = {
-#                     "id": str(example.id),
-#                     "name": example.title,
-#                     "version": content.example_version,
-#                     "latest_version": latest_version,
-#                     "has_update": has_update,
-#                     "release_status": content.deployment_status
-#                 }
-        
-#         contents_list.append(content_data)
-    
-#     result = {"contents": contents_list}
-    
-#     # Cache the result
-#     if cache:
-#         await cache.set(cache_key, result, ttl=300)  # Cache for 5 minutes
-    
-#     return result
 
-# @course_content_router.router.get(
-#     "/courses/{course_id}/available-examples",
-#     response_model=Dict[str, Any]
-# )
-# async def get_available_examples(
-#     course_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
-#     db: Session = Depends(get_db),
-#     cache: Annotated[BaseCache, Depends(get_redis_client)] = None,
-#     search: Optional[str] = None,
-#     category: Optional[str] = None,
-#     language: Optional[str] = None,
-#     limit: int = 100,
-#     offset: int = 0
-# ):
-#     """
-#     Get available examples from the Example Library for a course.
+@course_content_router.router.get(
+    "/courses/{course_id}/deployment-summary",
+    response_model=DeploymentSummary
+)
+async def get_course_deployment_summary(
+    course_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+    cache: Annotated[BaseCache, Depends(get_redis_client)] = None
+):
+    """
+    Get deployment summary for a course.
     
-#     Returns examples that can be deployed to course content,
-#     with filtering by search query, category, and language.
-#     """
-#     # Check permissions
-#     if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="Not authorized to view this course"
-#         )
+    Shows statistics about example deployments in the course.
+    """
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_tutor", db).filter(
+        Course.id == course_id
+    ).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this course"
+        )
     
-#     # Check cache first
-#     cache_key = f"course:{course_id}:available-examples:{search}:{category}:{language}:{limit}:{offset}"
-#     if cache:
-#         cached = await cache.get(cache_key)
-#         if cached:
-#             return cached
+    # Try cache first
+    cache_key = f"course:{course_id}:deployment-summary"
+    if cache:
+        cached = await cache.get(cache_key)
+        if cached:
+            return cached
     
-#     # Build query for examples
-#     query = db.query(Example).filter(
-#         Example.archived_at.is_(None)
-#     )
+    # Get total course content count
+    total_content = db.query(CourseContent).filter(
+        CourseContent.course_id == course_id,
+        CourseContent.archived_at.is_(None)
+    ).count()
     
-#     # Apply search filter
-#     if search:
-#         search_pattern = f"%{search}%"
-#         query = query.filter(
-#             or_(
-#                 Example.title.ilike(search_pattern),
-#                 Example.description.ilike(search_pattern),
-#                 Example.properties['tags'].astext.ilike(search_pattern)
-#             )
-#         )
+    # Get submittable content count
+    submittable_query = db.query(CourseContent).join(
+        CourseContentType
+    ).join(
+        CourseContentKind
+    ).filter(
+        CourseContent.course_id == course_id,
+        CourseContent.archived_at.is_(None),
+        CourseContentKind.submittable == True
+    )
+    submittable_content = submittable_query.count()
     
-#     # Apply category filter
-#     if category:
-#         query = query.filter(
-#             Example.properties['category'].astext == category
-#         )
+    # Get deployment statistics
+    deployments = db.query(CourseContentDeployment).join(
+        CourseContent
+    ).filter(
+        CourseContent.course_id == course_id
+    ).all()
     
-#     # Apply language filter  
-#     if language:
-#         query = query.filter(
-#             Example.properties['language'].astext == language
-#         )
+    deployments_total = len(deployments)
+    deployments_pending = sum(1 for d in deployments if d.deployment_status == "pending")
+    deployments_deployed = sum(1 for d in deployments if d.deployment_status == "deployed")
+    deployments_failed = sum(1 for d in deployments if d.deployment_status == "failed")
     
-#     # Get total count
-#     total = query.count()
+    # Get last deployment timestamp
+    last_deployment = None
+    for d in deployments:
+        if d.deployed_at and (last_deployment is None or d.deployed_at > last_deployment):
+            last_deployment = d.deployed_at
     
-#     # Apply pagination
-#     examples = query.offset(offset).limit(limit).all()
+    summary = DeploymentSummary(
+        course_id=course_id,
+        total_content=total_content,
+        submittable_content=submittable_content,
+        deployments_total=deployments_total,
+        deployments_pending=deployments_pending,
+        deployments_deployed=deployments_deployed,
+        deployments_failed=deployments_failed,
+        last_deployment_at=last_deployment
+    )
     
-#     # Get unique categories and languages for filters
-#     all_examples = db.query(Example).filter(Example.archived_at.is_(None)).all()
-#     categories = set()
-#     languages = set()
+    # Cache the result
+    if cache:
+        await cache.set(cache_key, summary.dict(), ttl=300)  # 5 minutes
     
-#     for ex in all_examples:
-#         if ex.properties:
-#             if 'category' in ex.properties:
-#                 categories.add(ex.properties['category'])
-#             if 'language' in ex.properties:
-#                 languages.add(ex.properties['language'])
-    
-#     # Format response
-#     example_list = []
-#     for example in examples:
-#         # Get latest version
-#         latest_version = db.query(ExampleVersion).filter(
-#             ExampleVersion.example_id == example.id
-#         ).order_by(ExampleVersion.version_number.desc()).first()
-        
-#         example_data = {
-#             "id": str(example.id),
-#             "title": example.title,
-#             "description": example.description,
-#             "repository_id": str(example.example_repository_id),
-#             "latest_version": latest_version.version_tag if latest_version else None
-#         }
-        
-#         # Add properties if they exist
-#         if example.properties:
-#             if 'category' in example.properties:
-#                 example_data['category'] = example.properties['category']
-#             if 'language' in example.properties:
-#                 example_data['language'] = example.properties['language']
-#             if 'tags' in example.properties:
-#                 example_data['tags'] = example.properties.get('tags', [])
-        
-#         example_list.append(example_data)
-    
-#     result = {
-#         "examples": example_list,
-#         "total": total,
-#         "filters": {
-#             "categories": sorted(list(categories)),
-#             "languages": sorted(list(languages))
-#         }
-#     }
-    
-#     # Cache the result
-#     if cache:
-#         await cache.set(cache_key, result, ttl=300)  # Cache for 5 minutes
-    
-#     return result
+    return summary
 
-# @course_content_router.router.get(
-#     "/courses/{course_id}/examples/{example_id}/deployment-preview",
-#     response_model=Dict[str, Any]
-# )
-# async def get_deployment_preview(
-#     course_id: str,
-#     example_id: str,
-#     permissions: Annotated[Principal, Depends(get_current_permissions)],
-#     db: Session = Depends(get_db),
-#     version: str = "latest",
-#     target_path: str = None
-# ):
-#     """
-#     Get a preview of what will happen when deploying an example.
+
+@course_content_router.router.get(
+    "/{content_id}/deployment",
+    response_model=Optional[DeploymentWithHistory]
+)
+async def get_content_deployment(
+    content_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Get deployment information for specific course content.
     
-#     Shows files, dependencies, and potential conflicts.
-#     """
-#     # Check permissions
-#     if check_course_permissions(permissions, Course, "_maintainer", db).filter(Course.id == course_id).first() is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="Not authorized to view this course"
-#         )
+    Returns deployment record with full history if exists.
+    """
+    # Get course content to check permissions
+    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"CourseContent {content_id} not found"
+        )
     
-#     # Get example
-#     example = db.query(Example).filter(Example.id == example_id).first()
-#     if not example:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail=f"Example {example_id} not found"
-#         )
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_tutor", db).filter(
+        Course.id == content.course_id
+    ).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this content"
+        )
     
-#     # Get version
-#     if version == "latest":
-#         version_obj = db.query(ExampleVersion).filter(
-#             ExampleVersion.example_id == example_id
-#         ).order_by(ExampleVersion.version_number.desc()).first()
-#     else:
-#         version_obj = db.query(ExampleVersion).filter(
-#             and_(
-#                 ExampleVersion.example_id == example_id,
-#                 ExampleVersion.version_tag == version
-#             )
-#         ).first()
+    # Get deployment
+    deployment = db.query(CourseContentDeployment).options(
+        joinedload(CourseContentDeployment.example_version)
+    ).filter(
+        CourseContentDeployment.course_content_id == str(content_id)
+    ).first()
     
-#     if not version_obj:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail=f"Version {version} not found for example"
-#         )
+    if not deployment:
+        return None
     
-#     # Check for conflicts if target_path provided
-#     conflicts = []
-#     if target_path:
-#         # Check if content already has a different example
-#         existing_content = db.query(CourseContent).filter(
-#             and_(
-#                 CourseContent.course_id == course_id,
-#                 CourseContent.path == target_path
-#             )
-#         ).first()
-        
-#         if existing_content and existing_content.example_id:
-#             if str(existing_content.example_id) != example_id:
-#                 existing_example = db.query(Example).filter(
-#                     Example.id == existing_content.example_id
-#                 ).first()
-#                 conflicts.append({
-#                     "type": "existing_example",
-#                     "path": target_path,
-#                     "current_example_id": str(existing_content.example_id),
-#                     "current_example_title": existing_example.title if existing_example else "Unknown",
-#                     "current_example_version": existing_content.example_version
-#                 })
+    # Get history
+    history = db.query(DeploymentHistory).filter(
+        DeploymentHistory.deployment_id == deployment.id
+    ).order_by(DeploymentHistory.created_at.desc()).all()
     
-#     # Get dependencies
-#     dependencies = []
-#     deps = db.query(ExampleDependency).filter(
-#         ExampleDependency.example_id == example_id
-#     ).all()
-    
-#     for dep in deps:
-#         dep_example = db.query(Example).filter(
-#             Example.id == dep.dependency_example_id
-#         ).first()
-#         if dep_example:
-#             dependencies.append({
-#                 "example_id": str(dep.dependency_example_id),
-#                 "title": dep_example.title,
-#                 "required": dep.required
-#             })
-    
-#     # Estimate file structure (in real implementation, would check MinIO)
-#     file_structure = {
-#         "files": [
-#             "meta.yaml",
-#             "README.md",
-#         ],
-#         "size_mb": 0.1  # Placeholder
-#     }
-    
-#     # Add files based on properties
-#     if version_obj.properties:
-#         props = version_obj.properties.get('properties', {})
-#         if 'studentTemplates' in props:
-#             file_structure['files'].extend(props['studentTemplates'])
-#         if 'testFiles' in props:
-#             file_structure['files'].extend(props['testFiles'])
-#         if 'additionalFiles' in props:
-#             file_structure['files'].extend(props['additionalFiles'])
-    
-#     return {
-#         "example": {
-#             "id": str(example.id),
-#             "title": example.title,
-#             "description": example.description,
-#             "category": example.properties.get('category') if example.properties else None,
-#             "language": example.properties.get('language') if example.properties else None
-#         },
-#         "version": {
-#             "id": str(version_obj.id),
-#             "version_tag": version_obj.version_tag,
-#             "created_at": version_obj.created_at.isoformat() if version_obj.created_at else None
-#         },
-#         "dependencies": dependencies,
-#         "conflicts": conflicts,
-#         "file_structure": file_structure
-#     }
+    return DeploymentWithHistory(
+        deployment=deployment,
+        history=history
+    )

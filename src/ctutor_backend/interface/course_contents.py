@@ -382,3 +382,13 @@ class CourseContentInterface(EntityInterface):
     cache_ttl = 300  # 5 minutes cache for course content data
     post_create = post_create
     post_update = post_update
+
+# Rebuild models to resolve forward references
+# Import the necessary types first
+from .example import ExampleVersionGet
+from .deployment import CourseContentDeploymentGet, DeploymentHistoryGet
+
+# Rebuild all models that have forward references
+CourseContentDeploymentGet.model_rebuild()
+DeploymentHistoryGet.model_rebuild()
+CourseContentGet.model_rebuild()

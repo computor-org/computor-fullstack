@@ -24,6 +24,7 @@ from ..model.course import Course, CourseContent, CourseFamily
 from ..model.example import Example, ExampleVersion, ExampleRepository
 from ..model.organization import Organization
 from ..model.execution import ExecutionBackend
+from ..model.deployment import CourseContentDeployment, DeploymentHistory
 from ..services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
@@ -312,6 +313,41 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 
                 if result['success']:
                     processed_count += 1
+                    
+                    # Create or update deployment record if content is submittable
+                    if content.is_submittable:
+                        # Find or create deployment record
+                        deployment = db.query(CourseContentDeployment).filter(
+                            CourseContentDeployment.course_content_id == content.id
+                        ).first()
+                        
+                        if not deployment:
+                            # Create new deployment record
+                            deployment = CourseContentDeployment(
+                                course_content_id=content.id,
+                                example_version_id=version.id
+                            )
+                            db.add(deployment)
+                        else:
+                            # Update existing deployment with new version
+                            deployment.example_version_id = version.id
+                        
+                        # Mark as deployed (will be saved after commit)
+                        deployment.set_deployed(
+                            path=str(content.example.identifier),
+                            metadata={'workflow': 'generate_student_template_v2'}
+                        )
+                        
+                        # Add history entry for this deployment
+                        history = DeploymentHistory(
+                            deployment_id=deployment.id,
+                            action='deployed',
+                            action_details=f'Deployed to student template repository for {content.path}',
+                            example_version_id=version.id,
+                            meta={'example_identifier': content.example.identifier},
+                            workflow_id='generate_student_template_v2'
+                        )
+                        db.add(history)
                 else:
                     errors.append(f"Failed to process {content.path}: {result.get('error')}")
                 
@@ -452,16 +488,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             'error_count': len(errors)
         }
         
-        # Create or update ExampleDeployment records
-        deployment_timestamp = datetime.now(timezone.utc)
-        
-        for content in course_contents:
-            if not any(str(content.path) in error for error in errors):
-                # Update CourseContent status
-                content.deployment_status = 'deployed'
-                content.deployed_at = deployment_timestamp
-                
-        
+        # Commit all database changes (including deployments)
         db.commit()
         
         # Clean up

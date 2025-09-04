@@ -120,7 +120,7 @@ class DeploymentHistoryGet(BaseModel):
     action_details: Optional[str]
     example_version_id: Optional[UUID]
     previous_example_version_id: Optional[UUID]
-    metadata: Optional[Dict[str, Any]]
+    meta: Optional[Dict[str, Any]] = Field(None, alias="meta")  # Database column is 'meta'
     workflow_id: Optional[str]
     created_at: datetime
     created_by: Optional[UUID]
@@ -232,3 +232,4 @@ class DeploymentHistoryInterface(EntityInterface):
     endpoint = "deployment-history"
     model = DeploymentHistory
     cache_ttl = 300  # Longer cache for historical data
+

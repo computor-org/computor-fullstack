@@ -248,7 +248,7 @@ class CourseFamilyPermissionHandler(PermissionHandler):
                 .outerjoin(Course, cm_other.course_id == Course.id)
                 .outerjoin(self.entity, self.entity.id == Course.course_family_id)
                 .filter(
-                    cm_other.course_id.in_(select(subquery))
+                    cm_other.course_id.in_(subquery)
                 )
             )
             
@@ -347,7 +347,7 @@ class CourseContentTypePermissionHandler(PermissionHandler):
             # Check if user has required role in any course
             has_required_role = db.query(
                 exists().where(
-                    CourseMember.course_id.in_(select(user_courses))
+                    CourseMember.course_id.in_(user_courses)
                 )
             ).scalar()
             
@@ -425,7 +425,7 @@ class CourseContentPermissionHandler(PermissionHandler):
                 .outerjoin(cm_other, cm_other.user_id == User.id)
                 .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
                 .filter(
-                    cm_other.course_id.in_(select(subquery))
+                    cm_other.course_id.in_(subquery)
                 )
             )
             

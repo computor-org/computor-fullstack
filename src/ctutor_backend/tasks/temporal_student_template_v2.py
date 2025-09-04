@@ -15,6 +15,7 @@ from pathlib import Path
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from ..utils.docker_utils import transform_localhost_url
@@ -307,19 +308,19 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     if content.is_submittable:
                         # Find or create deployment record
                         deployment = db.query(CourseContentDeployment).filter(
-                            CourseContentDeployment.course_content_id == content.id
+                            CourseContentDeployment.course_content_id == str(content.id)
                         ).first()
                         
                         if not deployment:
                             # Create new deployment record
                             deployment = CourseContentDeployment(
-                                course_content_id=content.id,
-                                example_version_id=version.id
+                                course_content_id=str(content.id),
+                                example_version_id=str(version.id)
                             )
                             db.add(deployment)
                         else:
                             # Update existing deployment with new version
-                            deployment.example_version_id = version.id
+                            deployment.example_version_id = str(version.id)
                         
                         # Mark as deployed
                         from datetime import datetime, timezone
@@ -331,10 +332,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                         
                         # Add history entry for this deployment
                         history = DeploymentHistory(
-                            deployment_id=deployment.id,
+                            deployment_id=str(deployment.id),
                             action='deployed',
                             action_details=f'Deployed to student template repository for {content.path}',
-                            example_version_id=version.id,
+                            example_version_id=str(version.id),
                             meta={'example_identifier': str(example.identifier)},
                             workflow_id='generate_student_template_v2'
                         )
@@ -351,10 +352,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                         
                         # Add history entry for failure
                         history = DeploymentHistory(
-                            deployment_id=content.deployment.id,
+                            deployment_id=str(content.deployment.id),
                             action='failed',
                             action_details=error_msg[:500],
-                            example_version_id=content.deployment.example_version_id,
+                            example_version_id=str(content.deployment.example_version_id) if content.deployment.example_version_id else None,
                             workflow_id=content.deployment.workflow_id
                         )
                         db.add(history)
@@ -373,10 +374,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                     
                     # Add history entry for failure
                     history = DeploymentHistory(
-                        deployment_id=content.deployment.id,
+                        deployment_id=str(content.deployment.id),
                         action='failed',
                         action_details=str(e)[:500],
-                        example_version_id=content.deployment.example_version_id,
+                        example_version_id=str(content.deployment.example_version_id) if content.deployment.example_version_id else None,
                         workflow_id=content.deployment.workflow_id
                     )
                     db.add(history)
@@ -580,10 +581,10 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                 
                 # Add history entry
                 history = DeploymentHistory(
-                    deployment_id=deployment.id,
+                    deployment_id=str(deployment.id),
                     action='failed',
                     action_details=f'Deployment failed: {str(e)[:500]}',
-                    example_version_id=deployment.example_version_id,
+                    example_version_id=str(deployment.example_version_id) if deployment.example_version_id else None,
                     workflow_id=deployment.workflow_id,
                     meta={'error': str(e)}
                 )

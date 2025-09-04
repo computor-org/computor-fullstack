@@ -329,10 +329,9 @@ async def update_submission_groups(
             course_content = submission_group.course_content
             assignment_directory = None
             
-            # If course content has an example, use its directory
-            if course_content and course_content.example_id:
-                from ..model.example import Example
-                example = db.query(Example).filter(Example.id == course_content.example_id).first()
+            # If course content has a deployment with an example, use its directory
+            if course_content and course_content.deployment and course_content.deployment.example_version:
+                example = course_content.deployment.example_version.example
                 if example:
                     assignment_directory = example.directory
             
@@ -709,10 +708,9 @@ async def create_team_repository(
         course_content = submission_group.course_content
         assignment_directory = None
         
-        # If course content has an example, use its directory
-        if course_content and course_content.example_id:
-            from ..model.example import Example
-            example = db.query(Example).filter(Example.id == course_content.example_id).first()
+        # If course content has a deployment with an example, use its directory
+        if course_content and course_content.deployment and course_content.deployment.example_version:
+            example = course_content.deployment.example_version.example
             if example:
                 assignment_directory = example.directory
         

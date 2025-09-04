@@ -883,13 +883,21 @@ async def generate_student_template(
     
     workflow_id = await task_executor.submit_task(task_submission)
     
-    # Update all pending_release contents to deploying
-    db.query(CourseContent).filter(
+    # Update all pending deployments to deploying status
+    deployment_ids = db.query(CourseContentDeployment.id).join(
+        CourseContent,
+        CourseContentDeployment.course_content_id == CourseContent.id
+    ).filter(
         and_(
             CourseContent.course_id == course_id,
-            CourseContent.deployment_status == "pending_release"
+            CourseContentDeployment.deployment_status == "pending"
         )
-    ).update({"deployment_status": "deploying"})
+    ).all()
+    
+    if deployment_ids:
+        db.query(CourseContentDeployment).filter(
+            CourseContentDeployment.id.in_([d[0] for d in deployment_ids])
+        ).update({"deployment_status": "in_progress"}, synchronize_session=False)
     
     db.commit()
     

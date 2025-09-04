@@ -855,11 +855,15 @@ async def generate_student_template(
             detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
         )
     
-    # Count contents to process
+    # Count contents to process - check for deployments instead of example_id
+    from ctutor_backend.model.deployment import CourseContentDeployment
     contents_with_examples = db.query(func.count(CourseContent.id)).filter(
         and_(
             CourseContent.course_id == course_id,
-            CourseContent.example_id.isnot(None)
+            CourseContent.id.in_(
+                db.query(CourseContentDeployment.course_content_id)
+                .filter(CourseContentDeployment.deployment_status == 'deployed')
+            )
         )
     ).scalar()
     

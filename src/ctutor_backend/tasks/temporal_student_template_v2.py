@@ -210,13 +210,17 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             if 'http' in student_template_url:
                 template_repo.create_remote('origin', student_template_url)
         
-        # Get all CourseContent with examples
+        # Get all CourseContent with deployed examples
+        from ..model.deployment import CourseContentDeployment
         course_contents = db.query(CourseContent).options(
-            joinedload(CourseContent.example).joinedload(Example.versions),
-            joinedload(CourseContent.example).joinedload(Example.repository)
+            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
+            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.repository)
         ).filter(
             CourseContent.course_id == course_id,
-            CourseContent.example_id.isnot(None),
+            CourseContent.id.in_(
+                db.query(CourseContentDeployment.course_content_id)
+                .filter(CourseContentDeployment.deployment_status == 'deployed')
+            ),
             CourseContent.archived_at.is_(None)
         ).order_by(CourseContent.path).all()
         
@@ -232,43 +236,28 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         
         for content in course_contents:
             try:
-                logger.info(f"Processing {content.path} with example {content.example_id}")
+                if not content.deployment or not content.deployment.example_version:
+                    logger.error(f"No deployment found for {content.path}")
+                    errors.append(f"No deployment found for {content.path}")
+                    continue
+                    
+                example_version = content.deployment.example_version
+                example = example_version.example
                 
-                # Get example and repository details with versions loaded
-                example = db.query(Example).options(
-                    joinedload(Example.versions)
-                ).filter(Example.id == content.example_id).first()
+                logger.info(f"Processing {content.path} with example {example.id} version {example_version.version_tag}")
+                
                 if not example:
-                    logger.error(f"Example {content.example_id} not found")
+                    logger.error(f"Example not found for deployment at {content.path}")
                     errors.append(f"Example not found for {content.path}")
                     continue
                 
-                # Get example version details
-                version = db.query(ExampleVersion).filter(
-                    ExampleVersion.example_id == content.example_id,
-                    ExampleVersion.version_tag == content.example_version
-                ).first()
+                # Use the version from deployment (already loaded)
+                version = example_version
                 
-                if not version:
-                    # Try to get latest version if specific version not found
-                    version = db.query(ExampleVersion).filter(
-                        ExampleVersion.example_id == content.example_id
-                    ).order_by(ExampleVersion.version_number.desc()).first()
-                    
-                    # Update the course content with the actual version used
-                    if version:
-                        logger.info(f"Updated example_version from '{content.example_version}' to '{version.version_tag}' for {content.path}")
-                        content.example_version = version.version_tag
-                
-                if not version:
-                    logger.error(f"No version found for example {content.example_id}")
-                    errors.append(f"No version found for {content.path}")
-                    continue
-
                 # Get the repository to determine bucket name
-                repository = example.repository
+                repository = version.repository if version.repository else example.repository
                 if not repository:
-                    logger.error(f"Repository not found for example {content.example_id}")
+                    logger.error(f"Repository not found for example {example.id}")
                     errors.append(f"Repository not found for {content.path}")
                     continue
                 
@@ -407,10 +396,16 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                             for i in range(1, len(path_parts)):
                                 tree_structure += " → " + path_parts[i]
                         
-                        # Get example directory (identifier) and title
-                        example_dir = str(content.example.identifier)
-                        example_title = content.example.title
-                        example_version = content.example_version if content.example_version else "latest"
+                        # Get example directory (identifier) and title from deployment
+                        if content.deployment and content.deployment.example_version:
+                            example_dir = str(content.deployment.example_version.example.identifier)
+                            example_title = content.deployment.example_version.example.title
+                            example_version = content.deployment.example_version.version_tag
+                        else:
+                            # Fallback if no deployment (shouldn't happen)
+                            example_dir = "unknown"
+                            example_title = "Unknown"
+                            example_version = "unknown"
                         
                         f.write(f"| {tree_structure} | [`{example_dir}`](./{example_dir}) | {example_title} (v{example_version}) |\n")
                 
@@ -632,13 +627,16 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
             else:
                 os.remove(item_path)
         
-        # Get course contents with examples
+        # Get course contents with deployed examples
         course_contents = db.query(CourseContent).options(
-            joinedload(CourseContent.example).joinedload(Example.versions),
-            joinedload(CourseContent.example).joinedload(Example.repository)
+            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
+            joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.repository)
         ).filter(
             CourseContent.course_id == course_id,
-            CourseContent.example_id.isnot(None),
+            CourseContent.id.in_(
+                db.query(CourseContentDeployment.course_content_id)
+                .filter(CourseContentDeployment.deployment_status == 'deployed')
+            ),
             CourseContent.archived_at.is_(None)
         ).order_by(CourseContent.path).all()
         
@@ -650,21 +648,22 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
         # Process each course content
         for content in course_contents:
             try:
-                logger.info(f"Processing content: {content.path}, example_id: {content.example_id}")
-                
-                if not content.example:
-                    logger.warning(f"CourseContent {content.path} has example_id but no example relationship")
+                if not content.deployment or not content.deployment.example_version:
+                    logger.warning(f"CourseContent {content.path} has no deployment")
                     continue
+                    
+                example_version = content.deployment.example_version
+                example = example_version.example
                 
-                logger.info(f"Example found: {content.example.identifier}, versions count: {len(content.example.versions) if content.example.versions else 0}")
+                logger.info(f"Processing content: {content.path}, example: {example.identifier}, version: {example_version.version_tag}")
                 
-                if not content.example_version:
-                    logger.warning(f"CourseContent {content.path} has no example_version specified")
+                if not example:
+                    logger.warning(f"CourseContent {content.path} deployment has no example")
                     continue
                 
                 # Extract execution backend slug from meta_yaml and link to course_content
                 if not content.execution_backend_id:
-                    backend_slug = content.example.get_execution_backend_slug(content.example_version)
+                    backend_slug = example.get_execution_backend_slug(example_version.version_tag)
                     if backend_slug:
                         # Find the execution backend by slug
                         exec_backend = db.query(ExecutionBackend).filter(

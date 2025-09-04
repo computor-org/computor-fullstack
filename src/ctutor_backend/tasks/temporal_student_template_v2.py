@@ -340,11 +340,46 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                         )
                         db.add(history)
                 else:
-                    errors.append(f"Failed to process {content.path}: {result.get('error')}")
+                    error_msg = f"Failed to process {content.path}: {result.get('error')}"
+                    errors.append(error_msg)
+                    
+                    # Mark this specific deployment as failed
+                    if content.deployment:
+                        content.deployment.deployment_status = 'failed'
+                        content.deployment.deployment_message = error_msg[:500]
+                        content.deployment.last_attempt_at = datetime.now(timezone.utc)
+                        
+                        # Add history entry for failure
+                        history = DeploymentHistory(
+                            deployment_id=content.deployment.id,
+                            action='failed',
+                            action_details=error_msg[:500],
+                            example_version_id=content.deployment.example_version_id,
+                            workflow_id=content.deployment.workflow_id
+                        )
+                        db.add(history)
                 
             except Exception as e:
                 logger.error(f"Failed to process content {content.path}: {e}")
-                errors.append(f"Failed to process {content.path}: {str(e)}")
+                error_msg = f"Failed to process {content.path}: {str(e)}"
+                errors.append(error_msg)
+                
+                # Mark this specific deployment as failed
+                if content.deployment:
+                    from datetime import datetime, timezone
+                    content.deployment.deployment_status = 'failed'
+                    content.deployment.deployment_message = str(e)[:500]
+                    content.deployment.last_attempt_at = datetime.now(timezone.utc)
+                    
+                    # Add history entry for failure
+                    history = DeploymentHistory(
+                        deployment_id=content.deployment.id,
+                        action='failed',
+                        action_details=str(e)[:500],
+                        example_version_id=content.deployment.example_version_id,
+                        workflow_id=content.deployment.workflow_id
+                    )
+                    db.add(history)
         
         # Update repository content (preserve existing directories, only update assigned examples)
         # Only remove/update files that are being actively managed, preserve everything else
@@ -491,15 +526,74 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
         # Clean up
         shutil.rmtree(temp_dir)
         
-        return {
-            "success": True,
-            "commit_hash": commit_hash,
-            "processed_contents": processed_count,
-            "errors": errors
-        }
+        # Check if we had partial failures
+        if errors and processed_count == 0:
+            # Complete failure - all content failed
+            logger.error(f"Complete failure: no content was processed successfully. Errors: {errors}")
+            return {
+                "success": False,
+                "commit_hash": commit_hash,
+                "processed_contents": 0,
+                "errors": errors,
+                "message": "Complete failure - no content processed"
+            }
+        elif errors:
+            # Partial success - some content processed but some failed
+            logger.warning(f"Partial success: {processed_count} processed, {len(errors)} failed")
+            return {
+                "success": True,  # Overall success since some content was processed
+                "partial": True,
+                "commit_hash": commit_hash,
+                "processed_contents": processed_count,
+                "errors": errors,
+                "message": f"Partial success: {processed_count} items processed, {len(errors)} failed"
+            }
+        else:
+            # Complete success
+            return {
+                "success": True,
+                "commit_hash": commit_hash,
+                "processed_contents": processed_count,
+                "errors": errors
+            }
         
     except Exception as e:
         logger.error(f"Failed to generate student template: {e}")
+        
+        # Update all in_progress deployments to failed status
+        try:
+            from datetime import datetime, timezone
+            deployments_to_fail = db.query(CourseContentDeployment).join(
+                CourseContent,
+                CourseContentDeployment.course_content_id == CourseContent.id
+            ).filter(
+                and_(
+                    CourseContent.course_id == course_id,
+                    CourseContentDeployment.deployment_status == "in_progress"
+                )
+            ).all()
+            
+            for deployment in deployments_to_fail:
+                deployment.deployment_status = "failed"
+                deployment.deployment_message = f"Workflow failed: {str(e)[:500]}"  # Truncate long error messages
+                deployment.last_attempt_at = datetime.now(timezone.utc)
+                
+                # Add history entry
+                history = DeploymentHistory(
+                    deployment_id=deployment.id,
+                    action='failed',
+                    action_details=f'Deployment failed: {str(e)[:500]}',
+                    example_version_id=deployment.example_version_id,
+                    workflow_id=deployment.workflow_id,
+                    meta={'error': str(e)}
+                )
+                db.add(history)
+            
+            db.commit()
+            logger.info(f"Updated {len(deployments_to_fail)} deployments to failed status")
+        except Exception as update_error:
+            logger.error(f"Failed to update deployment status: {update_error}")
+        
         return {
             "success": False,
             "error": str(e)

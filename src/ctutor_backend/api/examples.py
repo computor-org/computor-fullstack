@@ -175,7 +175,7 @@ async def get_version(
 ):
     """Get a specific version."""
     # Check permissions
-    if not permissions.permitted("example", "list"):
+    if not permissions.permitted("example", "get"):
         raise ForbiddenException("You don't have permission to view versions")
     
     # Try cache first

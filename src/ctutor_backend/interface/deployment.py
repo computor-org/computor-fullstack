@@ -10,6 +10,8 @@ from typing import Optional, List, Dict, Any, Literal, TYPE_CHECKING
 from pydantic import BaseModel, Field, ConfigDict
 from uuid import UUID
 
+from ctutor_backend.interface.example import ExampleVersionList
+
 from .base import BaseEntityGet, EntityInterface, ListQuery
 
 if TYPE_CHECKING:
@@ -84,6 +86,8 @@ class CourseContentDeploymentList(BaseModel):
     deployment_status: str
     assigned_at: datetime
     deployed_at: Optional[datetime]
+
+    example_version: Optional['ExampleVersionList'] = None
     
     model_config = ConfigDict(from_attributes=True)
 

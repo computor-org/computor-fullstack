@@ -63,6 +63,9 @@ def claims_organization_manager() -> List[Tuple[str, str]]:
     
     # Add specific example permissions
     claims.extend([
+        ("permissions", f"{Example.__tablename__}:get"),
+        ("permissions", f"{Example.__tablename__}:list"),
+        ("permissions", f"{Example.__tablename__}:create"),
         ("permissions", f"{Example.__tablename__}:upload"),
         ("permissions", f"{Example.__tablename__}:download")
     ])

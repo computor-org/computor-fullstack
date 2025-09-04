@@ -269,8 +269,10 @@ def db_get_course_claims(user_id: str, db: Session) -> List[tuple]: #TODO: PERMI
     # Add general permissions for lecturers
     if is_lecturer:
         course_claims.extend([
-            ("permissions", f"{CourseContent.__tablename__}:create"),
-            ("permissions", f"{CourseContent.__tablename__}:update"),
+            ("permissions", f"{Example.__tablename__}:get"),
+            ("permissions", f"{Example.__tablename__}:list"),
+            ("permissions", f"{Example.__tablename__}:create"),
+            ("permissions", f"{Example.__tablename__}:update"),
             ("permissions", f"{Example.__tablename__}:upload"),
             ("permissions", f"{Example.__tablename__}:download"),
         ])

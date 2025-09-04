@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional, List, Literal
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
@@ -10,111 +10,31 @@ from ctutor_backend.model.course import CourseContentKind, CourseContentType, Co
 from ctutor_backend.model.auth import User
 from ..custom_types import Ltree
 
-
-# Deployment History Models
-class DeploymentHistoryAction(BaseModel):
-    """Single deployment history action entry."""
-    action: Literal["deployed", "unassigned", "reassigned", "archived", "updated", "failed"] = Field(
-        description="Type of deployment action"
-    )
-    timestamp: datetime = Field(
-        description="When the action occurred"
-    )
-    example_id: Optional[str] = Field(
-        default=None,
-        description="Example ID involved in the action"
-    )
-    example_version: Optional[str] = Field(
-        default=None,
-        description="Example version at time of action"
-    )
-    previous_example_id: Optional[str] = Field(
-        default=None,
-        description="Previous example ID (for reassignment)"
-    )
-    previous_example_version: Optional[str] = Field(
-        default=None,
-        description="Previous example version (for reassignment)"
-    )
-    reason: Optional[str] = Field(
-        default=None,
-        description="Reason for the action (optional)"
-    )
-    performed_by: Optional[str] = Field(
-        default=None,
-        description="User ID who performed the action"
-    )
-    workflow_id: Optional[str] = Field(
-        default=None,
-        description="Temporal workflow ID if applicable"
-    )
-    error_message: Optional[str] = Field(
-        default=None,
-        description="Error message if action failed"
-    )
-    
-    model_config = ConfigDict(use_enum_values=True)
+if TYPE_CHECKING:
+    from .deployment import CourseContentDeploymentGet
 
 
-class DeploymentHistory(BaseModel):
-    """Complete deployment history for a CourseContent."""
-    actions: List[DeploymentHistoryAction] = Field(
-        default_factory=list,
-        description="List of deployment actions in chronological order"
-    )
-    last_successful_deployment: Optional[datetime] = Field(
-        default=None,
-        description="Timestamp of last successful deployment"
-    )
-    last_successful_example_id: Optional[str] = Field(
-        default=None,
-        description="Example ID of last successful deployment"
-    )
-    last_successful_example_version: Optional[str] = Field(
-        default=None,
-        description="Example version of last successful deployment"
-    )
-    
-    def add_action(self, action: DeploymentHistoryAction) -> None:
-        """Add a new action to the history."""
-        self.actions.append(action)
-        
-        # Update last successful deployment if applicable
-        if action.action == "deployed" and not action.error_message:
-            self.last_successful_deployment = action.timestamp
-            self.last_successful_example_id = action.example_id
-            self.last_successful_example_version = action.example_version
-    
-    def get_latest_action(self) -> Optional[DeploymentHistoryAction]:
-        """Get the most recent action."""
-        return self.actions[-1] if self.actions else None
-    
-    model_config = ConfigDict(use_enum_values=True)
-
-
+# Course Content Properties - deployment history moved to separate deployment table
 class CourseContentProperties(BaseModel):
+    """Properties for course content (stored in JSONB)."""
     gitlab: Optional[GitLabConfig] = None
-    deployment_history: Optional[DeploymentHistory] = Field(
-        default=None,
-        description="Complete deployment history for this content"
-    )
+    # Additional custom properties can be stored here
     
     model_config = ConfigDict(
         extra='allow',
     )
 
 class CourseContentPropertiesGet(BaseModel):
+    """Properties for course content GET responses."""
     gitlab: Optional[GitLabConfigGet] = None
-    deployment_history: Optional[DeploymentHistory] = Field(
-        default=None,
-        description="Complete deployment history for this content"
-    )
+    # Additional custom properties can be included here
 
     model_config = ConfigDict(
         extra='allow',
     )
     
 class CourseContentCreate(BaseModel):
+    """DTO for creating course content."""
     title: Optional[str] = None
     description: Optional[str] = None
     path: str
@@ -126,15 +46,13 @@ class CourseContentCreate(BaseModel):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
-    # Example assignment fields (only for submittable content)
-    example_id: Optional[str] = None
-    example_version_id: Optional[str] = None
-    deployment_status: Optional[str] = None
-    deployed_at: Optional[datetime] = None
+    # Note: Example assignments are now handled through the deployment API
+    # Use POST /course-contents/{id}/assign-example instead
 
     model_config = ConfigDict(use_enum_values=True)
 
 class CourseContentGet(BaseEntityGet):
+    """DTO for course content GET responses."""
     id: str
     archived_at: Optional[datetime] = None
     title: Optional[str] = None
@@ -150,13 +68,22 @@ class CourseContentGet(BaseEntityGet):
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
     
-    # Example assignment fields (only for submittable content, null otherwise)
-    example_id: Optional[str] = None
-    example_version_id: Optional[str] = None
-    deployment_status: Optional[str] = None
-    deployed_at: Optional[datetime] = None
+    # Deprecated fields - kept for backwards compatibility during migration
+    # These will be removed in a future version
+    # Access deployment info via GET /course-contents/{id}/deployment instead
+    example_version_id: Optional[str] = Field(
+        None, 
+        deprecated=True,
+        description="DEPRECATED: Use deployment API"
+    )
 
     course_content_type: Optional[CourseContentTypeGet] = None
+    
+    # Optional deployment summary (populated when requested)
+    deployment: Optional['CourseContentDeploymentGet'] = Field(
+        None,
+        description="Deployment information if requested via include=deployment"
+    )
 
     @field_validator('path', mode='before')
     @classmethod
@@ -166,6 +93,7 @@ class CourseContentGet(BaseEntityGet):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
 class CourseContentList(BaseModel):
+    """DTO for course content list responses."""
     id: str
     title: Optional[str] = None
     path: str
@@ -178,13 +106,17 @@ class CourseContentList(BaseModel):
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
     
-    # Example assignment fields (only for submittable content, null otherwise)
-    example_id: Optional[str] = None
-    example_version_id: Optional[str] = None
-    deployment_status: Optional[str] = None
-    deployed_at: Optional[datetime] = None
-    
     course_content_type: Optional[CourseContentTypeGet] = None
+    
+    # Optional deployment summary for list views
+    has_deployment: Optional[bool] = Field(
+        None,
+        description="Whether this content has an example deployment"
+    )
+    deployment_status: Optional[str] = Field(
+        None,
+        description="Current deployment status if has_deployment=true"
+    )
     
     @field_validator('path', mode='before')
     @classmethod
@@ -194,6 +126,7 @@ class CourseContentList(BaseModel):
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
 class CourseContentUpdate(BaseModel):
+    """DTO for updating course content."""
     path: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
@@ -204,8 +137,11 @@ class CourseContentUpdate(BaseModel):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    # Note: Example assignments cannot be updated here
+    # Use the deployment API endpoints instead
 
 class CourseContentQuery(ListQuery):
+    """Query parameters for course content."""
     id: Optional[str] = None
     title: Optional[str] = None
     path: Optional[str] = None
@@ -218,8 +154,14 @@ class CourseContentQuery(ListQuery):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     execution_backend_id: Optional[str] = None
+    # Deployment filtering is done via separate deployment endpoints
+    has_deployment: Optional[bool] = Field(
+        None,
+        description="Filter by whether content has a deployment"
+    )
 
 def course_content_search(db: Session, query, params: Optional[CourseContentQuery]):
+    """Search course content based on query parameters."""
     if params.id != None:
         query = query.filter(CourseContent.id == params.id)
     if params.title != None:
@@ -250,10 +192,33 @@ def course_content_search(db: Session, query, params: Optional[CourseContentQuer
         query = query.filter(CourseContent.archived_at != None)
     else:
         query = query.filter(CourseContent.archived_at == None)
+    
+    # Filter by deployment status if requested
+    if params.has_deployment is not None:
+        from ..model.deployment import CourseContentDeployment
+        if params.has_deployment:
+            # Has deployment - use exists subquery
+            query = query.filter(
+                db.query(CourseContentDeployment)
+                .filter(CourseContentDeployment.course_content_id == CourseContent.id)
+                .exists()
+            )
+        else:
+            # No deployment - use not exists subquery
+            query = query.filter(
+                ~db.query(CourseContentDeployment)
+                .filter(CourseContentDeployment.course_content_id == CourseContent.id)
+                .exists()
+            )
         
     return query
 
 def post_create(course_content: CourseContent, db: Session):
+    """Post-create hook for course content.
+    
+    Creates submission groups for individual assignments.
+    Note: Deployment records are created separately via the deployment API.
+    """
     import logging
     logger = logging.getLogger(__name__)
     
@@ -401,9 +366,14 @@ def post_update(updated_item: CourseContent, old_item: CourseContentGet, db: Ses
             raise
 
 class CourseContentInterface(EntityInterface):
+    """Interface for CourseContent entity.
+    
+    Note: Example deployments are managed through the deployment API.
+    Use CourseContentDeploymentInterface for deployment operations.
+    """
     create = CourseContentCreate
     get = CourseContentGet
-    list = CourseContentGet  # Use CourseContentGet for list to include relationships
+    list = CourseContentList  # Use CourseContentList for list views
     update = CourseContentUpdate
     query = CourseContentQuery
     search = course_content_search

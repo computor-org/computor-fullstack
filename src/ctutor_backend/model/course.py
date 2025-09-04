@@ -234,7 +234,8 @@ class CourseContent(Base):
     example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
     example_version = relationship('ExampleVersion', foreign_keys=[example_version_id])
     
-    # Deployment tracking
+    # Deployment tracking - One-to-one relationship with CourseContentDeployment
+    deployment = relationship('CourseContentDeployment', back_populates='course_content', uselist=False)
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(

@@ -101,6 +101,13 @@ class CourseContentDeployment(Base):
         comment="Additional deployment data (workflow IDs, file lists, etc.)"
     )
     
+    # Temporal workflow tracking
+    workflow_id = Column(
+        String(255),
+        nullable=True,
+        comment="Current/last Temporal workflow ID for deployment"
+    )
+    
     # Audit fields
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

@@ -897,7 +897,11 @@ async def generate_student_template(
     if deployment_ids:
         db.query(CourseContentDeployment).filter(
             CourseContentDeployment.id.in_([d[0] for d in deployment_ids])
-        ).update({"deployment_status": "in_progress"}, synchronize_session=False)
+        ).update({
+            "deployment_status": "in_progress",
+            "workflow_id": workflow_id,
+            "last_attempt_at": datetime.now(timezone.utc)
+        }, synchronize_session=False)
     
     db.commit()
     

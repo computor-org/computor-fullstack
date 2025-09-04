@@ -341,6 +341,169 @@ async def unassign_example_from_content(
 
 
 @course_content_router.router.get(
+    "/deployment/{content_id}",
+    response_model=Dict[str, Any]
+)
+async def get_deployment_status_with_workflow(
+    content_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    """
+    Get detailed deployment status including Temporal workflow information.
+    
+    Returns deployment data and checks the Temporal workflow status if one is running.
+    """
+    # Check content exists
+    content = db.query(CourseContent).filter(CourseContent.id == str(content_id)).first()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course content not found"
+        )
+    
+    # Check permissions
+    if check_course_permissions(permissions, Course, "_student", db).filter(
+        Course.id == content.course_id
+    ).first() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view deployment status"
+        )
+    
+    # Get deployment with relationships
+    deployment = db.query(CourseContentDeployment).options(
+        joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example)
+    ).filter(
+        CourseContentDeployment.course_content_id == str(content_id)
+    ).first()
+    
+    if not deployment:
+        return {
+            "deployment": None,
+            "workflow": None,
+            "message": "No deployment found for this content"
+        }
+    
+    # Build deployment info
+    deployment_info = {
+        "id": str(deployment.id),
+        "course_content_id": str(deployment.course_content_id),
+        "example_version_id": str(deployment.example_version_id) if deployment.example_version_id else None,
+        "deployment_status": deployment.deployment_status,
+        "deployment_message": deployment.deployment_message,
+        "assigned_at": deployment.assigned_at.isoformat() if deployment.assigned_at else None,
+        "deployed_at": deployment.deployed_at.isoformat() if deployment.deployed_at else None,
+        "last_attempt_at": deployment.last_attempt_at.isoformat() if deployment.last_attempt_at else None,
+        "deployment_path": deployment.deployment_path,
+        "workflow_id": deployment.workflow_id
+    }
+    
+    # If there's an example version, include its info
+    if deployment.example_version:
+        deployment_info["example_version"] = {
+            "id": str(deployment.example_version.id),
+            "version_tag": deployment.example_version.version_tag,
+            "example": {
+                "id": str(deployment.example_version.example.id),
+                "identifier": str(deployment.example_version.example.identifier),
+                "title": deployment.example_version.example.title
+            } if deployment.example_version.example else None
+        }
+    
+    # Check Temporal workflow status if workflow_id exists
+    workflow_info = None
+    if deployment.workflow_id:
+        try:
+            # Import Temporal client
+            from temporalio.client import Client
+            from datetime import datetime, timezone
+            import os
+            
+            # Get Temporal configuration
+            temporal_host = os.environ.get('TEMPORAL_HOST', 'localhost')
+            temporal_port = os.environ.get('TEMPORAL_PORT', '7233')
+            temporal_namespace = os.environ.get('TEMPORAL_NAMESPACE', 'default')
+            
+            # Create Temporal client
+            async def get_workflow_status():
+                client = await Client.connect(
+                    f"{temporal_host}:{temporal_port}",
+                    namespace=temporal_namespace
+                )
+                
+                try:
+                    # Get workflow handle
+                    handle = client.get_workflow_handle(deployment.workflow_id)
+                    
+                    # Describe the workflow to get its status
+                    description = await handle.describe()
+                    
+                    return {
+                        "workflow_id": deployment.workflow_id,
+                        "status": description.status.name if description.status else "UNKNOWN",
+                        "start_time": description.start_time.isoformat() if description.start_time else None,
+                        "close_time": description.close_time.isoformat() if description.close_time else None,
+                        "execution_time": description.execution_time.isoformat() if description.execution_time else None,
+                        "task_queue": description.task_queue,
+                        "workflow_type": description.workflow_type,
+                        "is_running": description.status.name in ["RUNNING", "PENDING"] if description.status else False
+                    }
+                except Exception as e:
+                    return {
+                        "workflow_id": deployment.workflow_id,
+                        "status": "NOT_FOUND",
+                        "error": str(e),
+                        "is_running": False
+                    }
+            
+            # Run the async function
+            workflow_info = await get_workflow_status()
+            
+            # Auto-update deployment status based on workflow status
+            if workflow_info["status"] == "COMPLETED" and deployment.deployment_status == "in_progress":
+                deployment.deployment_status = "deployed"
+                deployment.deployed_at = datetime.now(timezone.utc)
+                deployment.deployment_message = "Deployment completed successfully"
+                db.commit()
+                deployment_info["deployment_status"] = "deployed"
+                deployment_info["deployed_at"] = deployment.deployed_at.isoformat()
+                
+            elif workflow_info["status"] in ["FAILED", "TERMINATED", "TIMED_OUT"] and deployment.deployment_status == "in_progress":
+                deployment.deployment_status = "failed"
+                deployment.deployment_message = f"Workflow {workflow_info['status'].lower()}"
+                db.commit()
+                deployment_info["deployment_status"] = "failed"
+                
+        except Exception as e:
+            workflow_info = {
+                "error": f"Failed to connect to Temporal: {str(e)}",
+                "workflow_id": deployment.workflow_id
+            }
+    
+    # Get recent history
+    history = db.query(DeploymentHistory).filter(
+        DeploymentHistory.deployment_id == deployment.id
+    ).order_by(DeploymentHistory.created_at.desc()).limit(5).all()
+    
+    history_items = [
+        {
+            "id": str(h.id),
+            "action": h.action,
+            "action_details": h.action_details,
+            "workflow_id": h.workflow_id,
+            "created_at": h.created_at.isoformat()
+        } for h in history
+    ]
+    
+    return {
+        "deployment": deployment_info,
+        "workflow": workflow_info,
+        "recent_history": history_items
+    }
+
+
+@course_content_router.router.get(
     "/courses/{course_id}/deployment-summary",
     response_model=DeploymentSummary
 )

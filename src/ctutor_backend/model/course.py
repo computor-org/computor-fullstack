@@ -238,6 +238,36 @@ class CourseContent(Base):
                CourseContentType.id == course_content_type_id)
         .scalar_subquery()
     )
+    
+    # Column property for is_submittable - derived from CourseContentKind.submittable
+    is_submittable = column_property(
+        select(CourseContentKind.submittable)
+        .where(
+            CourseContentKind.id == CourseContentType.course_content_kind_id,
+            CourseContentType.id == course_content_type_id
+        )
+        .scalar_subquery()
+    )
+    
+    # Column property for has_deployment - check if deployment exists
+    @property 
+    def has_deployment(self):
+        """Check if this course content has a deployment."""
+        # Only submittable content can have deployments
+        if not self.is_submittable:
+            return False
+        return self.deployment is not None
+    
+    # Column property for deployment_status - get status from deployment if exists
+    @property
+    def deployment_status(self):
+        """Get deployment status if deployment exists."""
+        # Only submittable content can have deployments
+        if not self.is_submittable:
+            return None
+        if self.deployment:
+            return self.deployment.deployment_status
+        return None
 
 
 class CourseMember(Base):

@@ -219,7 +219,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
             CourseContent.course_id == course_id,
             CourseContent.id.in_(
                 db.query(CourseContentDeployment.course_content_id)
-                .filter(CourseContentDeployment.deployment_status == 'deployed')
+                .filter(CourseContentDeployment.example_version_id.isnot(None))  # Has an assigned example
             ),
             CourseContent.archived_at.is_(None)
         ).order_by(CourseContent.path).all()
@@ -321,11 +321,13 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                             # Update existing deployment with new version
                             deployment.example_version_id = version.id
                         
-                        # Mark as deployed (will be saved after commit)
-                        deployment.set_deployed(
-                            path=str(content.example.identifier),
-                            metadata={'workflow': 'generate_student_template_v2'}
-                        )
+                        # Mark as deployed
+                        from datetime import datetime, timezone
+                        deployment.deployment_status = 'deployed'
+                        deployment.deployed_at = datetime.now(timezone.utc)
+                        deployment.deployment_path = str(example.identifier)
+                        deployment.deployment_metadata = {'workflow': 'generate_student_template_v2'}
+                        deployment.deployment_message = 'Successfully deployed to student template'
                         
                         # Add history entry for this deployment
                         history = DeploymentHistory(
@@ -333,7 +335,7 @@ async def generate_student_template_v2(course_id: str, student_template_url: str
                             action='deployed',
                             action_details=f'Deployed to student template repository for {content.path}',
                             example_version_id=version.id,
-                            meta={'example_identifier': content.example.identifier},
+                            meta={'example_identifier': str(example.identifier)},
                             workflow_id='generate_student_template_v2'
                         )
                         db.add(history)
@@ -635,7 +637,7 @@ async def generate_assignments_repository(course_id: str, assignments_url: str) 
             CourseContent.course_id == course_id,
             CourseContent.id.in_(
                 db.query(CourseContentDeployment.course_content_id)
-                .filter(CourseContentDeployment.deployment_status == 'deployed')
+                .filter(CourseContentDeployment.example_version_id.isnot(None))  # Has an assigned example
             ),
             CourseContent.archived_at.is_(None)
         ).order_by(CourseContent.path).all()

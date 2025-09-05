@@ -39,77 +39,87 @@ async def download_example_files(repository: Any, version: Any) -> Dict[str, byt
 
 
 async def download_example_from_git(repository: Any, version: Any) -> Dict[str, bytes]:
-    """Download example files from Git repository."""
-    import os
-    import tempfile
-    import shutil
-    import git
+    # """Download example files from Git repository."""
+    # import os
+    # import tempfile
+    # import shutil
+    # import git
     
-    files = {}
-    temp_dir = tempfile.mkdtemp()
+    # files = {}
+    # temp_dir = tempfile.mkdtemp()
     
-    try:
-        repo = git.Repo.clone_from(repository.url, temp_dir, branch=version.version_tag)
+    # try:
+    #     repo = git.Repo.clone_from(repository.url, temp_dir, branch=version.version_tag)
         
-        for root, dirs, file_list in os.walk(temp_dir):
-            # Skip .git directory
-            if '.git' in dirs:
-                dirs.remove('.git')
+    #     for root, dirs, file_list in os.walk(temp_dir):
+    #         # Skip .git directory
+    #         if '.git' in dirs:
+    #             dirs.remove('.git')
             
-            for file_name in file_list:
-                file_path = os.path.join(root, file_name)
-                relative_path = os.path.relpath(file_path, temp_dir)
+    #         for file_name in file_list:
+    #             file_path = os.path.join(root, file_name)
+    #             relative_path = os.path.relpath(file_path, temp_dir)
                 
-                with open(file_path, 'rb') as f:
-                    files[relative_path] = f.read()
+    #             with open(file_path, 'rb') as f:
+    #                 files[relative_path] = f.read()
         
-        return files
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    #     return files
+    # finally:
+    #     shutil.rmtree(temp_dir, ignore_errors=True)
+    logger.error(f"Git source type not implemented for repository {repository.name}")
+    raise NotImplementedError(f"Git source type is not yet implemented for repository '{repository.name}'")
 
 
-async def download_example_from_object_storage(repository: Any, version: Any) -> Dict[str, bytes]:
-    """Download example files from MinIO/S3 object storage."""
+async def download_example_from_object_storage(
+    repository: Any, 
+    version: Any
+) -> Dict[str, bytes]:
+    """
+    Download example files from MinIO/S3 object storage.
+    
+    Args:
+        repository: ExampleRepository with source_type in ['minio', 's3']
+        version: ExampleVersion with storage path information
+        
+    Returns:
+        Dictionary mapping file paths to their content
+    """
     from ..services.storage_service import StorageService
     
-    # Determine bucket name based on repository properties
-    bucket_name = repository.properties.get('bucket', 'examples')
-    
-    # Use the storage path from version to locate files
-    prefix = version.storage_path
-    if not prefix:
-        # Fallback: construct path from example identifier and version
-        example_id = repository.example_id
-        prefix = f"{example_id}/{version.version_tag}"
-    
-    logger.info(f"Downloading from bucket: {bucket_name}, prefix: {prefix}")
-    
     # Initialize storage service
-    storage = StorageService()
+    storage_service = StorageService()
     
-    # List and download all files with the prefix
-    files = {}
-    try:
-        objects = storage.client.list_objects(bucket_name, prefix=prefix, recursive=True)
-        
-        for obj in objects:
-            # Skip directories
-            if obj.object_name.endswith('/'):
-                continue
-            
-            # Get relative path (remove prefix)
-            relative_path = obj.object_name[len(prefix):].lstrip('/')
-            
+    storage_path = version.storage_path
+    bucket_name = repository.source_url  # Use repository's source_url as bucket name
+    prefix = storage_path.strip('/')
+    
+    logger.info(f"Downloading from {repository.source_type} bucket: {bucket_name}, path: {storage_path}")
+    
+    # Download all files for this example
+    example_files = {}
+    objects = await storage_service.list_objects(
+        prefix=prefix,
+        bucket_name=bucket_name
+    )
+    
+    for obj in objects:
+        try:
             # Download file content
-            response = storage.client.get_object(bucket_name, obj.object_name)
-            files[relative_path] = response.read()
-            response.close()
-            response.release_conn()
-        
-        return files
-    except Exception as e:
-        logger.error(f"Failed to download from object storage: {e}")
-        raise
+            file_data = await storage_service.download_file(
+                object_key=obj.object_name,
+                bucket_name=bucket_name
+            )
+            
+            # Get relative path within example
+            relative_path = obj.object_name
+            if prefix:
+                relative_path = obj.object_name.replace(prefix, '').lstrip('/')
+            
+            example_files[relative_path] = file_data
+        except Exception as e:
+            logger.error(f"Failed to download {obj.object_name}: {e}")
+    
+    return example_files
 
 
 # Activities

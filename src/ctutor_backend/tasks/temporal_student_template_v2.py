@@ -325,7 +325,8 @@ async def generate_student_template_activity_v2(
                     
                     # Determine target directory in student template
                     # Use the path from course_content, removing any leading/trailing slashes
-                    target_dir = content.path.strip('/')
+                    # Convert Ltree path to string first
+                    target_dir = str(content.path).strip('/')
                     full_target_path = os.path.join(template_repo_path, target_dir)
                     
                     # Create target directory if it doesn't exist

@@ -7,6 +7,8 @@ from ctutor_backend.interface.student_course_contents import (
 )
 from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseMember, CourseContent, CourseSubmissionGroupGrading
 from ctutor_backend.model.auth import User
+from ctutor_backend.model.deployment import CourseContentDeployment
+from ctutor_backend.model.example import ExampleVersion, Example
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +19,19 @@ def build_enhanced_submission_group(course_submission_group, submission_status, 
     if not course_submission_group:
         return None
     
-    # Get course content info with example relationship
+    # Get course content info with deployment and example relationship
     course_content = db.query(CourseContent).options(
-        joinedload(CourseContent.example)
+        joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example)
     ).filter(
         CourseContent.id == course_submission_group.course_content_id
     ).first()
     
-    # Get example identifier if course content has an example
+    # Get example identifier if course content has a deployed example
     example_identifier = None
-    if course_content and course_content.example:
-        example_identifier = str(course_content.example.identifier)
+    if course_content and course_content.deployment and course_content.deployment.example_version:
+        example = course_content.deployment.example_version.example
+        if example:
+            example_identifier = str(example.identifier)
     
     # Get course content path
     course_content_path = None

@@ -272,6 +272,7 @@ async def generate_student_template_activity_v2(
             # Process each CourseContent with an example
             processed_count = 0
             errors = []
+            successfully_processed = []  # Track which content was successfully processed
             
             for content in course_contents:
                 try:
@@ -374,18 +375,9 @@ Follow the course submission guidelines to submit your work.
                     processed_count += 1
                     logger.info(f"Successfully processed {content.path}")
                     
-                    # Update deployment status to deployed with history
-                    content.deployment.deployment_status = "deployed"
-                    content.deployment.deployed_at = datetime.now(timezone.utc)
-                    
-                    # Add success history entry
-                    history = DeploymentHistory(
-                        deployment_id=content.deployment.id,
-                        action="deployed",
-                        action_details=f"Successfully deployed to student template at {target_dir}",
-                        example_version_id=content.deployment.example_version_id
-                    )
-                    db.add(history)
+                    # Don't mark as deployed yet - wait until after successful git push
+                    # Just track that we processed it successfully
+                    successfully_processed.append(content)
                     
                 except Exception as e:
                     error_msg = f"Failed to process {content.path}: {str(e)}"
@@ -406,10 +398,10 @@ Follow the course submission guidelines to submit your work.
                         )
                         db.add(history)
             
-            # Commit database changes
-            db.commit()
+            # Don't commit yet - wait until after git operations
             
             # If we processed any content, commit and push to Git
+            git_push_successful = False
             if processed_count > 0:
                 try:
                     # Stage all changes
@@ -425,20 +417,62 @@ Follow the course submission guidelines to submit your work.
                         # Push to remote
                         if 'origin' in [remote.name for remote in template_repo.remotes]:
                             if gitlab_token and 'http' in student_template_url:
-                                # Push with authentication
-                                template_repo.git.push('origin', 'main', env={'GIT_ASKPASS': 'echo', 'GIT_USERNAME': 'oauth2', 'GIT_PASSWORD': gitlab_token})
+                                # For HTTP URLs with token, update remote URL to include auth
+                                # This avoids the "could not read Username" error in non-interactive environments
+                                origin = template_repo.remote('origin')
+                                origin.set_url(auth_url)  # Use the auth URL we created earlier
+                                template_repo.git.push('origin', 'main')
                             else:
                                 template_repo.git.push('origin', 'main')
                             logger.info("Pushed changes to GitLab")
+                            git_push_successful = True
                         else:
                             logger.warning("No remote 'origin' found, skipping push")
+                            git_push_successful = True  # Consider successful if no remote
                     else:
                         logger.info("No changes to commit")
+                        git_push_successful = True  # No changes needed
                         
                 except Exception as e:
                     error_msg = f"Failed to commit/push changes: {str(e)}"
                     logger.error(error_msg)
                     errors.append(error_msg)
+                    git_push_successful = False
+            
+            # Now update deployment statuses based on git push result
+            if git_push_successful and processed_count > 0:
+                # Mark successfully processed content as deployed
+                for content in successfully_processed:
+                    if content.deployment:
+                        content.deployment.deployment_status = "deployed"
+                        content.deployment.deployed_at = datetime.now(timezone.utc)
+                        
+                        # Add success history entry
+                        history = DeploymentHistory(
+                            deployment_id=content.deployment.id,
+                            action="deployed",
+                            action_details=f"Successfully deployed to student template",
+                            example_version_id=content.deployment.example_version_id
+                        )
+                        db.add(history)
+            else:
+                # Git push failed - mark all as failed
+                for content in course_contents:
+                    if content.deployment and content.deployment.deployment_status == "deploying":
+                        content.deployment.deployment_status = "failed"
+                        content.deployment.deployment_message = "Git push failed"
+                        
+                        # Add failure history entry
+                        history = DeploymentHistory(
+                            deployment_id=content.deployment.id,
+                            action="failed",
+                            action_details="Failed to push to Git repository",
+                            example_version_id=content.deployment.example_version_id
+                        )
+                        db.add(history)
+            
+            # Now commit database changes
+            db.commit()
             
             # Prepare result
             success = processed_count > 0 and len(errors) < len(course_contents)

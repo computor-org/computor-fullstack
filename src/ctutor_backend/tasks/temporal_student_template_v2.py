@@ -205,9 +205,37 @@ async def generate_student_template_activity_v2(
         # Transform localhost URLs for Docker environments
         student_template_url = transform_localhost_url(student_template_url)
         logger.info(f"Using student template URL: {student_template_url}")
+
+        # Get course details
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise ValueError(f"Course {course_id} not found")
         
-        # Check if we need GitLab token
-        gitlab_token = os.getenv('GITLAB_TOKEN')
+        organization = course.organization
+        
+        # # Get organization directly using the foreign key relationship
+        # organization = db.query(Organization).filter(Organization.id == course.organization_id).first()
+        # if not organization:
+        #     raise ValueError(f"Organization not found for course {course_id}. Organization ID: {course.organization_id}")
+        
+        # Get GitLab token from organization properties
+        gitlab_token = None
+        if organization.properties and 'gitlab' in organization.properties:
+            gitlab_config = organization.properties.get('gitlab', {})
+            encrypted_token = gitlab_config.get('token')  # Use 'token' field as defined in GitLabConfig
+            
+            if encrypted_token:
+                # Decrypt the GitLab token
+                from ..interface.tokens import decrypt_api_key
+                try:
+                    gitlab_token = decrypt_api_key(encrypted_token)
+                    logger.info(f"Using decrypted GitLab token from organization {organization.title}")
+                except Exception as e:
+                    logger.error(f"Failed to decrypt GitLab token for organization {organization.title}: {str(e)}")
+                    gitlab_token = None
+        
+        if not gitlab_token:
+            logger.warning(f"No GitLab token found in organization {organization.title} properties")
         
         # Use temp directory for repository work
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -244,9 +272,12 @@ async def generate_student_template_activity_v2(
                 # Set default branch to main
                 template_repo.git.checkout('-b', 'main')
                 
-                # Add remote
+                # Add remote with auth URL if we have a token
                 if 'http' in student_template_url:
-                    template_repo.create_remote('origin', student_template_url)
+                    if gitlab_token:
+                        template_repo.create_remote('origin', auth_url)
+                    else:
+                        template_repo.create_remote('origin', student_template_url)
             
             # Get all CourseContent with assigned examples (deployments in 'deploying' status)
             course_contents = db.query(CourseContent).options(
@@ -416,14 +447,9 @@ Follow the course submission guidelines to submit your work.
                         
                         # Push to remote
                         if 'origin' in [remote.name for remote in template_repo.remotes]:
-                            if gitlab_token and 'http' in student_template_url:
-                                # For HTTP URLs with token, update remote URL to include auth
-                                # This avoids the "could not read Username" error in non-interactive environments
-                                origin = template_repo.remote('origin')
-                                origin.set_url(auth_url)  # Use the auth URL we created earlier
-                                template_repo.git.push('origin', 'main')
-                            else:
-                                template_repo.git.push('origin', 'main')
+                            # The remote should already have auth URL if token was provided
+                            # Just push directly
+                            template_repo.git.push('origin', 'main')
                             logger.info("Pushed changes to GitLab")
                             git_push_successful = True
                         else:

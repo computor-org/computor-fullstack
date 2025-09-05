@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-04T09:54:18.756587
+ * Generated on: 2025-09-05T13:28:29.862255
 
  * Category: Courses
 
@@ -10,13 +10,244 @@
 
 
 
-import type { ComputorDeploymentConfig, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials } from './common';
+import type { ComputorDeploymentConfig, CourseContentDeploymentGet, CourseContentDeploymentList, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials } from './common';
 
 import type { OrganizationGet } from './organizations';
 
 import type { UserList } from './users';
 
 
+
+export interface TutorCourseMemberCourseContent {
+  id: string;
+  path: string;
+}
+
+export interface TutorCourseMemberGet {
+  id: string;
+  properties?: CourseMemberProperties | null;
+  user_id: string;
+  course_id: string;
+  course_group_id?: string | null;
+  course_role_id: string;
+  unreviewed_course_contents?: TutorCourseMemberCourseContent[];
+  user: UserList;
+}
+
+export interface TutorCourseMemberList {
+  id: string;
+  user_id: string;
+  course_id: string;
+  course_group_id?: string | null;
+  course_role_id: string;
+  unreviewed?: boolean | null;
+  user: UserList;
+}
+
+export interface CourseProperties {
+  gitlab?: GitLabConfig | null;
+}
+
+export interface CoursePropertiesGet {
+  gitlab?: GitLabConfigGet | null;
+}
+
+export interface CourseCreate {
+  id?: string | null;
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  course_family_id: string;
+  properties?: CourseProperties | null;
+}
+
+export interface CourseGet {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  course_family_id: string;
+  properties?: CoursePropertiesGet | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  organization_id: string;
+  course_family?: CourseFamilyGet | null;
+}
+
+export interface CourseList {
+  id: string;
+  title?: string | null;
+  course_family_id?: string | null;
+  organization_id?: string | null;
+  path: string;
+  properties?: CoursePropertiesGet | null;
+}
+
+export interface CourseUpdate {
+  title?: string | null;
+  description?: string | null;
+  properties?: CourseProperties | null;
+}
+
+export interface CourseMemberProperties {
+  gitlab?: CourseMemberGitLabConfig | null;
+}
+
+export interface CourseMemberCreate {
+  id?: string | null;
+  properties?: CourseMemberProperties | null;
+  user_id: string;
+  course_id: string;
+  course_group_id?: string | null;
+  course_role_id: string;
+}
+
+export interface CourseMemberGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  properties?: CourseMemberProperties | null;
+  user_id: string;
+  course_id: string;
+  course_group_id?: string | null;
+  course_role_id: string;
+  user?: UserList | null;
+}
+
+export interface CourseMemberList {
+  id: string;
+  user_id: string;
+  course_id: string;
+  course_group_id?: string | null;
+  course_role_id: string;
+  user: UserList;
+}
+
+export interface CourseMemberUpdate {
+  properties?: CourseMemberProperties | null;
+  course_group_id?: string | null;
+  course_role_id?: string | null;
+}
+
+export interface CourseExecutionBackendCreate {
+  execution_backend_id: string;
+  course_id: string;
+  properties?: any | null;
+}
+
+export interface CourseExecutionBackendGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  execution_backend_id: string;
+  course_id: string;
+  properties?: any | null;
+}
+
+export interface CourseExecutionBackendList {
+  execution_backend_id: string;
+  course_id: string;
+}
+
+export interface CourseExecutionBackendUpdate {
+  properties?: any | null;
+}
+
+export interface CourseRoleGet {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+}
+
+export interface CourseContentTypeCreate {
+  slug: string;
+  title?: string | null;
+  description?: string | null;
+  color?: string | null;
+  properties?: any | null;
+  course_id: string;
+  course_content_kind_id: string;
+}
+
+export interface CourseContentTypeGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  slug: string;
+  title?: string | null;
+  description?: string | null;
+  color: string;
+  properties?: any | null;
+  course_id: string;
+  course_content_kind_id: string;
+  course_content_kind?: CourseContentKindGet | null;
+}
+
+export interface CourseContentTypeList {
+  id: string;
+  slug: string;
+  title?: string | null;
+  color: string;
+  course_id: string;
+  course_content_kind_id: string;
+}
+
+export interface CourseContentTypeUpdate {
+  slug?: string | null;
+  title?: string | null;
+  color?: string | null;
+  description?: string | null;
+  properties?: any | null;
+}
+
+export interface CourseGroupCreate {
+  title?: string | null;
+  description?: string | null;
+  course_id: string;
+  properties?: any | null;
+}
+
+export interface CourseGroupGet {
+  title?: string | null;
+  description?: string | null;
+  course_id: string;
+  properties?: any | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+}
+
+export interface CourseGroupList {
+  id: string;
+  title?: string | null;
+  course_id: string;
+}
+
+export interface CourseGroupUpdate {
+  title?: string | null;
+  description?: string | null;
+  course_id?: string | null;
+  properties?: any | null;
+}
 
 /**
  * Repository information for a submission group
@@ -131,6 +362,30 @@ export interface CourseContentStudentUpdate {
   grading?: number | null;
 }
 
+export interface CourseStudentRepository {
+  provider_url?: string | null;
+  full_path?: string | null;
+}
+
+export interface CourseStudentGet {
+  id: string;
+  title?: string | null;
+  course_family_id?: string | null;
+  organization_id?: string | null;
+  course_content_types: CourseContentTypeGet[];
+  path: string;
+  repository: CourseStudentRepository;
+}
+
+export interface CourseStudentList {
+  id: string;
+  title?: string | null;
+  course_family_id?: string | null;
+  organization_id?: string | null;
+  path: string;
+  repository: CourseStudentRepository;
+}
+
 export interface CourseContentKindCreate {
   title?: string | null;
   description?: string | null;
@@ -215,6 +470,53 @@ export interface CourseTaskRequest {
   gitlab?: GitLabCredentials | null;
 }
 
+export interface CourseFamilyProperties {
+  gitlab?: GitLabConfig | null;
+}
+
+export interface CourseFamilyPropertiesGet {
+  gitlab?: GitLabConfigGet | null;
+}
+
+export interface CourseFamilyCreate {
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  organization_id: string;
+  properties?: CourseFamilyProperties | null;
+}
+
+export interface CourseFamilyGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  organization_id: string;
+  properties?: CourseFamilyPropertiesGet | null;
+  organization?: OrganizationGet | null;
+}
+
+export interface CourseFamilyList {
+  id: string;
+  title?: string | null;
+  organization_id: string;
+  path: string;
+}
+
+export interface CourseFamilyUpdate {
+  title?: string | null;
+  description?: string | null;
+  path?: string | null;
+  organization_id?: string | null;
+  properties?: CourseFamilyProperties | null;
+}
+
 /**
  * Properties for course content (stored in JSONB).
  */
@@ -270,11 +572,14 @@ export interface CourseContentGet {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   execution_backend_id?: string | null;
+  is_submittable?: boolean;
+  has_deployment?: boolean | null;
+  deployment_status?: string | null;
   /** DEPRECATED: Use deployment API */
   example_version_id?: string | null;
   course_content_type?: CourseContentTypeGet | null;
   /** Deployment information if requested via include=deployment */
-  deployment?: any | null;
+  deployment?: CourseContentDeploymentGet | null;
 }
 
 /**
@@ -292,11 +597,14 @@ export interface CourseContentList {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   execution_backend_id?: string | null;
+  is_submittable?: boolean;
   course_content_type?: CourseContentTypeGet | null;
   /** Whether this content has an example deployment */
   has_deployment?: boolean | null;
   /** Current deployment status if has_deployment=true */
   deployment_status?: string | null;
+  /** Deployment information if requested via include=deployment */
+  deployment?: CourseContentDeploymentList | null;
 }
 
 /**
@@ -313,297 +621,6 @@ export interface CourseContentUpdate {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   execution_backend_id?: string | null;
-}
-
-export interface CourseStudentRepository {
-  provider_url?: string | null;
-  full_path?: string | null;
-}
-
-export interface CourseStudentGet {
-  id: string;
-  title?: string | null;
-  course_family_id?: string | null;
-  organization_id?: string | null;
-  course_content_types: CourseContentTypeGet[];
-  path: string;
-  repository: CourseStudentRepository;
-}
-
-export interface CourseStudentList {
-  id: string;
-  title?: string | null;
-  course_family_id?: string | null;
-  organization_id?: string | null;
-  path: string;
-  repository: CourseStudentRepository;
-}
-
-export interface CourseExecutionBackendCreate {
-  execution_backend_id: string;
-  course_id: string;
-  properties?: any | null;
-}
-
-export interface CourseExecutionBackendGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  execution_backend_id: string;
-  course_id: string;
-  properties?: any | null;
-}
-
-export interface CourseExecutionBackendList {
-  execution_backend_id: string;
-  course_id: string;
-}
-
-export interface CourseExecutionBackendUpdate {
-  properties?: any | null;
-}
-
-export interface CourseFamilyProperties {
-  gitlab?: GitLabConfig | null;
-}
-
-export interface CourseFamilyPropertiesGet {
-  gitlab?: GitLabConfigGet | null;
-}
-
-export interface CourseFamilyCreate {
-  title?: string | null;
-  description?: string | null;
-  path: string;
-  organization_id: string;
-  properties?: CourseFamilyProperties | null;
-}
-
-export interface CourseFamilyGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  title?: string | null;
-  description?: string | null;
-  path: string;
-  organization_id: string;
-  properties?: CourseFamilyPropertiesGet | null;
-  organization?: OrganizationGet | null;
-}
-
-export interface CourseFamilyList {
-  id: string;
-  title?: string | null;
-  organization_id: string;
-  path: string;
-}
-
-export interface CourseFamilyUpdate {
-  title?: string | null;
-  description?: string | null;
-  path?: string | null;
-  organization_id?: string | null;
-  properties?: CourseFamilyProperties | null;
-}
-
-export interface CourseRoleGet {
-  id: string;
-  title?: string | null;
-  description?: string | null;
-}
-
-export interface CourseMemberProperties {
-  gitlab?: CourseMemberGitLabConfig | null;
-}
-
-export interface CourseMemberCreate {
-  id?: string | null;
-  properties?: CourseMemberProperties | null;
-  user_id: string;
-  course_id: string;
-  course_group_id?: string | null;
-  course_role_id: string;
-}
-
-export interface CourseMemberGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  properties?: CourseMemberProperties | null;
-  user_id: string;
-  course_id: string;
-  course_group_id?: string | null;
-  course_role_id: string;
-  user?: UserList | null;
-}
-
-export interface CourseMemberList {
-  id: string;
-  user_id: string;
-  course_id: string;
-  course_group_id?: string | null;
-  course_role_id: string;
-  user: UserList;
-}
-
-export interface CourseMemberUpdate {
-  properties?: CourseMemberProperties | null;
-  course_group_id?: string | null;
-  course_role_id?: string | null;
-}
-
-export interface CourseTutorRepository {
-  provider_url?: string | null;
-  full_path_reference?: string | null;
-}
-
-export interface CourseTutorGet {
-  id: string;
-  title?: string | null;
-  course_family_id?: string | null;
-  organization_id?: string | null;
-  path: string;
-  repository: CourseTutorRepository;
-}
-
-export interface CourseTutorList {
-  id: string;
-  title?: string | null;
-  course_family_id?: string | null;
-  organization_id?: string | null;
-  path: string;
-  repository: CourseTutorRepository;
-}
-
-export interface CourseContentTypeCreate {
-  slug: string;
-  title?: string | null;
-  description?: string | null;
-  color?: string | null;
-  properties?: any | null;
-  course_id: string;
-  course_content_kind_id: string;
-}
-
-export interface CourseContentTypeGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  slug: string;
-  title?: string | null;
-  description?: string | null;
-  color: string;
-  properties?: any | null;
-  course_id: string;
-  course_content_kind_id: string;
-  course_content_kind?: CourseContentKindGet | null;
-}
-
-export interface CourseContentTypeList {
-  id: string;
-  slug: string;
-  title?: string | null;
-  color: string;
-  course_id: string;
-  course_content_kind_id: string;
-}
-
-export interface CourseContentTypeUpdate {
-  slug?: string | null;
-  title?: string | null;
-  color?: string | null;
-  description?: string | null;
-  properties?: any | null;
-}
-
-export interface TutorCourseMemberCourseContent {
-  id: string;
-  path: string;
-}
-
-export interface TutorCourseMemberGet {
-  id: string;
-  properties?: CourseMemberProperties | null;
-  user_id: string;
-  course_id: string;
-  course_group_id?: string | null;
-  course_role_id: string;
-  unreviewed_course_contents?: TutorCourseMemberCourseContent[];
-  user: UserList;
-}
-
-export interface TutorCourseMemberList {
-  id: string;
-  user_id: string;
-  course_id: string;
-  course_group_id?: string | null;
-  course_role_id: string;
-  unreviewed?: boolean | null;
-  user: UserList;
-}
-
-export interface CourseProperties {
-  gitlab?: GitLabConfig | null;
-}
-
-export interface CoursePropertiesGet {
-  gitlab?: GitLabConfigGet | null;
-}
-
-export interface CourseCreate {
-  id?: string | null;
-  title?: string | null;
-  description?: string | null;
-  path: string;
-  course_family_id: string;
-  properties?: CourseProperties | null;
-}
-
-export interface CourseGet {
-  id: string;
-  title?: string | null;
-  description?: string | null;
-  path: string;
-  course_family_id: string;
-  properties?: CoursePropertiesGet | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  organization_id: string;
-  course_family?: CourseFamilyGet | null;
-}
-
-export interface CourseList {
-  id: string;
-  title?: string | null;
-  course_family_id?: string | null;
-  organization_id?: string | null;
-  path: string;
-  properties?: CoursePropertiesGet | null;
-}
-
-export interface CourseUpdate {
-  title?: string | null;
-  description?: string | null;
-  properties?: CourseProperties | null;
 }
 
 export interface CourseMemberCommentCreate {
@@ -645,38 +662,27 @@ export interface CourseMemberCommentUpdate {
   message?: string | null;
 }
 
-export interface CourseGroupCreate {
-  title?: string | null;
-  description?: string | null;
-  course_id: string;
-  properties?: any | null;
+export interface CourseTutorRepository {
+  provider_url?: string | null;
+  full_path_reference?: string | null;
 }
 
-export interface CourseGroupGet {
-  title?: string | null;
-  description?: string | null;
-  course_id: string;
-  properties?: any | null;
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-}
-
-export interface CourseGroupList {
+export interface CourseTutorGet {
   id: string;
   title?: string | null;
-  course_id: string;
+  course_family_id?: string | null;
+  organization_id?: string | null;
+  path: string;
+  repository: CourseTutorRepository;
 }
 
-export interface CourseGroupUpdate {
+export interface CourseTutorList {
+  id: string;
   title?: string | null;
-  description?: string | null;
-  course_id?: string | null;
-  properties?: any | null;
+  course_family_id?: string | null;
+  organization_id?: string | null;
+  path: string;
+  repository: CourseTutorRepository;
 }
 
 export interface CourseSignupResponse {
@@ -686,34 +692,12 @@ export interface CourseSignupResponse {
   repository: string;
 }
 
-export interface CourseContentFileQuery {
-  filename?: string | null;
-}
-
-/**
- * Request to assign an example to course content.
- */
-export interface AssignExampleRequest {
-  /** UUID of the Example to assign */
-  example_id: string;
-  /** Version to assign (default: latest) */
-  example_version?: string;
-}
-
-/**
- * Response for course content with example information.
- */
-export interface CourseContentExampleResponse {
-  id: string;
-  path: string;
-  title: string;
-  example?: Record<string, any> | null;
-  /** pending_release, released, modified */
-  deployment_status: string;
-}
-
 export interface CourseContentMessage {
   body: string;
+}
+
+export interface CourseContentFileQuery {
+  filename?: string | null;
 }
 
 export interface CourseMemberCommentTutorCreate {

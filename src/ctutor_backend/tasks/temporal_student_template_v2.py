@@ -184,8 +184,7 @@ async def generate_student_template_activity_v2(
                 deployment_id=deployment.id,
                 action="deploying",
                 action_details="Started deployment via student template generation",
-                example_version_id=deployment.example_version_id,
-                performed_by="system"
+                example_version_id=deployment.example_version_id
             )
             db.add(history)
         
@@ -373,8 +372,7 @@ Follow the course submission guidelines to submit your work.
                         deployment_id=content.deployment.id,
                         action="deployed",
                         action_details=f"Successfully deployed to student template at {target_dir}",
-                        example_version_id=content.deployment.example_version_id,
-                        performed_by="system"
+                        example_version_id=content.deployment.example_version_id
                     )
                     db.add(history)
                     
@@ -393,8 +391,7 @@ Follow the course submission guidelines to submit your work.
                             deployment_id=content.deployment.id,
                             action="failed",
                             action_details=f"Failed to deploy: {str(e)[:200]}",
-                            example_version_id=content.deployment.example_version_id,
-                            performed_by="system"
+                            example_version_id=content.deployment.example_version_id
                         )
                         db.add(history)
             
@@ -471,8 +468,7 @@ Follow the course submission guidelines to submit your work.
                     deployment_id=deployment.id,
                     action="failed",
                     action_details=f"Workflow failed: {str(e)[:200]}",
-                    example_version_id=deployment.example_version_id,
-                    performed_by="system"
+                    example_version_id=deployment.example_version_id
                 )
                 db.add(history)
             

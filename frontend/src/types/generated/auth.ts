@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-04T09:54:18.754523
+ * Generated on: 2025-09-05T13:28:29.859680
 
  * Category: Auth
 
@@ -11,6 +11,27 @@
 
 
 export interface AuthConfig {
+}
+
+/**
+ * SSO Bearer token credentials.
+ */
+export interface SSOAuthCredentials {
+  token: string;
+  scheme?: string;
+}
+
+export interface HeaderAuthCredentials {
+  type: any;
+  credentials: any;
+}
+
+export interface OrganizationUpdateTokenQuery {
+  type: string;
+}
+
+export interface OrganizationUpdateTokenUpdate {
+  token: string;
 }
 
 /**
@@ -57,25 +78,4 @@ export interface TokenRefreshResponse {
   expires_in?: number | null;
   /** New refresh token if rotated */
   refresh_token?: string | null;
-}
-
-/**
- * SSO Bearer token credentials.
- */
-export interface SSOAuthCredentials {
-  token: string;
-  scheme?: string;
-}
-
-export interface HeaderAuthCredentials {
-  type: any;
-  credentials: any;
-}
-
-export interface OrganizationUpdateTokenQuery {
-  type: string;
-}
-
-export interface OrganizationUpdateTokenUpdate {
-  token: string;
 }

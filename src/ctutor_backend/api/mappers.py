@@ -162,14 +162,21 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     submission_status = query[5] if len(query) > 5 else None
     submission_grading = query[6] if len(query) > 6 else None
     
-    # Get directory from example if available, otherwise from properties
+    # Get directory from deployment's example if available, otherwise from properties
     directory = None
-    if course_content.example_id and db:
-        # Fetch the example to get the directory
-        from ctutor_backend.model.example import Example
-        example = db.query(Example).filter(Example.id == course_content.example_id).first()
-        if example:
-            directory = example.directory
+    if hasattr(course_content, 'deployment') and course_content.deployment and db:
+        # Get the example through deployment
+        from ctutor_backend.model.deployment import CourseContentDeployment
+        from ctutor_backend.model.example import Example, ExampleVersion
+        
+        deployment = course_content.deployment
+        if deployment.example_version_id:
+            # Get example version and then example
+            example_version = db.query(ExampleVersion).filter(
+                ExampleVersion.id == deployment.example_version_id
+            ).first()
+            if example_version and example_version.example:
+                directory = example_version.example.directory
     
     # Fallback to properties if no example directory found
     if not directory and course_content.properties:

@@ -883,32 +883,22 @@ async def generate_student_template(
     
     workflow_id = await task_executor.submit_task(task_submission)
     
-    # Update all pending deployments to deploying status
+    # Don't update status here - let the workflow handle all status transitions
+    # Just count how many deployments are ready to process
     deployment_ids = db.query(CourseContentDeployment.id).join(
         CourseContent,
         CourseContentDeployment.course_content_id == CourseContent.id
     ).filter(
         and_(
             CourseContent.course_id == course_id,
-            CourseContentDeployment.deployment_status == "pending"
+            CourseContentDeployment.deployment_status.in_(["pending", "failed"])
         )
     ).all()
-    
-    if deployment_ids:
-        db.query(CourseContentDeployment).filter(
-            CourseContentDeployment.id.in_([d[0] for d in deployment_ids])
-        ).update({
-            "deployment_status": "in_progress",
-            "workflow_id": workflow_id,
-            "last_attempt_at": datetime.now(timezone.utc)
-        }, synchronize_session=False)
-    
-    db.commit()
     
     return GenerateTemplateResponse(
         workflow_id=workflow_id,
         status="started",
-        contents_to_process=contents_with_examples or 0
+        contents_to_process=len(deployment_ids) if deployment_ids else 0
     )
 
 # @system_router.post(

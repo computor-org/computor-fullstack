@@ -151,21 +151,35 @@ class CourseContentDeployment(Base):
     def __repr__(self):
         return f"<CourseContentDeployment(id={self.id}, content={self.course_content_id}, status={self.deployment_status})>"
     
-    def set_deployed(self, path: str, metadata: Dict[str, Any] = None):
+    def set_deploying(self, workflow_id: str = None):
+        """Mark deployment as in progress."""
+        from datetime import datetime, timezone
+        self.deployment_status = "deploying"
+        self.last_attempt_at = datetime.now(timezone.utc)
+        if workflow_id:
+            self.workflow_id = workflow_id
+    
+    def set_deployed(self, path: str, workflow_id: str = None, metadata: Dict[str, Any] = None):
         """Mark deployment as successful."""
+        from datetime import datetime, timezone
         self.deployment_status = "deployed"
-        self.deployed_at = datetime.utcnow()
+        self.deployed_at = datetime.now(timezone.utc)
         self.deployment_path = path
+        if workflow_id:
+            self.workflow_id = workflow_id
         if metadata:
             if not self.deployment_metadata:
                 self.deployment_metadata = {}
             self.deployment_metadata.update(metadata)
     
-    def set_failed(self, error_message: str, metadata: Dict[str, Any] = None):
+    def set_failed(self, error_message: str, workflow_id: str = None, metadata: Dict[str, Any] = None):
         """Mark deployment as failed."""
+        from datetime import datetime, timezone
         self.deployment_status = "failed"
-        self.deployment_message = error_message
-        self.last_attempt_at = datetime.utcnow()
+        self.deployment_message = error_message[:500] if error_message else None  # Truncate long messages
+        self.last_attempt_at = datetime.now(timezone.utc)
+        if workflow_id:
+            self.workflow_id = workflow_id
         if metadata:
             if not self.deployment_metadata:
                 self.deployment_metadata = {}

@@ -46,9 +46,7 @@ from .temporal_hierarchy_management import (
 )
 from .temporal_student_template_v2 import (
     GenerateStudentTemplateWorkflowV2,
-    generate_student_template_v2,
-    generate_student_and_assignments_repositories,
-    generate_assignments_repository
+    generate_student_template_activity_v2
 )
 from .temporal_student_repository import (
     StudentRepositoryCreationWorkflow,
@@ -108,9 +106,7 @@ class TemporalWorker:
             create_course_family_activity,
             create_course_activity,
             create_course_content_types_activity,
-            generate_student_template_v2,  # Original version
-            generate_student_and_assignments_repositories,  # New dual-repo version
-            generate_assignments_repository,  # Assignments-only version
+            generate_student_template_activity_v2,  # Student template generation
             create_student_repository,  # Fork student-template for individual student
             create_team_repository,  # Fork student-template for team
         ]

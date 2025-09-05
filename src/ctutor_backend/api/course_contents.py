@@ -241,6 +241,7 @@ async def assign_example_to_content(
         "last_attempt_at": deployment.last_attempt_at,
         "deployment_message": deployment.deployment_message,
         "deployment_metadata": deployment.deployment_metadata,
+        "workflow_id": deployment.workflow_id,  # Include workflow_id
         "created_at": deployment.created_at,
         "updated_at": deployment.updated_at,
         "created_by": deployment.created_by,

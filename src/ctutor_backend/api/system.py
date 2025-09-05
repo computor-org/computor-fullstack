@@ -876,7 +876,8 @@ async def generate_student_template(
             "course_id": course_id,
             "student_template_url": student_template_url,
             "assignments_url": assignments_url,
-            "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
+            "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+            "force_redeploy": request.force_redeploy
         },
         queue="computor-tasks"
     )
@@ -885,13 +886,17 @@ async def generate_student_template(
     
     # Don't update status here - let the workflow handle all status transitions
     # Just count how many deployments are ready to process
+    statuses_to_count = ["pending", "failed"]
+    if request.force_redeploy:
+        statuses_to_count.append("deployed")
+    
     deployment_ids = db.query(CourseContentDeployment.id).join(
         CourseContent,
         CourseContentDeployment.course_content_id == CourseContent.id
     ).filter(
         and_(
             CourseContent.course_id == course_id,
-            CourseContentDeployment.deployment_status.in_(["pending", "failed"])
+            CourseContentDeployment.deployment_status.in_(statuses_to_count)
         )
     ).all()
     

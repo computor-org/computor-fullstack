@@ -127,13 +127,14 @@ async def download_example_from_object_storage(
 async def generate_student_template_activity_v2(
     course_id: str, 
     student_template_url: str,
-    workflow_id: str = None
+    workflow_id: str = None,
+    force_redeploy: bool = False
 ) -> Dict[str, Any]:
     """
     Generate student template repository from examples assigned to course content.
     
     This activity:
-    1. Sets all assigned deployments to 'deploying' status
+    1. Sets all assigned deployments to 'deploying' status (or resets deployed if force_redeploy)
     2. Clones/creates the student-template repository
     3. Downloads example files from MinIO/S3
     4. Processes examples (removes solutions, adds README)
@@ -144,6 +145,7 @@ async def generate_student_template_activity_v2(
         course_id: Course to generate template for
         student_template_url: GitLab URL of student template repository
         workflow_id: Temporal workflow ID for tracking
+        force_redeploy: If True, redeploy already deployed content (default: False)
     
     Returns:
         Dict with success status and details
@@ -170,7 +172,15 @@ async def generate_student_template_activity_v2(
     
     try:
         # First, update all assigned deployments to 'deploying' status
-        logger.info(f"Updating deployments to 'deploying' status for course {course_id}")
+        # Determine which deployment statuses to process
+        if force_redeploy:
+            # Include already deployed content for redeployment
+            statuses_to_process = ["pending", "failed", "deployed"]
+            logger.info(f"Force redeploy enabled - will reprocess deployed content for course {course_id}")
+        else:
+            # Normal mode - only process pending and failed
+            statuses_to_process = ["pending", "failed"]
+            logger.info(f"Updating deployments to 'deploying' status for course {course_id}")
         
         deployments_to_process = db.query(CourseContentDeployment).join(
             CourseContent
@@ -178,23 +188,32 @@ async def generate_student_template_activity_v2(
             and_(
                 CourseContent.course_id == course_id,
                 CourseContentDeployment.example_version_id.isnot(None),  # Has an assigned example
-                CourseContentDeployment.deployment_status.in_(["pending", "failed"])  # Ready to deploy
+                CourseContentDeployment.deployment_status.in_(statuses_to_process)  # Status filter based on force_redeploy
             )
         ).all()
         
         # Update all to 'deploying' and add history
         for deployment in deployments_to_process:
+            # Track if this is a redeploy
+            was_deployed = deployment.deployment_status == "deployed"
+            
             deployment.deployment_status = "deploying"
             deployment.last_attempt_at = datetime.now(timezone.utc)
             if workflow_id:
                 deployment.workflow_id = workflow_id
             
-            # Add history entry
+            # Add history entry with appropriate details
+            if was_deployed and force_redeploy:
+                action_details = "Force redeployment via student template generation"
+            else:
+                action_details = "Started deployment via student template generation"
+            
             history = DeploymentHistory(
                 deployment_id=deployment.id,
                 action="deploying",
-                action_details="Started deployment via student template generation",
-                example_version_id=deployment.example_version_id
+                action_details=action_details,
+                example_version_id=deployment.example_version_id,
+                meta={"force_redeploy": force_redeploy} if force_redeploy else None
             )
             db.add(history)
         
@@ -631,6 +650,7 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         """Run the student template generation workflow."""
         course_id = params.get('course_id')
         student_template_url = params.get('student_template_url')
+        force_redeploy = params.get('force_redeploy', False)  # Default to False if not provided
         
         if not course_id:
             return WorkflowResult(
@@ -660,7 +680,7 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         try:
             result = await workflow.execute_activity(
                 generate_student_template_activity_v2,
-                args=[course_id, student_template_url, workflow_id],
+                args=[course_id, student_template_url, workflow_id, force_redeploy],
                 start_to_close_timeout=timedelta(minutes=30),
                 retry_policy=retry_policy
             )

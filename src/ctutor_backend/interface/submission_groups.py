@@ -82,57 +82,57 @@ class SubmissionGroupInterface(EntityInterface):
     cache_ttl = 120  # 2 minutes - submission groups change moderately frequently
 
 
-# Student-specific DTOs
-class SubmissionGroupRepository(BaseModel):
-    """Repository information for a submission group"""
-    provider: str = "gitlab"  # gitlab, github, etc.
-    url: str                  # Base URL
-    full_path: str            # Organization/project path
-    clone_url: Optional[str] = None  # Full clone URL
-    web_url: Optional[str] = None    # Web interface URL
+# # Student-specific DTOs
+# class SubmissionGroupRepository(BaseModel):
+#     """Repository information for a submission group"""
+#     provider: str = "gitlab"  # gitlab, github, etc.
+#     url: str                  # Base URL
+#     full_path: str            # Organization/project path
+#     clone_url: Optional[str] = None  # Full clone URL
+#     web_url: Optional[str] = None    # Web interface URL
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)
 
 
-class SubmissionGroupMemberBasic(BaseModel):
-    """Basic member information"""
-    id: str
-    user_id: str
-    course_member_id: str
-    username: Optional[str] = None
-    full_name: Optional[str] = None
+# class SubmissionGroupMemberBasic(BaseModel):
+#     """Basic member information"""
+#     id: str
+#     user_id: str
+#     course_member_id: str
+#     username: Optional[str] = None
+#     full_name: Optional[str] = None
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)
 
 
-class SubmissionGroupGradingStudent(BaseModel):
-    """Student's view of grading"""
-    id: str
-    grading: float  # 0.0 to 1.0
-    status: Optional[str] = None  # corrected, correction_necessary, etc.
-    graded_by: Optional[str] = None  # Name of grader
-    created_at: datetime
+# class SubmissionGroupGradingStudent(BaseModel):
+#     """Student's view of grading"""
+#     id: str
+#     grading: float  # 0.0 to 1.0
+#     status: Optional[str] = None  # corrected, correction_necessary, etc.
+#     graded_by: Optional[str] = None  # Name of grader
+#     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)
 
 
-class SubmissionGroupStudent(BaseModel):
-    """Student's view of a submission group"""
-    id: str
-    course_id: str
-    course_content_id: str
-    course_content_title: Optional[str] = None
-    course_content_path: Optional[str] = None
-    example_identifier: Optional[str] = None  # The example.identifier for directory structure
-    max_group_size: int
-    current_group_size: int = 1
-    members: List[SubmissionGroupMemberBasic] = []
-    repository: Optional[SubmissionGroupRepository] = None
-    latest_grading: Optional[SubmissionGroupGradingStudent] = None
-    created_at: datetime
-    updated_at: datetime
+# class SubmissionGroupStudent(BaseModel):
+#     """Student's view of a submission group"""
+#     id: str
+#     course_id: str
+#     course_content_id: str
+#     course_content_title: Optional[str] = None
+#     course_content_path: Optional[str] = None
+#     example_identifier: Optional[str] = None  # The example.identifier for directory structure
+#     max_group_size: int
+#     current_group_size: int = 1
+#     members: List[SubmissionGroupMemberBasic] = []
+#     repository: Optional[SubmissionGroupRepository] = None
+#     latest_grading: Optional[SubmissionGroupGradingStudent] = None
+#     created_at: datetime
+#     updated_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)
 
 
 class SubmissionGroupStudentQuery(BaseModel):

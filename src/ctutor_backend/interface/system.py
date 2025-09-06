@@ -123,6 +123,10 @@ class GenerateTemplateRequest(BaseModel):
         default=None,
         description="Custom commit message (optional)"
     )
+    force_redeploy: bool = Field(
+        default=False,
+        description="Force redeployment of already deployed content"
+    )
 
 
 class GenerateTemplateResponse(BaseModel):

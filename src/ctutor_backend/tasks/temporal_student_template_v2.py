@@ -356,7 +356,7 @@ async def generate_student_template_activity_v2(
                     
                     # Extract execution backend slug from meta_yaml and link to course_content
                     if not content.execution_backend_id:
-                        backend_slug = example.get_execution_backend_slug(example_version.version_tag)
+                        backend_slug = example_version.get_execution_backend_slug()
                         if backend_slug:
                             # Find the execution backend by slug
                             exec_backend = db.query(ExecutionBackend).filter(

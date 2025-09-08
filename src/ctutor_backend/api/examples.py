@@ -2,9 +2,11 @@
 FastAPI endpoints for Example Library management.
 """
 
+import base64
 import io
 import json
 import logging
+import re
 import yaml
 from typing import List, Optional
 from uuid import UUID
@@ -419,11 +421,79 @@ async def upload_example(
     for filename, content in request.files.items():
         object_key = f"{storage_path}/{filename}"
         
-        # Create file-like object from content
-        file_data = io.BytesIO(content.encode('utf-8'))
+        # Handle content based on its type
+        if isinstance(content, bytes):
+            # Content is already bytes - use directly
+            file_data = io.BytesIO(content)
+        elif isinstance(content, str):
+            # Content is a string - need to determine how to handle it
+            
+            # Check if it looks like base64 (only contains base64 characters)
+            base64_pattern = re.compile(r'^[A-Za-z0-9+/\s]*={0,2}$')
+            
+            # Remove whitespace for checking
+            clean_content = content.replace('\n', '').replace('\r', '').replace(' ', '').replace('\t', '')
+            
+            if len(clean_content) > 100 and base64_pattern.match(clean_content):
+                # Looks like base64 - try to decode it
+                try:
+                    file_data = io.BytesIO(base64.b64decode(clean_content))
+                    logger.debug(f"Decoded base64 for {filename}")
+                except Exception as e:
+                    # Not valid base64, treat as text
+                    logger.debug(f"Base64 decode failed for {filename}, treating as text: {e}")
+                    file_data = io.BytesIO(content.encode('utf-8'))
+            else:
+                # Doesn't look like base64 - treat as text
+                file_data = io.BytesIO(content.encode('utf-8'))
+        else:
+            # Unexpected type
+            logger.error(f"Unexpected content type for {filename}: {type(content)}")
+            continue
         
-        # Determine content type
-        content_type = "text/yaml" if filename.endswith('.yaml') else "text/plain"
+        # Determine content type based on file extension
+        filename_lower = filename.lower()
+        if filename_lower.endswith('.yaml') or filename_lower.endswith('.yml'):
+            content_type = "text/yaml"
+        elif filename_lower.endswith('.json'):
+            content_type = "application/json"
+        elif filename_lower.endswith('.xml'):
+            content_type = "application/xml"
+        elif filename_lower.endswith('.html') or filename_lower.endswith('.htm'):
+            content_type = "text/html"
+        elif filename_lower.endswith('.css'):
+            content_type = "text/css"
+        elif filename_lower.endswith('.js'):
+            content_type = "application/javascript"
+        elif filename_lower.endswith('.py'):
+            content_type = "text/x-python"
+        elif filename_lower.endswith('.java'):
+            content_type = "text/x-java"
+        elif filename_lower.endswith('.c') or filename_lower.endswith('.h'):
+            content_type = "text/x-c"
+        elif filename_lower.endswith('.cpp') or filename_lower.endswith('.hpp') or filename_lower.endswith('.cc'):
+            content_type = "text/x-c++"
+        elif filename_lower.endswith('.png'):
+            content_type = "image/png"
+        elif filename_lower.endswith('.jpg') or filename_lower.endswith('.jpeg'):
+            content_type = "image/jpeg"
+        elif filename_lower.endswith('.gif'):
+            content_type = "image/gif"
+        elif filename_lower.endswith('.svg'):
+            content_type = "image/svg+xml"
+        elif filename_lower.endswith('.pdf'):
+            content_type = "application/pdf"
+        elif filename_lower.endswith('.zip'):
+            content_type = "application/zip"
+        elif filename_lower.endswith('.tar') or filename_lower.endswith('.tar.gz') or filename_lower.endswith('.tgz'):
+            content_type = "application/x-tar"
+        elif filename_lower.endswith('.md'):
+            content_type = "text/markdown"
+        elif filename_lower.endswith('.txt'):
+            content_type = "text/plain"
+        else:
+            # Default to octet-stream for unknown binary files, text/plain for text
+            content_type = "application/octet-stream" if isinstance(content, bytes) else "text/plain"
         
         # Upload file
         await storage_service.upload_file(

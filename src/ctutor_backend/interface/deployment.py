@@ -74,7 +74,7 @@ class CourseContentDeploymentGet(BaseEntityGet):
     
     # Relationships (optionally loaded)
     example_version: Optional['ExampleVersionGet'] = None
-    course_content: Optional['CourseContentGet'] = None
+    #course_content: Optional['CourseContentGet'] = None
     
     model_config = ConfigDict(from_attributes=True)
 

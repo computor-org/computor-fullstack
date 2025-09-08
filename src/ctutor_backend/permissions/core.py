@@ -19,7 +19,8 @@ from ctutor_backend.permissions.handlers_impl import (
     CourseContentTypePermissionHandler,
     CourseContentPermissionHandler,
     CourseMemberPermissionHandler,
-    ReadOnlyPermissionHandler
+    ReadOnlyPermissionHandler,
+    ResultPermissionHandler
 )
 
 # Import refactored Principal and related classes
@@ -89,7 +90,7 @@ def initialize_permission_handlers():
     permission_registry.register(GroupClaim, UserPermissionHandler(GroupClaim))
     permission_registry.register(UserGroup, UserPermissionHandler(UserGroup))
     permission_registry.register(ExecutionBackend, ReadOnlyPermissionHandler(ExecutionBackend))
-    permission_registry.register(Result, CourseMemberPermissionHandler(Result))
+    permission_registry.register(Result, ResultPermissionHandler(Result))
 
 
 def check_admin(permissions: Principal) -> bool:

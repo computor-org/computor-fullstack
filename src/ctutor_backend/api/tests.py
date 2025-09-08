@@ -275,8 +275,10 @@ async def create_test(
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path
         
-        # Use directory from example
-        assignment_directory = course_content.example.directory
+        # Use directory from example (retrieved from the query at position 5)
+        if not example:
+            raise BadRequestException(detail="No example associated with this assignment. Please ensure an example has been deployed.")
+        assignment_directory = example.directory
         
         token = decrypt_api_key(organization_properties.gitlab.token)
         

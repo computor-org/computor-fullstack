@@ -24,7 +24,8 @@ from ctutor_backend.model.course import Course, CourseContent, CourseContentType
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
-from ctutor_backend.model.example import Example
+from ctutor_backend.model.example import Example, ExampleVersion
+from ctutor_backend.model.deployment import CourseContentDeployment
 from ..custom_types import Ltree
 from ctutor_backend.tasks import get_task_executor, TaskSubmission
 class TestRunResponse(ResultCreate):
@@ -92,7 +93,9 @@ async def create_test(
         .join(CourseExecutionBackend, CourseExecutionBackend.course_id == CourseContent.course_id) \
         .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
         .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .outerjoin(Example, Example.id == CourseContent.example_id) \
+        .outerjoin(CourseContentDeployment, CourseContentDeployment.course_content_id == CourseContent.id) \
+        .outerjoin(ExampleVersion, ExampleVersion.id == CourseContentDeployment.example_version_id) \
+        .outerjoin(Example, Example.id == ExampleVersion.example_id) \
         .outerjoin(
             results_count_subquery,
             (CourseContent.id == results_count_subquery.c.course_content_id)

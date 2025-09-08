@@ -3,7 +3,7 @@ Pydantic interfaces for Example Library models.
 """
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -271,7 +271,7 @@ class ExampleUploadRequest(BaseModel):
     """Request to upload an example to storage."""
     repository_id: UUID
     directory: str = Field(..., pattern="^[a-zA-Z0-9._-]+$")
-    files: Dict[str, str] = Field(..., description="Map of filename to content (must include meta.yaml)")
+    files: Dict[str, Union[str, bytes]] = Field(..., description="Map of filename to content. Text files as UTF-8 strings, binary files as either base64-encoded strings or raw bytes. Must include meta.yaml")
 
 
 class ExampleBatchUploadRequest(BaseModel):

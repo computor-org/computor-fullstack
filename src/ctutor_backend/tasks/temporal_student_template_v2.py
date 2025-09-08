@@ -15,6 +15,135 @@ from .registry import register_task
 logger = logging.getLogger(__name__)
 
 
+async def process_example_for_student_template_v2(
+    example_files: Dict[str, bytes],
+    target_path: Any,  # Path object
+    course_content: Any,
+    version: Any
+) -> Dict[str, Any]:
+    """
+    Process example files for student template generation.
+    Uses meta.yaml to determine which files to include.
+    """
+    import yaml
+    from pathlib import Path
+    
+    try:
+        # Create target directory
+        target_path.mkdir(parents=True, exist_ok=True)
+        
+        # Parse meta.yaml if it exists
+        meta_yaml = None
+        if 'meta.yaml' in example_files:
+            try:
+                meta_yaml = yaml.safe_load(example_files['meta.yaml'])
+            except Exception as e:
+                logger.error(f"Failed to parse meta.yaml: {e}")
+        
+        # Process content directory files
+        for filename, content in example_files.items():
+            if filename.startswith('content/'):
+                # Handle index*.md files specially - rename to README*.md
+                if filename.startswith('content/index'):
+                    # Handle index.md -> README.md
+                    if filename == 'content/index.md':
+                        readme_path = target_path / 'README.md'
+                        readme_path.write_bytes(content)
+                    # Handle index_<lang>.md -> README_<lang>.md
+                    elif filename.startswith('content/index_') and filename.endswith('.md'):
+                        # Extract language suffix
+                        lang_suffix = filename[len('content/index'):-3]  # Gets '_de' from 'content/index_de.md'
+                        readme_filename = f'README{lang_suffix}.md'
+                        readme_path = target_path / readme_filename
+                        readme_path.write_bytes(content)
+                # Copy all other content files (mediaFiles, etc.) preserving structure
+                else:
+                    # Remove 'content/' prefix and copy to assignment root
+                    relative_path = filename.replace('content/', '', 1)
+                    file_path = target_path / relative_path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(content)
+        
+        if meta_yaml:
+            properties = meta_yaml.get('properties', {})
+            
+            # Process additionalFiles - copy to assignment root
+            additional_files = properties.get('additionalFiles', [])
+            for file_name in additional_files:
+                if file_name in example_files:
+                    # Copy to root of assignment directory
+                    file_path = target_path / Path(file_name).name  # Use only filename, not path
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(example_files[file_name])
+            
+            # Process studentSubmissionFiles - ensure all required files exist
+            # Use content from studentTemplates when available, otherwise create empty
+            submission_files = properties.get('studentSubmissionFiles', [])
+            student_templates = properties.get('studentTemplates', [])
+            
+            # Build a map of template filenames to their content
+            template_content_map = {}
+            for template_path in student_templates:
+                # Try to find the template file in example_files
+                file_content = None
+                actual_path = None
+                
+                if template_path in example_files:
+                    file_content = example_files[template_path]
+                    actual_path = template_path
+                else:
+                    # Try to find by filename
+                    filename = Path(template_path).name
+                    for file_path, content in example_files.items():
+                        if Path(file_path).name == filename:
+                            # Prefer paths containing 'studentTemplate'
+                            if 'studentTemplate' in file_path:
+                                file_content = content
+                                actual_path = file_path
+                                break
+                            elif file_content is None:
+                                file_content = content
+                                actual_path = file_path
+                
+                if file_content is not None:
+                    # Store the content mapped to just the filename
+                    filename = Path(template_path).name
+                    template_content_map[filename] = file_content
+                    logger.info(f"Found template content for: {filename} from {actual_path}")
+                else:
+                    logger.warning(f"Student template file not found: {template_path}")
+            
+            # Now create all studentSubmissionFiles
+            for submission_file in submission_files:
+                submission_path = target_path / submission_file
+                submission_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Check if we have template content for this file
+                if submission_file in template_content_map:
+                    # Use template content
+                    submission_path.write_bytes(template_content_map[submission_file])
+                    logger.info(f"Created {submission_file} from template")
+                else:
+                    # Create empty file
+                    submission_path.write_text('')
+                    logger.info(f"Created empty file: {submission_file}")
+        else:
+            # No meta.yaml - fallback processing
+            logger.warning(f"No meta.yaml found for {course_content.path}, using fallback processing")
+            for filename, content in example_files.items():
+                # Skip test files and meta files
+                if not filename.startswith('test') and not filename.endswith('_test.py') and filename != 'meta.yaml':
+                    file_path = target_path / filename
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(content)
+        
+        return {"success": True}
+        
+    except Exception as e:
+        logger.error(f"Failed to process example content {course_content.path}: {e}")
+        return {"success": False, "error": str(e)}
+
+
 async def download_example_files(repository: Any, version: Any) -> Dict[str, bytes]:
     """
     Download example files from repository based on its source type.
@@ -304,6 +433,32 @@ async def generate_student_template_activity_v2(
             template_repo.git.config('user.email', git_email)
             template_repo.git.config('user.name', git_name)
             
+            # Clean the repository to ensure only current content is present
+            # This removes old assignments that are no longer in the course
+            logger.info("Cleaning student template repository to sync with current course content")
+            
+            # Get list of all items in the repo (excluding .git)
+            repo_items = []
+            for item in os.listdir(template_repo_path):
+                if item != '.git' and item != '.gitignore':
+                    item_path = os.path.join(template_repo_path, item)
+                    repo_items.append((item, item_path))
+            
+            # Track how many items were cleaned for commit message
+            cleaned_items_count = len(repo_items)
+            
+            # Remove all existing content (except .git directory)
+            for item_name, item_path in repo_items:
+                if os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                    logger.debug(f"Removed directory: {item_name}")
+                else:
+                    os.remove(item_path)
+                    logger.debug(f"Removed file: {item_name}")
+            
+            if cleaned_items_count > 0:
+                logger.info(f"Cleaned {cleaned_items_count} items from student template repository")
+            
             # Get all CourseContent with assigned examples (deployments in 'deploying' status)
             course_contents = db.query(CourseContent).options(
                 joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
@@ -385,47 +540,21 @@ async def generate_student_template_activity_v2(
                     target_dir = str(example.identifier)
                     full_target_path = os.path.join(template_repo_path, target_dir)
                     
-                    # Create target directory if it doesn't exist
-                    os.makedirs(full_target_path, exist_ok=True)
+                    # Process the example files for student template
+                    # This function handles meta.yaml properties like studentSubmissionFiles,
+                    # studentTemplates, additionalFiles, and content directory processing
+                    process_result = await process_example_for_student_template_v2(
+                        example_files=files,
+                        target_path=Path(full_target_path),
+                        course_content=content,
+                        version=example_version
+                    )
                     
-                    # Write each file to the student template repository
-                    for file_path, file_content in files.items():
-                        # Skip solution files
-                        if 'solution' in file_path.lower() or 'loesung' in file_path.lower():
-                            logger.debug(f"Skipping solution file: {file_path}")
-                            continue
-                        
-                        # Full path for the file in the template repo
-                        full_file_path = os.path.join(full_target_path, file_path)
-                        
-                        # Create parent directories if needed
-                        os.makedirs(os.path.dirname(full_file_path), exist_ok=True)
-                        
-                        # Write file
-                        with open(full_file_path, 'wb') as f:
-                            f.write(file_content)
-                        
-                        logger.debug(f"Wrote {file_path} to {full_file_path}")
-                    
-                    # Create a simple README for the assignment
-                    readme_path = os.path.join(full_target_path, "README.md")
-                    if not os.path.exists(readme_path):
-                        readme_content = f"""# {content.title}
-
-This is your assignment workspace for **{content.title}**.
-
-## Assignment Path
-`{content.path}`
-
-## Instructions
-Please refer to the course materials for detailed instructions.
-
-## Submission
-Follow the course submission guidelines to submit your work.
-"""
-                        with open(readme_path, 'w') as f:
-                            f.write(readme_content)
-                        logger.debug(f"Created README.md for {content.path}")
+                    if not process_result.get("success"):
+                        error_msg = process_result.get("error", "Unknown error during processing")
+                        logger.error(f"Failed to process example for {content.path}: {error_msg}")
+                        errors.append(f"Processing failed for {content.path}: {error_msg}")
+                        continue
                     
                     processed_count += 1
                     logger.info(f"Successfully processed {content.path}")
@@ -465,27 +594,48 @@ Follow the course submission guidelines to submit your work.
                     # Generate assignment structure table
                     if successfully_processed:
                         f.write(f"## Assignment Structure\n\n")
-                        f.write(f"| Course Path | Assignment Directory | Title | Version |\n")
+                        f.write(f"| Content Path | Assignment Directory | Title | Version |\n")
                         f.write(f"|-------------|---------------------|-------|----------|\n")
                         
                         # Sort by course content path for better organization
                         sorted_contents = sorted(successfully_processed, key=lambda x: str(x.path))
+                        
+                        # Fetch all course contents to build complete path hierarchy
+                        all_contents = db.query(CourseContent).filter(
+                            CourseContent.course_id == course_id,
+                            CourseContent.archived_at.is_(None)
+                        ).all()
+                        
+                        # Build a complete map of paths to titles
+                        path_to_title = {}
+                        for content in all_contents:
+                            path_to_title[str(content.path)] = content.title
                         
                         for content in sorted_contents:
                             if content.deployment and content.deployment.example_version:
                                 example = content.deployment.example_version.example
                                 version = content.deployment.example_version.version_tag
                                 
-                                # Create tree structure visualization from ltree path
+                                # Build title path with "/" separation
                                 path_parts = str(content.path).split('.')
-                                if len(path_parts) > 1:
-                                    # Indent sub-paths for visual hierarchy
-                                    indent = "  " * (len(path_parts) - 1)
-                                    path_display = indent + "└─ " + path_parts[-1]
-                                else:
-                                    path_display = path_parts[0]
+                                title_parts = []
                                 
-                                f.write(f"| {path_display} | `{example.identifier}/` | {content.title} | {version} |\n")
+                                # Build up the path progressively to find each part's title
+                                for i, part in enumerate(path_parts):
+                                    # Reconstruct path up to this part
+                                    current_path = '.'.join(path_parts[:i+1])
+                                    
+                                    # Try to find title for this path segment
+                                    if current_path in path_to_title:
+                                        title_parts.append(path_to_title[current_path])
+                                    else:
+                                        # If we can't find the title, use the path segment as fallback
+                                        title_parts.append(part)
+                                
+                                # Join with " / " as requested
+                                title_path = " / ".join(title_parts)
+                                
+                                f.write(f"| {title_path} | `{example.identifier}/` | {content.title} | {version} |\n")
                     
                     f.write(f"\n## Instructions\n\n")
                     f.write(f"Each assignment is in its own directory. Navigate to the assignment directory and follow the instructions in its README.md file.\n\n")
@@ -504,9 +654,11 @@ Follow the course submission guidelines to submit your work.
                     template_repo.git.add(A=True)
                     
                     # Check if there are changes to commit
-                    if template_repo.is_dirty():
-                        # Commit changes
-                        commit_message = f"Deploy {processed_count} examples from Example Library"
+                    if template_repo.is_dirty() or template_repo.untracked_files:
+                        # Commit changes - message indicates full sync operation
+                        commit_message = f"Sync student template: Deploy {processed_count} examples from Example Library"
+                        if cleaned_items_count > 0:
+                            commit_message += f" (cleaned {cleaned_items_count} old items)"
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         

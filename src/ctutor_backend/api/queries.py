@@ -274,6 +274,17 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
     results_count_sub = results_count_subquery(None,course_member_id,None,db)
     latest_grading_sub = latest_grading_subquery(db)
 
+    # Subquery to get the member's submission groups
+    member_submission_groups = select(CourseSubmissionGroup).select_from(
+        CourseSubmissionGroup
+    ).join(
+        CourseSubmissionGroupMember,
+        CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
+    ).where(
+        CourseSubmissionGroupMember.course_member_id == course_member_id
+    ).subquery()
+
+    # Query ALL course contents for the course where the user is a member
     query = db.query(
             CourseContent,
             results_count_sub.c.total_results_count,
@@ -285,10 +296,12 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
         ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-        .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .join(CourseContent, CourseContent.id == CourseSubmissionGroup.course_content_id) \
+        .join(Course, Course.id == CourseMember.course_id) \
+        .join(CourseContent, CourseContent.course_id == Course.id) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
+        .outerjoin(CourseSubmissionGroup,
+                   (CourseSubmissionGroup.course_content_id == CourseContent.id) &
+                   (CourseSubmissionGroup.id.in_(select(member_submission_groups.c.id)))) \
         .outerjoin(
             latest_result_sub,
             CourseContent.id == latest_result_sub.c.course_content_id

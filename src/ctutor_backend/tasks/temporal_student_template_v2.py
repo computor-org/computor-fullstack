@@ -664,7 +664,8 @@ async def generate_student_template_activity_v2(
             if cleaned_items_count > 0:
                 logger.info(f"Cleaned {cleaned_items_count} items from student template repository")
             
-            # Get all CourseContent with assigned examples (deployments in 'deploying' status)
+            # Get ALL CourseContent with assigned examples (any deployment with an example_version)
+            # This ensures the repository contains ALL deployed examples, not just ones being updated
             course_contents = db.query(CourseContent).options(
                 joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
                 joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.repository)
@@ -673,8 +674,9 @@ async def generate_student_template_activity_v2(
                 CourseContent.id.in_(
                     db.query(CourseContentDeployment.course_content_id)
                     .filter(
-                        CourseContentDeployment.deployment_status == "deploying",
-                        CourseContentDeployment.example_version_id.isnot(None)
+                        CourseContentDeployment.example_version_id.isnot(None)  # Has an assigned example
+                        # Note: We include ALL deployments with examples, regardless of status
+                        # This ensures the repository contains everything, not just newly deployed items
                     )
                 ),
                 CourseContent.archived_at.is_(None)
@@ -888,10 +890,11 @@ async def generate_student_template_activity_v2(
                     git_push_successful = False
             
             # Now update deployment statuses based on git push result
+            # Only update deployments that were marked as "deploying" at the start
             if git_push_successful and processed_count > 0:
-                # Mark successfully processed content as deployed
+                # Mark successfully processed content as deployed (only if currently deploying)
                 for content in successfully_processed:
-                    if content.deployment:
+                    if content.deployment and content.deployment.deployment_status == "deploying":
                         content.deployment.deployment_status = "deployed"
                         content.deployment.deployed_at = datetime.now(timezone.utc)
                         
@@ -904,7 +907,7 @@ async def generate_student_template_activity_v2(
                         )
                         db.add(history)
             else:
-                # Git push failed - mark all as failed
+                # Git push failed - mark only the ones we're processing as failed
                 for content in course_contents:
                     if content.deployment and content.deployment.deployment_status == "deploying":
                         content.deployment.deployment_status = "failed"

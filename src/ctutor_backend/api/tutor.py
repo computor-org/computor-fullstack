@@ -23,7 +23,7 @@ from ctutor_backend.interface.student_courses import CourseStudentInterface, Cou
 from ctutor_backend.interface.tutor_course_members import TutorCourseMemberCourseContent, TutorCourseMemberGet, TutorCourseMemberList
 from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ctutor_backend.model.auth import User
-from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember
+from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery, CourseContentStudentUpdate, ResultStudentList, SubmissionGroupStudentList
 from ctutor_backend.model.result import Result
@@ -81,86 +81,59 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
-    latest_result_sub = latest_result_subquery(None,course_member_id,course_content_id,db)
-    results_count_sub = results_count_subquery(None,course_member_id,course_content_id,db)
-    latest_grading_sub = latest_grading_subquery(db)
+    # Create a new CourseSubmissionGroupGrading entry before querying latest grading
+    # 1) Resolve the student's course member and related submission group for this content
+    student_cm = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
+    if student_cm is None:
+        raise NotFoundException()
 
-    query = db.query(
-            CourseContent,
-            results_count_sub.c.total_results_count,
-            Result,
-            CourseSubmissionGroup,
-            results_count_sub.c.submitted_count,
-            latest_grading_sub.c.status,
-            latest_grading_sub.c.grading
-        ) \
-        .select_from(CourseContent) \
-        .filter(CourseContent.id == course_content_id) \
-        .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
-        .join(CourseMember, CourseMember.id == course_member_id) \
-        .join(Course,(Course.id == CourseContent.course_id) & (Course.id == CourseMember.course_id)) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-        .join(CourseSubmissionGroup, (CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) & 
-              (CourseSubmissionGroup.course_content_id == CourseContent.id)) \
-        .outerjoin(
-            latest_result_sub,
-            CourseContent.id == latest_result_sub.c.course_content_id
-        ).outerjoin(
-            Result,
-            (Result.course_content_id == latest_result_sub.c.course_content_id) &
-            (Result.created_at == latest_result_sub.c.latest_result_date)
-        ) \
-        .outerjoin(
-            results_count_sub,
-            CourseContent.id == results_count_sub.c.course_content_id
-        ).outerjoin(
-            latest_grading_sub,
-            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
-            (latest_grading_sub.c.rn == 1)
-        ).first()
-
-    course_content, result_count, result, course_submission_group, submitted_count, submission_status, submission_grading = query
-
-    entity = course_member_update.model_dump(exclude_unset=True)
-    
-    for key in entity.keys():
-        attr = entity.get(key)
-        setattr(course_submission_group, key, attr)
-
-    db.commit()
-    db.refresh(course_submission_group)
-    
-    return CourseContentStudentList(
-            id=course_content.id,
-            title=course_content.title,
-            path=course_content.path,
-            course_id=course_content.course_id,
-            course_content_type_id=course_content.course_content_type_id,
-            course_content_kind_id=course_content.course_content_kind_id,
-            course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
-            position=course_content.position,
-            max_group_size=course_content.max_group_size,
-            directory=course_content.properties.get("gitlab", {}).get("directory") if course_content.properties else None,
-            color=course_content.course_content_type.color,
-            #submitted=True if submitted_count != None and submitted_count > 0 else False,
-            result_count=result_count if result_count != None else 0,
-            max_test_runs=course_content.max_test_runs,
-            result=ResultStudentList(
-                execution_backend_id=result.execution_backend_id,
-                test_system_id=result.test_system_id,
-                version_identifier=result.version_identifier,
-                status=result.status,
-                result=result.result,
-                submit=result.submit
-            ) if result != None and result.test_system_id != None else None,
-            submission=SubmissionGroupStudentList(
-                id=course_submission_group.id,
-                status=submission_status,
-                grading=submission_grading,
-                count=submitted_count if submitted_count != None else 0,
-                max_submissions=course_submission_group.max_submissions
-            )
+    course_submission_group = (
+        db.query(CourseSubmissionGroup)
+        .join(
+            CourseSubmissionGroupMember,
+            CourseSubmissionGroupMember.course_submission_group_id == CourseSubmissionGroup.id,
         )
+        .filter(
+            CourseSubmissionGroupMember.course_member_id == course_member_id,
+            CourseSubmissionGroup.course_content_id == course_content_id,
+        )
+        .first()
+    )
+
+    if course_submission_group is None:
+        raise NotFoundException()
+
+    # 2) Resolve the grader's course member (the current user in the same course)
+    grader_cm = (
+        db.query(CourseMember)
+        .filter(
+            CourseMember.user_id == permissions.get_user_id_or_throw(),
+            CourseMember.course_id == student_cm.course_id,
+        )
+        .first()
+    )
+    if grader_cm is None:
+        # Fallback safety: forbid if we cannot resolve grader identity in course
+        raise ForbiddenException()
+
+    # 3) Create grading if payload includes grading/status
+    payload = course_member_update.model_dump(exclude_unset=True)
+    if payload:
+        if payload.get("grading") is None:
+            # Grading is required for a new grading entry
+            raise BadRequestException()
+        new_grading = CourseSubmissionGroupGrading(
+            course_submission_group_id=course_submission_group.id,
+            graded_by_course_member_id=grader_cm.id,
+            grading=payload.get("grading"),
+            status=payload.get("status"),
+        )
+        db.add(new_grading)
+        db.commit()
+
+    # 4) Return fresh data using shared mapper and latest grading subquery
+    course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db)
+    return course_member_course_content_result_mapper(course_contents_result, db)
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
 async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):

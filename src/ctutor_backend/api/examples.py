@@ -3,12 +3,14 @@ FastAPI endpoints for Example Library management.
 """
 
 import base64
+import zipfile
+import mimetypes
 import io
 import json
 import logging
 import re
 import yaml
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 from datetime import datetime, timezone
 from ..custom_types import Ltree
@@ -55,6 +57,186 @@ CACHE_TTL_LIST = 300  # 5 minutes
 CACHE_TTL_GET = 600   # 10 minutes
 
 # Note: Basic CRUD operations are handled by CrudRouter in server.py
+
+# ------------------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------------------
+
+def _guess_content_type(filename: str, is_binary: bool) -> str:
+    """Return a reasonable content-type for a given filename.
+
+    Preference order:
+    1) Known multi-part extensions (e.g. .tar.gz/.tgz)
+    2) Explicit overrides for common types
+    3) Python's mimetypes.guess_type
+    4) Fallback to application/octet-stream for binary, text/plain for text
+    """
+    name = filename.lower()
+
+    # Multi-part extensions first
+    if name.endswith('.tar.gz') or name.endswith('.tgz'):
+        return 'application/x-tar'
+
+    # Explicit overrides to keep behavior consistent across platforms
+    overrides = {
+        '.yaml': 'text/yaml',
+        '.yml': 'text/yaml',
+        '.json': 'application/json',
+        '.xml': 'application/xml',
+        '.html': 'text/html',
+        '.htm': 'text/html',
+        '.css': 'text/css',
+        '.js': 'application/javascript',
+        '.py': 'text/x-python',
+        '.java': 'text/x-java',
+        '.c': 'text/x-c',
+        '.h': 'text/x-c',
+        '.cpp': 'text/x-c++',
+        '.hpp': 'text/x-c++',
+        '.cc': 'text/x-c++',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.pdf': 'application/pdf',
+        '.zip': 'application/zip',
+        '.tar': 'application/x-tar',
+        '.md': 'text/markdown',
+        '.txt': 'text/plain',
+    }
+
+    for ext, ctype in overrides.items():
+        if name.endswith(ext):
+            return ctype
+
+    # Fall back to mimetypes
+    guessed, _ = mimetypes.guess_type(filename)
+    if guessed:
+        return guessed
+
+    # Final fallback based on binary/text
+    return 'application/octet-stream' if is_binary else 'text/plain'
+
+
+_BINARY_EXTENSIONS = {
+    '.png', '.jpg', '.jpeg', '.gif', '.pdf', '.zip', '.tar', '.tgz', '.tar.gz',
+}
+
+
+def _is_binary_by_extension(filename: str) -> bool:
+    name = filename.lower()
+    return any(name.endswith(ext) for ext in _BINARY_EXTENSIONS)
+
+
+def _extract_file_bytes(filename: str, content: object) -> Tuple[io.BytesIO, bool]:
+    """Convert provided content to bytes and determine binary/text.
+
+    - bytes -> passthrough (binary)
+    - str with data URI -> base64 decode (binary)
+    - str and binary-suspect extension -> try base64 decode; else encode as UTF-8 (text)
+    - str generic -> attempt safe base64 decode (validate), else encode UTF-8 (text)
+    """
+    # Raw bytes
+    if isinstance(content, (bytes, bytearray)):
+        return io.BytesIO(bytes(content)), True
+
+    if not isinstance(content, str):
+        # Unknown type: coerce to string and store as text
+        data = io.BytesIO(str(content).encode('utf-8'))
+        return data, False
+
+    # Strings
+    text = content
+
+    # Handle data URI
+    if text.startswith('data:'):
+        try:
+            base64_marker = ';base64,'
+            idx = text.find(base64_marker)
+            if idx != -1:
+                b64 = text[idx + len(base64_marker):]
+                return io.BytesIO(base64.b64decode(b64, validate=False)), True
+        except Exception:
+            pass  # fall back to other handling
+
+    # Normalize whitespace
+    clean = text.replace('\n', '').replace('\r', '').replace(' ', '').replace('\t', '')
+
+    # If extension suggests binary, aggressively try base64 decode first
+    if _is_binary_by_extension(filename):
+        try:
+            return io.BytesIO(base64.b64decode(clean, validate=True)), True
+        except Exception:
+            # Fall back to raw text bytes; still store something
+            return io.BytesIO(text.encode('utf-8')), False
+
+    # For non-binary extensions, attempt a safe base64 decode only if characters match
+    base64_pattern = re.compile(r'^[A-Za-z0-9+/]*={0,2}$')
+    if len(clean) % 4 == 0 and base64_pattern.match(clean):
+        try:
+            decoded = base64.b64decode(clean, validate=True)
+            return io.BytesIO(decoded), True
+        except Exception:
+            pass
+
+    # Default: treat as UTF-8 text
+    return io.BytesIO(text.encode('utf-8')), False
+
+
+_TEXT_CONTENT_TYPES = {
+    'application/json',
+    'application/xml',
+    'application/javascript',
+    'application/x-javascript',
+    'text/plain',
+    'text/html',
+    'text/css',
+    'text/csv',
+    'text/markdown',
+    'text/yaml',
+    'text/x-python',
+    'text/x-java',
+    'text/x-c',
+    'text/x-c++',
+    'image/svg+xml',
+}
+
+
+def _is_text_content_type(content_type: Optional[str]) -> bool:
+    if not content_type:
+        return False
+    if content_type.startswith('text/'):
+        return True
+    return content_type in _TEXT_CONTENT_TYPES
+
+
+def _encode_for_response(filename: str, data: bytes, content_type: Optional[str]) -> str:
+    """Return a string payload suitable for ExampleDownloadResponse.files.
+
+    - Text types: UTF-8 decoded string
+    - Binary types: Data URI with base64
+    """
+    if _is_text_content_type(content_type):
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            # Fall back to base64 data URI if decoding fails
+            b64 = base64.b64encode(data).decode('ascii')
+            ctype = content_type or _guess_content_type(filename, True)
+            return f"data:{ctype};base64,{b64}"
+
+    # If content-type unknown, attempt to decode as UTF-8 text
+    if not content_type:
+        try:
+            return data.decode('utf-8')
+        except UnicodeDecodeError:
+            pass
+
+    # Binary: base64 data URI
+    b64 = base64.b64encode(data).decode('ascii')
+    ctype = content_type or _guess_content_type(filename, True)
+    return f"data:{ctype};base64,{b64}"
 
 # ==============================================================================
 # Example Endpoints
@@ -331,14 +513,66 @@ async def upload_example(
     if repository.source_type not in ["minio", "s3"]:
         raise BadRequestException(f"Upload not supported for {repository.source_type} repositories")
     
+    # Support two input modes:
+    # 1) Classic: request.files contains all files including 'meta.yaml'
+    # 2) Zipped:  request.files contains a single .zip which we extract here
+
+    # Detect zipped upload (first .zip file wins)
+    extracted_files = None
+    zip_entry_name = next((name for name in request.files.keys() if name.lower().endswith('.zip')), None)
+    if zip_entry_name is not None:
+        try:
+            zip_bytes_io, _ = _extract_file_bytes(zip_entry_name, request.files[zip_entry_name])
+            with zipfile.ZipFile(zip_bytes_io, 'r') as zf:
+                files: dict[str, bytes] = {}
+                for info in zf.infolist():
+                    if info.is_dir():
+                        continue
+                    # Normalize arcname and skip any unsafe paths
+                    raw_name = info.filename
+                    # Exclude MacOS and hidden dot entries
+                    if raw_name.startswith('__MACOSX/') or '/.' in raw_name or raw_name.endswith('.meta.yaml'):
+                        continue
+                    # Normalize to avoid zip slip
+                    norm_name = raw_name.replace('\\', '/')
+                    norm_name = norm_name.lstrip('/')
+                    # Collapse .. segments
+                    parts = []
+                    for part in norm_name.split('/'):
+                        if part in ('', '.'):
+                            continue
+                        if part == '..':
+                            # Unsafe path
+                            parts = []
+                            break
+                        parts.append(part)
+                    if not parts:
+                        continue
+                    safe_name = '/'.join(parts)
+                    # Read raw bytes; text/binary handled later
+                    with zf.open(info, 'r') as fp:
+                        data = fp.read()
+                        files[safe_name] = data
+                extracted_files = files
+        except Exception as e:
+            logger.exception("Failed to extract uploaded zip for example")
+            raise BadRequestException(f"Invalid zip upload: {e}")
+
+    # Choose file source
+    incoming_files = extracted_files if extracted_files is not None else request.files
+
     # Validate that meta.yaml is included
-    if 'meta.yaml' not in request.files:
+    if 'meta.yaml' not in incoming_files:
         raise BadRequestException("meta.yaml file is required")
     
     # Parse meta.yaml to extract example metadata
     try:
-        meta_content = request.files['meta.yaml']
-        meta_data = yaml.safe_load(meta_content)
+        meta_content = incoming_files['meta.yaml']
+        if isinstance(meta_content, (bytes, bytearray)):
+            meta_str = meta_content.decode('utf-8', errors='replace')
+        else:
+            meta_str = str(meta_content)
+        meta_data = yaml.safe_load(meta_str)
     except yaml.YAMLError as e:
         raise BadRequestException(f"Invalid meta.yaml format: {str(e)}")
     
@@ -416,84 +650,24 @@ async def upload_example(
     bucket_name = repository.source_url.split('/')[0]  # First part is bucket
     
     # Get test.yaml content if it exists
-    test_yaml_content = request.files.get('test.yaml')
-    
-    for filename, content in request.files.items():
+    test_yaml_content = incoming_files.get('test.yaml')
+    if isinstance(test_yaml_content, (bytes, bytearray)):
+        test_yaml_content = test_yaml_content.decode('utf-8', errors='replace')
+
+    for filename, content in incoming_files.items():
+        if filename.lower().endswith('.zip'):
+            # Do not store the container zip itself
+            continue
         object_key = f"{storage_path}/{filename}"
         
-        # Handle content based on its type
-        if isinstance(content, bytes):
-            # Content is already bytes - use directly
-            file_data = io.BytesIO(content)
-        elif isinstance(content, str):
-            # Content is a string - need to determine how to handle it
-            
-            # Check if it looks like base64 (only contains base64 characters)
-            base64_pattern = re.compile(r'^[A-Za-z0-9+/\s]*={0,2}$')
-            
-            # Remove whitespace for checking
-            clean_content = content.replace('\n', '').replace('\r', '').replace(' ', '').replace('\t', '')
-            
-            if len(clean_content) > 100 and base64_pattern.match(clean_content):
-                # Looks like base64 - try to decode it
-                try:
-                    file_data = io.BytesIO(base64.b64decode(clean_content))
-                    logger.debug(f"Decoded base64 for {filename}")
-                except Exception as e:
-                    # Not valid base64, treat as text
-                    logger.debug(f"Base64 decode failed for {filename}, treating as text: {e}")
-                    file_data = io.BytesIO(content.encode('utf-8'))
-            else:
-                # Doesn't look like base64 - treat as text
-                file_data = io.BytesIO(content.encode('utf-8'))
-        else:
-            # Unexpected type
-            logger.error(f"Unexpected content type for {filename}: {type(content)}")
+        # Convert incoming content to bytes and determine if it's binary
+        file_data, is_binary = _extract_file_bytes(filename, content)
+        if file_data is None:
+            logger.error(f"Could not process content for {filename}")
             continue
         
-        # Determine content type based on file extension
-        filename_lower = filename.lower()
-        if filename_lower.endswith('.yaml') or filename_lower.endswith('.yml'):
-            content_type = "text/yaml"
-        elif filename_lower.endswith('.json'):
-            content_type = "application/json"
-        elif filename_lower.endswith('.xml'):
-            content_type = "application/xml"
-        elif filename_lower.endswith('.html') or filename_lower.endswith('.htm'):
-            content_type = "text/html"
-        elif filename_lower.endswith('.css'):
-            content_type = "text/css"
-        elif filename_lower.endswith('.js'):
-            content_type = "application/javascript"
-        elif filename_lower.endswith('.py'):
-            content_type = "text/x-python"
-        elif filename_lower.endswith('.java'):
-            content_type = "text/x-java"
-        elif filename_lower.endswith('.c') or filename_lower.endswith('.h'):
-            content_type = "text/x-c"
-        elif filename_lower.endswith('.cpp') or filename_lower.endswith('.hpp') or filename_lower.endswith('.cc'):
-            content_type = "text/x-c++"
-        elif filename_lower.endswith('.png'):
-            content_type = "image/png"
-        elif filename_lower.endswith('.jpg') or filename_lower.endswith('.jpeg'):
-            content_type = "image/jpeg"
-        elif filename_lower.endswith('.gif'):
-            content_type = "image/gif"
-        elif filename_lower.endswith('.svg'):
-            content_type = "image/svg+xml"
-        elif filename_lower.endswith('.pdf'):
-            content_type = "application/pdf"
-        elif filename_lower.endswith('.zip'):
-            content_type = "application/zip"
-        elif filename_lower.endswith('.tar') or filename_lower.endswith('.tar.gz') or filename_lower.endswith('.tgz'):
-            content_type = "application/x-tar"
-        elif filename_lower.endswith('.md'):
-            content_type = "text/markdown"
-        elif filename_lower.endswith('.txt'):
-            content_type = "text/plain"
-        else:
-            # Default to octet-stream for unknown binary files, text/plain for text
-            content_type = "application/octet-stream" if isinstance(content, bytes) else "text/plain"
+        # Determine content type based on filename and whether it is binary
+        content_type = _guess_content_type(filename, is_binary)
         
         # Upload file
         await storage_service.upload_file(
@@ -506,7 +680,7 @@ async def upload_example(
     # Create or update version record
     if existing_version:
         # Update existing version
-        existing_version.meta_yaml = meta_content
+        existing_version.meta_yaml = meta_str
         existing_version.test_yaml = test_yaml_content
         existing_version.updated_at = func.now()
         version = existing_version
@@ -517,7 +691,7 @@ async def upload_example(
             version_tag=version_tag,
             version_number=version_number,
             storage_path=storage_path,
-            meta_yaml=meta_content,
+            meta_yaml=meta_str,
             test_yaml=test_yaml_content,
             created_by=permissions.user_id,
         )
@@ -701,13 +875,18 @@ async def download_example_version(
             # Get relative filename
             filename = obj.object_name.replace(f"{ex_version.storage_path}/", "")
             
-            # Download file content
+            # Download file content and fetch content-type
             file_data = await storage_service.download_file(
                 bucket_name=bucket_name,
                 object_key=obj.object_name,
             )
+            info = await storage_service.get_object_info(
+                bucket_name=bucket_name,
+                object_key=obj.object_name,
+            )
             
-            files[filename] = file_data.decode('utf-8')
+            # Encode based on content-type
+            files[filename] = _encode_for_response(filename, file_data, info.content_type)
         
         return files
     
@@ -855,8 +1034,3 @@ async def delete_example_dependency(
     db.commit()
     
     return {"message": "Dependency deleted successfully"}
-
-
-
-
-

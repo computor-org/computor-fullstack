@@ -117,20 +117,15 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         raise ForbiddenException()
 
     # 3) Create grading if payload includes grading/status
-    payload = course_member_update.model_dump(exclude_unset=True)
-    if payload:
-        if payload.get("grading") is None:
-            # Grading is required for a new grading entry
-            raise BadRequestException()
-        new_grading = CourseSubmissionGroupGrading(
+    new_grading = CourseSubmissionGroupGrading(
             course_submission_group_id=course_submission_group.id,
             graded_by_course_member_id=grader_cm.id,
-            grading=payload.get("grading"),
-            status=payload.get("status"),
-        )
-        db.add(new_grading)
-        db.commit()
-
+            grading=course_member_update.grading if course_member_update.grading != None else 0,
+            status=course_member_update.status,
+    )
+    db.add(new_grading)
+    db.commit()
+        
     # 4) Return fresh data using shared mapper and latest grading subquery
     course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db)
     return course_member_course_content_result_mapper(course_contents_result, db)

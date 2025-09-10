@@ -51,7 +51,6 @@ class SubmissionGroupStudentList(BaseModel):
     current_group_size: int = 1
     members: List[SubmissionGroupMemberBasic] = []
     repository: Optional[SubmissionGroupRepository] = None
-    latest_grading: Optional[SubmissionGroupGradingStudent] = None
     status: Optional[str] = None  # Backward compatibility
     grading: Optional[float] = None  # Backward compatibility
     count: int = 0  # Backward compatibility - submission count

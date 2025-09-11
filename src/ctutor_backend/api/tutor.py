@@ -26,6 +26,7 @@ from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
 from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery, CourseContentStudentUpdate, ResultStudentList, SubmissionGroupStudentList
+from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.model.result import Result
 from ctutor_backend.redis_cache import get_redis_client
 from aiocache import BaseCache
@@ -116,17 +117,36 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
         # Fallback safety: forbid if we cannot resolve grader identity in course
         raise ForbiddenException()
 
-    # 3) Create grading if payload includes grading/status
+    # 3) Get the last submitted result if we want to link the grading to it
+    last_result_id = None
+    if course_submission_group.last_submitted_result:
+        last_result_id = course_submission_group.last_submitted_result
+
+    # 4) Map status string to GradingStatus enum value
+    grading_status = GradingStatus.NOT_REVIEWED  # Default
+    if course_member_update.status:
+        status_map = {
+            "corrected": GradingStatus.CORRECTED,
+            "correction_necessary": GradingStatus.CORRECTION_NECESSARY,
+            "correction_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
+            "improvement_possible": GradingStatus.IMPROVEMENT_POSSIBLE,
+            "not_reviewed": GradingStatus.NOT_REVIEWED
+        }
+        grading_status = status_map.get(course_member_update.status, GradingStatus.NOT_REVIEWED)
+
+    # 5) Create grading if payload includes grading/status
     new_grading = CourseSubmissionGroupGrading(
             course_submission_group_id=course_submission_group.id,
             graded_by_course_member_id=grader_cm.id,
             grading=course_member_update.grading if course_member_update.grading != None else 0,
-            status=course_member_update.status,
+            status=grading_status.value,  # Use integer value of enum
+            feedback=getattr(course_member_update, 'feedback', None),  # Add feedback if provided
+            result_id=last_result_id  # Link to the last submitted result
     )
     db.add(new_grading)
     db.commit()
         
-    # 4) Return fresh data using shared mapper and latest grading subquery
+    # 6) Return fresh data using shared mapper and latest grading subquery
     course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db)
     return course_member_course_content_result_mapper(course_contents_result, db)
 

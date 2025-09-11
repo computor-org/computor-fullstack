@@ -10,7 +10,7 @@ from datetime import timedelta
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 
-from ctutor_backend.api.system import ReleaseStudentsCreate
+from ctutor_backend.interface.system import ReleaseStudentsCreate
 from ctutor_backend.api.utils import collect_sub_path_positions_if_meta_exists
 from ctutor_backend.interface.deployments import ApiConfig, ComputorDeploymentConfig, CodeabilityReleaseBuilder
 from .temporal_base import BaseWorkflow, WorkflowResult

@@ -1,4 +1,5 @@
 from typing import List, TYPE_CHECKING
+from enum import IntEnum
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Float, ForeignKey, ForeignKeyConstraint, Index, 
@@ -6,6 +7,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, column_property, Mapped
+from sqlalchemy.ext.hybrid import hybrid_property
 try:
     from ..custom_types import LtreeType
 except ImportError:
@@ -17,6 +19,14 @@ from .base import Base
 if TYPE_CHECKING:
     from .result import Result
     from .example import ExampleVersion
+
+
+class GradingStatus(IntEnum):
+    """Enumeration for grading status values."""
+    NOT_REVIEWED = 0
+    CORRECTED = 1
+    CORRECTION_NECESSARY = 2
+    IMPROVEMENT_POSSIBLE = 3
 
 
 class CourseContentKind(Base):
@@ -341,6 +351,33 @@ class CourseSubmissionGroup(Base):
     results = relationship('Result', back_populates='course_submission_group')
     gradings = relationship('CourseSubmissionGroupGrading', back_populates='course_submission_group',
                            cascade='all, delete-orphan')
+    
+    # Hybrid property for the last submitted result
+    @hybrid_property
+    def last_submitted_result(self):
+        """Get the most recent submitted result for this submission group."""
+        # Python side: when results are loaded
+        submitted = [r for r in self.results if r.submit]
+        if not submitted:
+            return None
+        return max(submitted, key=lambda r: r.created_at)
+    
+    @last_submitted_result.expression
+    def last_submitted_result(cls):
+        """SQL expression for the last submitted result."""
+        from .result import Result
+        # Subquery to get the ID of the most recent submitted result
+        subq = (
+            select(Result.id)
+            .where(
+                Result.course_submission_group_id == cls.id,
+                Result.submit == True
+            )
+            .order_by(Result.created_at.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        return subq
 
 
 class CourseSubmissionGroupMember(Base):
@@ -378,9 +415,11 @@ class CourseSubmissionGroupGrading(Base):
     
     This table records:
     - The actual grade (0.0 to 1.0)
-    - The grading status
+    - The grading status (using GradingStatus enum: 0=not_reviewed, 1=corrected, 2=correction_necessary, 3=improvement_possible)
     - Who performed the grading (staff member/tutor/lecturer)
     - When the grading occurred
+    - Feedback/comments on the grading
+    - Reference to the specific result that was graded
     """
     __tablename__ = 'course_submission_group_grading'
     __table_args__ = (
@@ -388,6 +427,8 @@ class CourseSubmissionGroupGrading(Base):
         Index('idx_grading_submission_group', 'course_submission_group_id'),
         # Ensure we can find all gradings by a specific grader
         Index('idx_grading_graded_by', 'graded_by_course_member_id'),
+        # Index for finding gradings by result
+        Index('idx_grading_result', 'result_id'),
     )
 
     # Primary key and versioning
@@ -407,10 +448,15 @@ class CourseSubmissionGroupGrading(Base):
         ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'),
         nullable=False
     )
+    result_id = Column(
+        ForeignKey('result.id', ondelete='SET NULL', onupdate='RESTRICT'),
+        nullable=True  # Nullable because grading might be done without a specific result
+    )
     
     # Grading data
     grading = Column(Float(53), nullable=False)  # Value between 0.0 and 1.0
-    status = Column(String(50))  # 'corrected', 'correction_necessary', 'correction_possible', null, etc.
+    status = Column(Integer, nullable=False, server_default=text("0"))  # GradingStatus enum values
+    feedback = Column(String(4096), nullable=True)  # Feedback/comments from the grader
     
     # Relationships
     course_submission_group = relationship(
@@ -422,9 +468,14 @@ class CourseSubmissionGroupGrading(Base):
         back_populates='gradings_given',
         foreign_keys=[graded_by_course_member_id]
     )
+    result = relationship(
+        'Result',
+        back_populates='gradings',
+        foreign_keys=[result_id]
+    )
     
     def __repr__(self):
-        return f"<CourseSubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status})>"
+        return f"<CourseSubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status}, has_feedback={bool(self.feedback)})>"
 
 
 class CourseMemberComment(Base):

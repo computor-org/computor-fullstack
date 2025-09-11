@@ -1,25 +1,43 @@
 import json
-from enum import Enum
 from pydantic import BaseModel, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.model import CourseContentType, CourseSubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
+from ctutor_backend.tasks.base import TaskStatus
 
-class ResultStatus(int,Enum):
-    COMPLETED = 0
-    FAILED = 1
-    CANCELLED = 2
-    SCHEDULED = 3
-    PENDING = 4
-    RUNNING = 5
-    CRASHED = 6
-    PAUSED = 7
-    CANCELLING = 8
-    NOT_AVAILABLE = -1
+# Mapping from old integer ResultStatus to new TaskStatus
+# This is for backward compatibility with existing data
+def map_int_to_task_status(status_int: int) -> TaskStatus:
+    """Map legacy integer status to TaskStatus enum."""
+    mapping = {
+        0: TaskStatus.FINISHED,    # COMPLETED -> FINISHED
+        1: TaskStatus.FAILED,      # FAILED -> FAILED
+        2: TaskStatus.CANCELLED,   # CANCELLED -> CANCELLED
+        3: TaskStatus.QUEUED,      # SCHEDULED -> QUEUED
+        4: TaskStatus.QUEUED,      # PENDING -> QUEUED
+        5: TaskStatus.STARTED,     # RUNNING -> STARTED
+        6: TaskStatus.FAILED,      # CRASHED -> FAILED
+        7: TaskStatus.DEFERRED,    # PAUSED -> DEFERRED
+        8: TaskStatus.CANCELLED,   # CANCELLING -> CANCELLED
+        -1: TaskStatus.FAILED      # NOT_AVAILABLE -> FAILED
+    }
+    return mapping.get(status_int, TaskStatus.FAILED)
+
+def map_task_status_to_int(status: TaskStatus) -> int:
+    """Map TaskStatus enum to legacy integer for database storage."""
+    mapping = {
+        TaskStatus.FINISHED: 0,    # FINISHED -> COMPLETED (0)
+        TaskStatus.FAILED: 1,      # FAILED -> FAILED (1)
+        TaskStatus.CANCELLED: 2,   # CANCELLED -> CANCELLED (2)
+        TaskStatus.QUEUED: 4,      # QUEUED -> PENDING (4)
+        TaskStatus.STARTED: 5,     # STARTED -> RUNNING (5)
+        TaskStatus.DEFERRED: 7     # DEFERRED -> PAUSED (7)
+    }
+    return mapping.get(status, 1)  # Default to FAILED (1)
 
 class ResultCreate(BaseModel):
     submit: bool
@@ -32,9 +50,9 @@ class ResultCreate(BaseModel):
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
-    status: ResultStatus
+    status: TaskStatus
     
-    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
 class ResultGet(BaseEntityGet):
     id: str
@@ -49,9 +67,11 @@ class ResultGet(BaseEntityGet):
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
-    status: ResultStatus
+    status: TaskStatus
+    # New: relationship to gradings
+    grading_ids: Optional[List[str]] = []  # IDs of gradings that reference this result
     
-    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
 class ResultList(BaseModel):
     id: str
@@ -64,19 +84,19 @@ class ResultList(BaseModel):
     test_system_id: str
     result: float
     version_identifier: str
-    status: ResultStatus
+    status: TaskStatus
 
-    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
     
 class ResultUpdate(BaseModel):
     submit: Optional[bool | None] = None
     result: Optional[float | None] = None
     result_json: Optional[dict | None] = None
-    status: Optional[ResultStatus | None] = None
+    status: Optional[TaskStatus | None] = None
     test_system_id: Optional[str | None] = None
     properties: Optional[dict | None] = None
 
-    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
 class ResultQuery(ListQuery):
     id: Optional[str] = None
@@ -89,12 +109,12 @@ class ResultQuery(ListQuery):
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str ] = None
     version_identifier: Optional[str] = None
-    status: Optional[ResultStatus] = None
+    status: Optional[TaskStatus] = None
     latest: Optional[bool] = False
     result: Optional[float] = None
     result_json: Optional[str] = None
 
-    model_config = ConfigDict(use_enum_values=True, from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
 def result_search(db: Session, query, params: Optional[ResultQuery]):
 
@@ -185,3 +205,44 @@ class ResultInterface(EntityInterface):
     endpoint = "results"
     model = Result
     cache_ttl = 60  # 1 minute - results change frequently as students submit work
+
+
+# Extended Result DTOs
+class ResultWithGrading(ResultGet):
+    """Result with associated grading information."""
+    latest_grading: Optional[dict] = None  # Latest grading for this result
+    grading_count: int = 0  # Number of times this result has been graded
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ResultDetailed(BaseModel):
+    """Detailed result information including submission group and grading."""
+    id: str
+    submit: bool
+    course_member_id: str
+    course_member_name: Optional[str] = None  # Name of the submitter
+    course_content_id: str
+    course_content_title: Optional[str] = None
+    course_content_path: Optional[str] = None
+    course_content_type_id: str
+    course_submission_group_id: Optional[str] = None
+    submission_group_members: Optional[List[dict]] = []  # Group member info
+    execution_backend_id: str
+    test_system_id: str
+    result: float
+    result_json: Optional[dict | None] = None
+    properties: Optional[dict | None] = None
+    version_identifier: str
+    status: TaskStatus
+    
+    # Grading information
+    gradings: List[dict] = []  # All gradings for this result
+    latest_grade: Optional[float] = None
+    latest_grading_status: Optional[int] = None  # GradingStatus value
+    latest_grading_feedback: Optional[str] = None
+    
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)

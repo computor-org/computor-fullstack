@@ -5,6 +5,7 @@ from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentList, ResultStudentList, SubmissionGroupStudentList,
     SubmissionGroupRepository, SubmissionGroupMemberBasic, SubmissionGroupGradingStudent
 )
+from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseMember, CourseContent, CourseSubmissionGroupGrading
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.deployment import CourseContentDeployment
@@ -21,8 +22,19 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     result = query[2]
     course_submission_group = query[3]
     submitted_count = query[4] if len(query) > 4 else None
-    submission_status = query[5] if len(query) > 5 else None
+    submission_status_int = query[5] if len(query) > 5 else None
     submission_grading = query[6] if len(query) > 6 else None
+    
+    # Convert integer status to string for backward compatibility
+    submission_status = None
+    if submission_status_int is not None:
+        status_map = {
+            GradingStatus.NOT_REVIEWED.value: "not_reviewed",
+            GradingStatus.CORRECTED.value: "corrected",
+            GradingStatus.CORRECTION_NECESSARY.value: "correction_necessary",
+            GradingStatus.IMPROVEMENT_POSSIBLE.value: "improvement_possible"
+        }
+        submission_status = status_map.get(submission_status_int, "not_reviewed")
     
     # Get directory from deployment's example if available, otherwise from properties
     directory = None

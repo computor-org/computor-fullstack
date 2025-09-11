@@ -16,23 +16,15 @@ from .temporal_client import (
 )
 from .temporal_base import BaseWorkflow, BaseActivity, WorkflowResult, WorkflowProgress
 
-# Import Temporal examples to auto-register tasks
-from . import temporal_examples
-
-# Import Temporal hierarchy management tasks to auto-register
-from . import temporal_hierarchy_management
-
-# Import Temporal system tasks to auto-register
-from . import temporal_system
-
-# Import Temporal student testing tasks to auto-register
-from . import temporal_student_testing
-
-# Import Temporal student template tasks to auto-register
-from . import temporal_student_template_v2
-
-# Import Temporal student repository tasks to auto-register
-from . import temporal_student_repository
+# Note: Temporal workflow modules are imported lazily to avoid circular dependencies
+# They will be imported when the worker starts or when specific tasks are needed
+# The modules that would normally be imported here are:
+# - temporal_examples
+# - temporal_hierarchy_management
+# - temporal_system
+# - temporal_student_testing
+# - temporal_student_template_v2
+# - temporal_student_repository
 
 __all__ = [
     'TaskExecutor',

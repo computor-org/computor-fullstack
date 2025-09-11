@@ -4,6 +4,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.deployments import GitLabConfig
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
+from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.model.course import CourseSubmissionGroup
 
 class SubmissionGroupProperties(BaseModel):
@@ -23,7 +24,8 @@ class SubmissionGroupCreate(BaseModel):
 class SubmissionGroupGet(BaseEntityGet, SubmissionGroupCreate):
     id: str
     course_id: str
-    status: Optional[str] = None
+    status: Optional[str] = None  # Deprecated - use latest grading status
+    last_submitted_result_id: Optional[str] = None  # ID of the last submitted result
 
     model_config = ConfigDict(from_attributes=True)
 class SubmissionGroupList(BaseModel):
@@ -33,7 +35,8 @@ class SubmissionGroupList(BaseModel):
     max_submissions: Optional[int] = None
     course_id: str
     course_content_id: str
-    status: Optional[str] = None
+    status: Optional[str] = None  # Deprecated - use latest grading status
+    last_submitted_result_id: Optional[str] = None  # ID of the last submitted result
 
     model_config = ConfigDict(from_attributes=True)
     
@@ -141,3 +144,41 @@ class SubmissionGroupStudentQuery(BaseModel):
     course_content_id: Optional[str] = None
     has_repository: Optional[bool] = None
     is_graded: Optional[bool] = None
+
+
+# Extended DTOs that include grading information
+class SubmissionGroupWithGrading(SubmissionGroupGet):
+    """Submission group with latest grading information."""
+    latest_grading: Optional[dict] = None  # Latest grading info
+    grading_count: int = 0  # Total number of gradings
+    last_submitted_at: Optional[datetime] = None  # When the last result was submitted
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SubmissionGroupDetailed(BaseModel):
+    """Detailed submission group information including members and gradings."""
+    id: str
+    course_id: str
+    course_content_id: str
+    properties: Optional[SubmissionGroupProperties] = None
+    max_group_size: int
+    max_submissions: Optional[int] = None
+    max_test_runs: Optional[int] = None
+    
+    # Related data
+    members: List[dict] = []  # List of member info
+    gradings: List[dict] = []  # List of all gradings
+    last_submitted_result: Optional[dict] = None  # Last submitted result info
+    
+    # Computed fields
+    current_group_size: int = 0
+    submission_count: int = 0
+    test_run_count: int = 0
+    latest_grade: Optional[float] = None
+    latest_grading_status: Optional[GradingStatus] = None
+    
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)

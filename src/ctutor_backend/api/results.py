@@ -12,7 +12,7 @@ from ctutor_backend.model.result import Result
 from ctutor_backend.tasks import get_task_executor
 from sqlalchemy.orm import Session
 
-from ctutor_backend.tasks.base import TaskStatus
+from ctutor_backend.interface.tasks import TaskStatus
 
 async def get_result_status(result: Result) -> TaskStatus:
     # Use Temporal task executor

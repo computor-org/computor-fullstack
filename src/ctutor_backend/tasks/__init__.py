@@ -6,7 +6,7 @@ that handles operations exceeding FastAPI's request-response cycle.
 """
 
 from .temporal_executor import TemporalTaskExecutor as TaskExecutor, get_task_executor
-from .base import BaseTask, TaskStatus, TaskResult, TaskSubmission, TaskInfo
+from .base import BaseTask, TaskResult, TaskSubmission, TaskInfo
 from .registry import task_registry, register_task
 from .temporal_client import (
     get_temporal_client, 
@@ -16,15 +16,23 @@ from .temporal_client import (
 )
 from .temporal_base import BaseWorkflow, BaseActivity, WorkflowResult, WorkflowProgress
 
-# Note: Temporal workflow modules are imported lazily to avoid circular dependencies
-# They will be imported when the worker starts or when specific tasks are needed
-# The modules that would normally be imported here are:
-# - temporal_examples
-# - temporal_hierarchy_management
-# - temporal_system
-# - temporal_student_testing
-# - temporal_student_template_v2
-# - temporal_student_repository
+# Import Temporal examples to auto-register tasks
+from . import temporal_examples
+
+# Import Temporal hierarchy management tasks to auto-register
+from . import temporal_hierarchy_management
+
+# Import Temporal system tasks to auto-register
+from . import temporal_system
+
+# Import Temporal student testing tasks to auto-register
+from . import temporal_student_testing
+
+# Import Temporal student template tasks to auto-register
+from . import temporal_student_template_v2
+
+# Import Temporal student repository tasks to auto-register
+from . import temporal_student_repository
 
 __all__ = [
     'TaskExecutor',

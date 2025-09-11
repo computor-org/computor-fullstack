@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.tasks.base import TaskStatus
+from ctutor_backend.interface.tasks import TaskStatus
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
 from ..custom_types import Ltree

@@ -318,6 +318,17 @@ class ComputorDeploymentConfig(BaseDeployment):
         description="Global deployment settings"
     )
     
+    # Optional: Upload examples from a local directory before deploying hierarchy
+    # Each immediate subdirectory is treated as an example to upload
+    class ExamplesUploadConfig(BaseModel):
+        repository: str = Field(description="Name of the Example Repository to use/create")
+        path: str = Field(description="Relative path to directory containing example subdirectories")
+
+    examples_upload: Optional["ComputorDeploymentConfig.ExamplesUploadConfig"] = Field(
+        default=None,
+        description="If provided, uploads examples before hierarchy deployment"
+    )
+    
     def validate_structure(self) -> bool:
         """Validate the deployment configuration structure."""
         return len(self.organizations) > 0

@@ -9,24 +9,6 @@ from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
 from ctutor_backend.tasks.base import TaskStatus
 
-# Mapping from old integer ResultStatus to new TaskStatus
-# This is for backward compatibility with existing data
-def map_int_to_task_status(status_int: int) -> TaskStatus:
-    """Map legacy integer status to TaskStatus enum."""
-    mapping = {
-        0: TaskStatus.FINISHED,    # COMPLETED -> FINISHED
-        1: TaskStatus.FAILED,      # FAILED -> FAILED
-        2: TaskStatus.CANCELLED,   # CANCELLED -> CANCELLED
-        3: TaskStatus.QUEUED,      # SCHEDULED -> QUEUED
-        4: TaskStatus.QUEUED,      # PENDING -> QUEUED
-        5: TaskStatus.STARTED,     # RUNNING -> STARTED
-        6: TaskStatus.FAILED,      # CRASHED -> FAILED
-        7: TaskStatus.DEFERRED,    # PAUSED -> DEFERRED
-        8: TaskStatus.CANCELLED,   # CANCELLING -> CANCELLED
-        -1: TaskStatus.FAILED      # NOT_AVAILABLE -> FAILED
-    }
-    return mapping.get(status_int, TaskStatus.FAILED)
-
 def map_task_status_to_int(status: TaskStatus) -> int:
     """Map TaskStatus enum to legacy integer for database storage."""
     mapping = {

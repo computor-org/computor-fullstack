@@ -8,16 +8,7 @@ from typing import Any, Dict, Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
-
-class TaskStatus(str, Enum):
-    """Task execution status enumeration."""
-    QUEUED = "queued"
-    STARTED = "started"
-    FINISHED = "finished"
-    FAILED = "failed"
-    DEFERRED = "deferred"
-    CANCELLED = "cancelled"
-
+from ctutor_backend.interface.tasks import TaskStatus
 
 class TaskResult(BaseModel):
     """Task execution result container."""

@@ -19,8 +19,8 @@ from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 from ctutor_backend.interface.tests import TestJob
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate, map_task_status_to_int
-from ctutor_backend.tasks.base import TaskStatus
+from ctutor_backend.interface.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate
+from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 from ctutor_backend.client.crud_client import CrudClient
 from ctutor_backend.utils.docker_utils import transform_localhost_url
 

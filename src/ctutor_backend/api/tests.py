@@ -16,8 +16,8 @@ from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultCreate, map_task_status_to_int
-from ctutor_backend.tasks.base import TaskStatus
+from ctutor_backend.interface.results import ResultCreate
+from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import User

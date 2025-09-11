@@ -16,7 +16,8 @@ from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultCreate, ResultStatus
+from ctutor_backend.interface.results import ResultCreate, map_task_status_to_int
+from ctutor_backend.tasks.base import TaskStatus
 from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import User
@@ -182,14 +183,14 @@ async def create_test(
         latest_result = sorted(existing_results, key=lambda r: r.created_at, reverse=True)[0]
         
         # Check if the latest result is still running according to DB
-        if ResultStatus(latest_result.status) in [ResultStatus.PENDING, ResultStatus.SCHEDULED, ResultStatus.RUNNING, ResultStatus.PAUSED]:
+        # Status values: 0=COMPLETED, 1=FAILED, 2=CANCELLED, 3=SCHEDULED, 4=PENDING, 5=RUNNING, 7=PAUSED
+        if latest_result.status in [4, 3, 5, 7]:  # PENDING, SCHEDULED, RUNNING, PAUSED
             # Check actual Temporal workflow status
             try:
                 task_executor = get_task_executor()
                 actual_status = await task_executor.get_task_status(latest_result.test_system_id)
                 
-                # Map Temporal status to ResultStatus
-                from ctutor_backend.tasks.base import TaskStatus
+                # Check Temporal status
                 if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
                     # Still running, return the existing one
                     return TestRunResponse(**latest_result.__dict__)
@@ -203,7 +204,7 @@ async def create_test(
                         
                         if workflow_status == "completed":
                             # Successfully completed
-                            latest_result.status = ResultStatus.COMPLETED
+                            latest_result.status = map_task_status_to_int(TaskStatus.FINISHED)
                             db.commit()
                             db.refresh(latest_result)
                             
@@ -214,32 +215,32 @@ async def create_test(
                             return TestRunResponse(**latest_result.__dict__)
                         else:
                             # Failed or other non-success status
-                            latest_result.status = ResultStatus.FAILED
+                            latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
                             db.commit()
                             db.refresh(latest_result)
                             # Will create a new run below
                     else:
                         # No result or unexpected format, treat as failed
-                        latest_result.status = ResultStatus.FAILED
+                        latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
                         db.commit()
                         db.refresh(latest_result)
                         # Will create a new run below
                 else:  # FAILED, CANCELLED, etc.
                     # Update DB status to failed
-                    latest_result.status = ResultStatus.FAILED
+                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
                     db.commit()
                     db.refresh(latest_result)
                     # Will create a new run below
             except Exception as e:
                 # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
                 logger.warning(f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}")
-                latest_result.status = ResultStatus.FAILED
+                latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
                 db.commit()
                 db.refresh(latest_result)
                 # Will create a new run below
         
         # If completed successfully and only updating submit flag
-        elif ResultStatus(latest_result.status) == ResultStatus.COMPLETED:
+        elif latest_result.status == 0:  # COMPLETED
             if test_create.submit and not latest_result.submit:
                 latest_result.submit = True
                 db.commit()
@@ -335,7 +336,7 @@ async def create_test(
         result=0,
         result_json=None,
         properties=None,
-        status=ResultStatus.PENDING,  # Start as PENDING
+        status=map_task_status_to_int(TaskStatus.QUEUED),  # Start as QUEUED
         version_identifier=commit
     )
 
@@ -366,15 +367,15 @@ async def create_test(
             if submitted_id != workflow_id:
                 logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
             
-            # Update status to SCHEDULED now that task is submitted
-            result_create.status = ResultStatus.SCHEDULED
+            # Update status to QUEUED now that task is submitted
+            result_create.status = map_task_status_to_int(TaskStatus.QUEUED)
             db.commit()
             db.refresh(result_create)
         else:
             raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported. Use 'temporal'.")
     except Exception as e:
         # If task submission fails, update result status to FAILED
-        result_create.status = ResultStatus.FAILED
+        result_create.status = map_task_status_to_int(TaskStatus.FAILED)
         result_create.properties = {"error": str(e)}
         db.commit()
         db.refresh(result_create)

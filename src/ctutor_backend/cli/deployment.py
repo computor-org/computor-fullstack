@@ -23,6 +23,7 @@ from ..interface.deployments_refactored import (
     ExecutionBackendConfig,
     ExecutionBackendReference,
     CourseProjects,
+    CourseContentConfig,
     EXAMPLE_DEPLOYMENT,
     EXAMPLE_MULTI_DEPLOYMENT
 )
@@ -44,7 +45,13 @@ from ..interface.example import (
     ExampleRepositoryInterface,
     ExampleRepositoryCreate,
     ExampleRepositoryQuery,
+    ExampleInterface,
+    ExampleQuery,
 )
+from ..interface.course_contents import CourseContentCreate, CourseContentInterface, CourseContentQuery
+from ..interface.course_content_types import CourseContentTypeInterface, CourseContentTypeQuery
+from ..interface.course_content_kind import CourseContentKindInterface, CourseContentKindQuery
+# Deployment is handled through course-contents API, not a separate deployment endpoint
 
 
 @click.group()
@@ -421,8 +428,232 @@ def _deploy_execution_backends(config: ComputorDeploymentConfig, auth: CLIAuthCo
             click.echo(f"    ❌ Failed to deploy backend {backend_config.slug}: {e}")
 
 
-def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
-    """Link execution backends to all deployed courses."""
+def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseConfig, auth: CLIAuthConfig, parent_path: str = None, position_counter: list = None):
+    """Deploy course contents for a course."""
+    
+    if not course_config.contents:
+        return
+    
+    # Initialize position counter if not provided
+    if position_counter is None:
+        position_counter = [1.0]
+    
+    # Get API clients
+    content_client = get_crud_client(auth, CourseContentInterface)
+    content_type_client = get_crud_client(auth, CourseContentTypeInterface)
+    content_kind_client = get_crud_client(auth, CourseContentKindInterface)
+    example_client = get_crud_client(auth, ExampleInterface)
+    backend_client = get_crud_client(auth, ExecutionBackendInterface)
+    custom_client = get_custom_client(auth)
+    
+    for content_config in course_config.contents:
+        try:
+            # Build the full path
+            if parent_path:
+                full_path = f"{parent_path}.{content_config.path}"
+            else:
+                full_path = content_config.path
+            
+            # Find the content type
+            content_types = content_type_client.list(CourseContentTypeQuery(
+                course_id=course_id,
+                slug=content_config.content_type
+            ))
+            
+            if not content_types:
+                click.echo(f"    ⚠️  Content type not found: {content_config.content_type}")
+                continue
+            
+            content_type = content_types[0]
+            
+            # Check if content already exists
+            existing_contents = content_client.list(CourseContentQuery(
+                course_id=course_id,
+                path=full_path
+            ))
+            
+            if existing_contents:
+                content = existing_contents[0]
+                click.echo(f"    ℹ️  Content already exists: {content.title} ({full_path})")
+            else:
+                # Determine position
+                position = content_config.position if content_config.position is not None else position_counter[0]
+                position_counter[0] += 1.0
+                
+                # Determine execution backend ID
+                execution_backend_id = None
+                if content_config.execution_backend:
+                    backends = backend_client.list(ExecutionBackendQuery(slug=content_config.execution_backend))
+                    if backends:
+                        execution_backend_id = str(backends[0].id)
+                
+                # Create the content
+                content_create = CourseContentCreate(
+                    title=content_config.title,
+                    description=content_config.description,
+                    path=full_path,
+                    course_id=course_id,
+                    course_content_type_id=str(content_type.id),
+                    position=position,
+                    max_group_size=content_config.max_group_size,
+                    max_test_runs=content_config.max_test_runs,
+                    max_submissions=content_config.max_submissions,
+                    execution_backend_id=execution_backend_id,
+                    properties=content_config.properties
+                )
+                
+                content = content_client.create(content_create)
+                click.echo(f"    ✅ Created content: {content_config.title} ({full_path})")
+            
+            # Check if the content type is submittable by looking up its kind
+            is_submittable = False
+            if content_type.course_content_kind_id:
+                content_kinds = content_kind_client.list(CourseContentKindQuery(
+                    id=content_type.course_content_kind_id
+                ))
+                if content_kinds and len(content_kinds) > 0:
+                    is_submittable = content_kinds[0].submittable
+            
+            # Handle example deployment for submittable content
+            if is_submittable and content_config.example_identifier:
+                # Find the example
+                examples = example_client.list(ExampleQuery(
+                    identifier=content_config.example_identifier
+                ))
+                
+                if not examples:
+                    click.echo(f"      ⚠️  Example not found: {content_config.example_identifier}")
+                else:
+                    example = examples[0]
+                    
+                    # Find the version using the API
+                    version_tag = content_config.example_version_tag or "latest"
+                    
+                    # Get all versions for this example through the API
+                    try:
+                        versions_response = custom_client.get(f"examples/{example.id}/versions")
+                        all_versions = versions_response if isinstance(versions_response, list) else []
+                    except Exception:
+                        all_versions = []
+                    
+                    # Find the matching version
+                    version = None
+                    if version_tag == "latest" and all_versions:
+                        # Get the latest version (should already be sorted by version_number desc)
+                        version = all_versions[0]
+                    else:
+                        # Look for specific version tag
+                        for v in all_versions:
+                            if v.get('version_tag') == version_tag:
+                                version = v
+                                break
+                    
+                    if version:
+                        # Check if deployment already exists using the course-contents API
+                        try:
+                            deployment_info = custom_client.get(f"course-contents/deployment/{content.id}")
+                            has_deployment = deployment_info and deployment_info.get('deployment_status') not in [None, 'unassigned']
+                        except Exception:
+                            has_deployment = False
+                        
+                        if has_deployment:
+                            click.echo(f"      ℹ️  Deployment already exists for example: {content_config.example_identifier}")
+                        else:
+                            # Assign example using the course-contents API
+                            try:
+                                assign_payload = {
+                                    "example_version_id": str(version['id'])
+                                }
+                                custom_client.create(f"course-contents/{content.id}/assign-example", assign_payload)
+                                click.echo(f"      ✅ Assigned example: {content_config.example_identifier} ({version_tag})")
+                            except Exception as e:
+                                click.echo(f"      ⚠️  Failed to assign example: {e}")
+                    else:
+                        click.echo(f"      ⚠️  Example version not found: {content_config.example_identifier} ({version_tag})")
+            
+            # Recursively deploy nested contents
+            if content_config.contents:
+                # Create a temporary course config with just the nested contents
+                nested_config = type('obj', (object,), {'contents': content_config.contents})()
+                _deploy_course_contents(course_id, nested_config, auth, full_path, position_counter)
+                
+        except Exception as e:
+            click.echo(f"    ❌ Failed to create content {content_config.title}: {e}")
+
+
+def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
+    """Generate GitLab student template repositories for courses with contents."""
+    
+    click.echo(f"\n🚀 Generating student template repositories...")
+    
+    # Get API clients
+    org_client = get_crud_client(auth, OrganizationInterface)
+    family_client = get_crud_client(auth, CourseFamilyInterface)
+    course_client = get_crud_client(auth, CourseInterface)
+    custom_client = get_custom_client(auth)
+    
+    generated_count = 0
+    failed_count = 0
+    
+    # Process each organization
+    for org_config in config.organizations:
+        # Find the organization
+        orgs = org_client.list(OrganizationQuery(path=org_config.path))
+        if not orgs:
+            continue
+        org = orgs[0]
+        
+        # Process each course family
+        for family_config in org_config.course_families:
+            # Find the course family
+            families = family_client.list(CourseFamilyQuery(
+                organization_id=str(org.id),
+                path=family_config.path
+            ))
+            if not families:
+                continue
+            family = families[0]
+            
+            # Process each course
+            for course_config in family_config.courses:
+                # Only process courses that have contents defined
+                if not course_config.contents:
+                    continue
+                    
+                # Find the course
+                courses = course_client.list(CourseQuery(
+                    course_family_id=str(family.id),
+                    path=course_config.path
+                ))
+                if not courses:
+                    continue
+                course = courses[0]
+                
+                # Generate student template for this course
+                try:
+                    click.echo(f"  Generating template for: {course_config.name} ({course_config.path})")
+                    result = custom_client.create(f"system/courses/{course.id}/generate-student-template", {})
+                    
+                    if result and result.get('workflow_id'):
+                        click.echo(f"    ✅ Template generation started (workflow: {result.get('workflow_id')})")
+                        generated_count += 1
+                    else:
+                        click.echo(f"    ⚠️  Template generation response unclear")
+                        failed_count += 1
+                except Exception as e:
+                    click.echo(f"    ❌ Failed to generate template: {e}")
+                    failed_count += 1
+    
+    # Summary
+    if generated_count > 0 or failed_count > 0:
+        click.echo(f"\n📊 Student Template Generation Summary:")
+        click.echo(f"  ✅ Successfully initiated: {generated_count} templates")
+        if failed_count > 0:
+            click.echo(f"  ❌ Failed: {failed_count} templates")
+
+
+def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: CLIAuthConfig, generate_student_template: bool = False):
+    """Link execution backends to all deployed courses and create course contents."""
     
     click.echo(f"\n🔗 Linking execution backends to courses...")
     
@@ -454,9 +685,6 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
             
             # Process each course
             for course_config in family_config.courses:
-                if not course_config.execution_backends:
-                    continue
-                
                 # Find the course
                 courses = course_client.list(CourseQuery(
                     course_family_id=str(family.id),
@@ -470,11 +698,21 @@ def _link_backends_to_deployed_courses(config: ComputorDeploymentConfig, auth: C
                 click.echo(f"  Course: {course_config.name} ({course_config.path})")
                 
                 # Link execution backends to this course
-                _link_execution_backends_to_course(
-                    str(course.id),
-                    course_config.execution_backends,
-                    auth
-                )
+                if course_config.execution_backends:
+                    _link_execution_backends_to_course(
+                        str(course.id),
+                        course_config.execution_backends,
+                        auth
+                    )
+                
+                # Deploy course contents
+                if course_config.contents:
+                    click.echo(f"\n📚 Creating course contents for {course_config.name}...")
+                    _deploy_course_contents(str(course.id), course_config, auth)
+    
+    # Generate student templates if requested
+    if generate_student_template:
+        _generate_student_templates(config, auth)
 
 
 def _link_execution_backends_to_course(course_id: str, execution_backends: list, auth: CLIAuthConfig):
@@ -741,8 +979,14 @@ def _upload_examples_from_directory(examples_dir: Path, repo_name: str, auth: CL
     default=True,
     help='Wait for deployment to complete'
 )
+@click.option(
+    '--generate-student-template',
+    is_flag=True,
+    default=False,
+    help='Generate GitLab student template repositories after creating course contents'
+)
 @authenticate
-def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
+def apply(config_file: str, dry_run: bool, wait: bool, generate_student_template: bool, auth: CLIAuthConfig):
     """
     Apply a deployment configuration to create the hierarchy.
     
@@ -874,8 +1118,8 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                         if status_data.get('status') == 'completed':
                             click.echo("\n✅ Deployment completed successfully!")
                             
-                            # Link execution backends to courses
-                            _link_backends_to_deployed_courses(config, auth)
+                            # Link execution backends to courses and create contents
+                            _link_backends_to_deployed_courses(config, auth, generate_student_template)
                             
                             # Deploy users if configured
                             if config.users:
@@ -892,10 +1136,15 @@ def apply(config_file: str, dry_run: bool, wait: bool, auth: CLIAuthConfig):
                 else:
                     click.echo("\n⚠️  Deployment is still running. Check status later.")
             
-            # If not waiting but deployment started, try to deploy users anyway
-            if not wait and config.users:
-                click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
-                _deploy_users(config, auth)
+            # If not waiting but deployment started, try to continue with remaining tasks
+            if not wait:
+                click.echo(f"\n⚠️  Continuing without waiting for hierarchy deployment...")
+                # Try to link backends and create contents (might fail if hierarchy not ready)
+                _link_backends_to_deployed_courses(config, auth, generate_student_template)
+                
+                if config.users:
+                    click.echo(f"\n📥 Creating {len(config.users)} users (hierarchy might still be deploying)...")
+                    _deploy_users(config, auth)
         else:
             click.echo("❌ Failed to start deployment", err=True)
             sys.exit(1)

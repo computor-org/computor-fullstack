@@ -54,6 +54,8 @@ from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.examples import examples_router
+from ctutor_backend.api.course_member_comments import router as course_member_comments_router
+from ctutor_backend.api.messages_api import messages_router
 from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
 import json
 import tempfile
@@ -311,6 +313,20 @@ app.include_router(
     examples_router,
     tags=["examples"],
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
+)
+
+app.include_router(
+    course_member_comments_router,
+    prefix="/course-member-comments",
+    tags=["course member comments"],
+    dependencies=[Depends(get_current_permissions)]
+)
+
+app.include_router(
+    messages_router,
+    prefix="/messages",
+    tags=["messages"],
+    dependencies=[Depends(get_current_permissions)]
 )
 
 

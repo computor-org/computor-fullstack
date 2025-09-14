@@ -10,6 +10,7 @@ from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.exceptions import ForbiddenException
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseMember, CourseContentType
+from ctutor_backend.model.message import Message
 
 
 class UserPermissionHandler(PermissionHandler):
@@ -622,3 +623,99 @@ class ReadOnlyPermissionHandler(PermissionHandler):
             return db.query(self.entity)
         
         raise ForbiddenException(detail={"entity": self.resource_name})
+
+
+class MessagePermissionHandler(PermissionHandler):
+    """Permission handler for Message entity with multi-context visibility.
+
+    Visibility rules:
+    - Authors (author_id) can see/update/delete their own messages.
+    - Direct user messages: user_id == principal.user_id.
+    - Course member messages: visible to that course member's user and tutors/lecturers of the course.
+    - Submission group messages: visible to group members and tutors/lecturers of the course.
+    - Course group messages: visible to members of the course (students in that group) and tutors/lecturers of the course.
+    """
+
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
+        if self.check_admin(principal):
+            return True
+
+        # Create: allow if user participates in the context or is tutor+ of course context.
+        if action == "create":
+            return True  # validated in filtered query on create_db
+
+        # Update/Delete: author only (non-admin)
+        if action in ["update", "delete"]:
+            return True  # enforced in build_query by restricting to author
+
+        # Get/List: allowed; filtered in query
+        if action in ["get", "list"]:
+            return True
+
+        return False
+
+    def build_query(self, principal: Principal, action: str, db: Session) -> Query:
+        from sqlalchemy import or_, and_
+        from ctutor_backend.permissions.query_builders import CoursePermissionQueryBuilder
+        from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseGroup, CourseMember
+
+        base = db.query(self.entity)
+
+        if self.check_admin(principal):
+            return base
+
+        # Author can always access their own messages
+        filters = [self.entity.author_id == principal.user_id]
+
+        # Direct user messages
+        filters.append(self.entity.user_id == principal.user_id)
+
+        # Course member messages for principal's memberships
+        cm_ids_subq = db.query(CourseMember.id).filter(CourseMember.user_id == principal.user_id)
+        filters.append(self.entity.course_member_id.in_(cm_ids_subq))
+
+        # Submission group messages for groups principal belongs to
+        sgm_subq = (
+            db.query(CourseSubmissionGroupMember.course_submission_group_id)
+            .join(CourseMember, CourseMember.id == CourseSubmissionGroupMember.course_member_id)
+            .filter(CourseMember.user_id == principal.user_id)
+        )
+        filters.append(self.entity.course_submission_group_id.in_(sgm_subq))
+
+        # Course group messages (memberships via course_member.course_group_id)
+        cg_subq = (
+            db.query(CourseMember.course_group_id)
+            .filter(CourseMember.user_id == principal.user_id)
+        )
+        filters.append(self.entity.course_group_id.in_(cg_subq))
+
+        # Tutors/lecturers: include messages in courses where principal has required role
+        permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(principal.user_id, "_tutor", db)
+        if permitted_courses is not None:
+            # From course_member
+            filters.append(
+                self.entity.course_member_id.in_(
+                    db.query(CourseMember.id).filter(CourseMember.course_id.in_(permitted_courses))
+                )
+            )
+            # From submission group
+            from ctutor_backend.model.course import CourseSubmissionGroup
+            filters.append(
+                self.entity.course_submission_group_id.in_(
+                    db.query(CourseSubmissionGroup.id).filter(CourseSubmissionGroup.course_id.in_(permitted_courses))
+                )
+            )
+            # From course group
+            filters.append(
+                self.entity.course_group_id.in_(
+                    db.query(CourseGroup.id).filter(CourseGroup.course_id.in_(permitted_courses))
+                )
+            )
+
+        query = base.filter(or_(*filters))
+
+        # For update/delete, restrict to author only (non-admin)
+        if action in ["update", "delete"]:
+            query = query.filter(self.entity.author_id == principal.user_id)
+
+        return query

@@ -114,7 +114,6 @@ class Course(Base):
     course_execution_backends = relationship("CourseExecutionBackend", back_populates="course", uselist=True)
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
     course_submission_groups = relationship("CourseSubmissionGroup", back_populates="course", uselist=True)
-    messages = relationship("Message", back_populates="course", uselist=True)
 
 
 class CourseContentType(Base):
@@ -319,8 +318,7 @@ class CourseMember(Base):
                                    back_populates="course_member", uselist=True, lazy="select")
     submission_group_members = relationship('CourseSubmissionGroupMember', back_populates='course_member')
     results = relationship('Result', back_populates='course_member')
-    messages_sent = relationship('Message', back_populates='transmitter')
-    message_reads = relationship('MessageRead', back_populates='course_member')
+    # Messaging relationships moved to user-level author/reader in Message/MessageRead
     gradings_given = relationship('CourseSubmissionGroupGrading', back_populates='graded_by',
                                  foreign_keys='CourseSubmissionGroupGrading.graded_by_course_member_id')
 

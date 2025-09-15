@@ -444,15 +444,13 @@ def upgrade() -> None:
     sa.Column('max_test_runs', sa.Integer(), nullable=True),
     sa.Column('max_submissions', sa.Integer(), nullable=True),
     sa.Column('execution_backend_id', postgresql.UUID(), nullable=True),
-    sa.Column('example_id', postgresql.UUID(), nullable=True, comment='Link to Example Library'),
-    sa.Column('example_version', sa.String(length=64), nullable=True, comment='Specific version snapshot from Example'),
+    sa.Column('example_version_id', postgresql.UUID(), nullable=True, comment='Reference to specific ExampleVersion'),
     sa.ForeignKeyConstraint(['course_content_type_id'], ['course_content_type.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_id', 'course_content_type_id'], ['course_content_type.course_id', 'course_content_type.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_id'], ['course.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['execution_backend_id'], ['execution_backend.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['example_id'], ['example.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('course_content_path_key', 'course_content', ['course_id', 'path'], unique=True)
@@ -472,6 +470,16 @@ def upgrade() -> None:
     sa.UniqueConstraint('example_id', 'version_tag', name='unique_example_version_tag'),
     sa.UniqueConstraint('example_id', 'version_number', name='unique_example_version_number')
     )
+    # Add FK from course_content.example_version_id to example_version.id
+    op.create_foreign_key(
+        'course_content_example_version_id_fkey',
+        'course_content',
+        'example_version',
+        ['example_version_id'],
+        ['id'],
+        ondelete='SET NULL',
+        onupdate='RESTRICT'
+    )
     op.create_table('example_dependency',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('example_id', postgresql.UUID(), nullable=False, comment='Example that has the dependency'),
@@ -483,6 +491,55 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('example_id', 'depends_id', name='unique_example_dependency')
     )
+    # Deployment tracking tables
+    op.create_table('course_content_deployment',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('course_content_id', postgresql.UUID(), nullable=False, comment='The course content (assignment) this deployment is for'),
+    sa.Column('example_version_id', postgresql.UUID(), nullable=True, comment='The specific example version that is/was deployed'),
+    sa.Column('deployment_status', sa.String(length=32), server_default=sa.text("'pending'::text"), nullable=False, comment='Status: pending, deploying, deployed, failed, unassigned'),
+    sa.Column('deployment_message', sa.Text(), nullable=True, comment='Additional message about deployment (e.g., error details)'),
+    sa.Column('assigned_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False, comment='When the example was assigned to this content'),
+    sa.Column('deployed_at', sa.DateTime(timezone=True), nullable=True, comment='When the deployment was successfully completed'),
+    sa.Column('last_attempt_at', sa.DateTime(timezone=True), nullable=True, comment='When the last deployment attempt was made'),
+    sa.Column('deployment_path', sa.Text(), nullable=True, comment='Path in the student-template repository where deployed'),
+    sa.Column('deployment_metadata', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=True, comment='Additional deployment data (workflow IDs, file lists, etc.)'),
+    sa.Column('workflow_id', sa.String(length=255), nullable=True, comment='Current/last Temporal workflow ID for deployment'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True),
+    sa.Column('updated_by', postgresql.UUID(), nullable=True),
+    sa.ForeignKeyConstraint(['course_content_id'], ['course_content.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['example_version_id'], ['example_version.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('course_content_id', name='uq_deployment_per_content')
+    )
+    op.create_index('idx_deployment_status', 'course_content_deployment', ['deployment_status'], unique=False)
+    op.create_index('idx_deployment_deployed_at', 'course_content_deployment', ['deployed_at'], unique=False)
+    op.create_index('idx_deployment_example_version', 'course_content_deployment', ['example_version_id'], unique=False)
+
+    op.create_table('deployment_history',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('deployment_id', postgresql.UUID(), nullable=False, comment='The deployment this history entry belongs to'),
+    sa.Column('action', sa.String(length=32), nullable=False, comment='Action type: assigned, reassigned, deployed, failed, unassigned, updated'),
+    sa.Column('action_details', sa.Text(), nullable=True, comment='Detailed description of the action'),
+    sa.Column('example_version_id', postgresql.UUID(), nullable=True, comment='The example version involved in this action'),
+    sa.Column('previous_example_version_id', postgresql.UUID(), nullable=True, comment='Previous example version (for reassignments)'),
+    sa.Column('meta', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), nullable=True, comment='Additional metadata about the action'),
+    sa.Column('workflow_id', sa.String(length=255), nullable=True, comment='Temporal workflow ID if action was triggered by workflow'),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True),
+    sa.ForeignKeyConstraint(['deployment_id'], ['course_content_deployment.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['example_version_id'], ['example_version.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['previous_example_version_id'], ['example_version.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_history_deployment_id', 'deployment_history', ['deployment_id'], unique=False)
+    op.create_index('idx_history_action', 'deployment_history', ['action'], unique=False)
+    op.create_index('idx_history_created_at', 'deployment_history', ['created_at'], unique=False)
+    op.create_index('idx_history_workflow_id', 'deployment_history', ['workflow_id'], unique=False)
     op.create_table('course_member',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -761,7 +818,7 @@ def upgrade() -> None:
             is_submittable boolean;
         BEGIN
             -- Skip if no example is set
-            IF NEW.example_id IS NULL THEN
+            IF NEW.example_version_id IS NULL THEN
                 RETURN NEW;
             END IF;
             
@@ -780,7 +837,7 @@ def upgrade() -> None:
         $$ LANGUAGE plpgsql;
         
         CREATE TRIGGER trg_validate_course_content_example
-        BEFORE INSERT OR UPDATE OF example_id ON course_content
+        BEFORE INSERT OR UPDATE OF example_version_id ON course_content
         FOR EACH ROW
         EXECUTE FUNCTION validate_course_content_example_submittable();
     """)
@@ -896,6 +953,17 @@ def downgrade() -> None:
     """)
     
     # ### commands auto generated by Alembic - please adjust! ###
+    # Drop deployment tracking tables
+    op.drop_index('idx_history_workflow_id', table_name='deployment_history')
+    op.drop_index('idx_history_created_at', table_name='deployment_history')
+    op.drop_index('idx_history_action', table_name='deployment_history')
+    op.drop_index('idx_history_deployment_id', table_name='deployment_history')
+    op.drop_table('deployment_history')
+    op.drop_index('idx_deployment_example_version', table_name='course_content_deployment')
+    op.drop_index('idx_deployment_deployed_at', table_name='course_content_deployment')
+    op.drop_index('idx_deployment_status', table_name='course_content_deployment')
+    op.drop_table('course_content_deployment')
+
     op.drop_index('result_version_identifier_member_content_partial_key', table_name='result')
     op.drop_index('result_version_identifier_group_content_partial_key', table_name='result')
     op.drop_index('idx_grading_result', table_name='course_submission_group_grading')

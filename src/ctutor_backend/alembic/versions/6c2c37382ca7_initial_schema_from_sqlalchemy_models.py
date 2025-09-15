@@ -506,31 +506,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index('course_member_key', 'course_member', ['user_id', 'course_id'], unique=True)
-    op.create_table('codeability_message',
-    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
-    sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('created_by', postgresql.UUID(), nullable=True),
-    sa.Column('updated_by', postgresql.UUID(), nullable=True),
-    sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('archived_at', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('course_id', postgresql.UUID(), nullable=False),
-    sa.Column('transmitter_course_member_id', postgresql.UUID(), nullable=False),
-    sa.Column('parent_id', postgresql.UUID(), nullable=True),
-    sa.Column('level', sa.Integer(), nullable=False),
-    sa.Column('title', sa.String(length=255), nullable=False),
-    sa.Column('content', sa.String(length=16384), nullable=False),
-    sa.ForeignKeyConstraint(['course_id'], ['course.id'], onupdate='RESTRICT', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
-    sa.ForeignKeyConstraint(['parent_id'], ['codeability_message.id'], onupdate='RESTRICT', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['transmitter_course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='CASCADE'),
-    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('msg_course_archived_idx', 'codeability_message', ['course_id', 'archived_at'], unique=False)
-    op.create_index('msg_parent_archived_idx', 'codeability_message', ['parent_id', 'archived_at'], unique=False)
-    op.create_index('msg_transmitter_archived_idx', 'codeability_message', ['transmitter_course_member_id', 'archived_at'], unique=False)
+    # message table moved below (after course_submission_group creation) to satisfy FKs
     op.create_table('course_member_comment',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -557,8 +533,6 @@ def upgrade() -> None:
     sa.Column('created_by', postgresql.UUID(), nullable=True),
     sa.Column('updated_by', postgresql.UUID(), nullable=True),
     sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('status', sa.String(length=2048), nullable=True),
-    sa.Column('grading', sa.Float(precision=53), nullable=True),
     sa.Column('max_group_size', sa.Integer(), nullable=False),
     sa.Column('max_test_runs', sa.Integer(), nullable=True),
     sa.Column('max_submissions', sa.Integer(), nullable=True),
@@ -570,7 +544,8 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('codeability_message_read',
+    # Create messages now that dependent tables exist
+    op.create_table('message',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -578,15 +553,50 @@ def upgrade() -> None:
     sa.Column('created_by', postgresql.UUID(), nullable=True),
     sa.Column('updated_by', postgresql.UUID(), nullable=True),
     sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('codeability_message_id', postgresql.UUID(), nullable=False),
-    sa.Column('course_member_id', postgresql.UUID(), nullable=False),
-    sa.ForeignKeyConstraint(['codeability_message_id'], ['codeability_message.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.Column('archived_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('author_id', postgresql.UUID(), nullable=False),
+    sa.Column('parent_id', postgresql.UUID(), nullable=True),
+    sa.Column('level', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=False),
+    sa.Column('content', sa.String(length=16384), nullable=False),
+    sa.Column('user_id', postgresql.UUID(), nullable=True),
+    sa.Column('course_member_id', postgresql.UUID(), nullable=True),
+    sa.Column('course_submission_group_id', postgresql.UUID(), nullable=True),
+    sa.Column('course_group_id', postgresql.UUID(), nullable=True),
+    sa.ForeignKeyConstraint(['author_id'], ['user.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['parent_id'], ['message.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['course_group_id'], ['course_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('msg_parent_archived_idx', 'message', ['parent_id', 'archived_at'], unique=False)
+    op.create_index('msg_author_archived_idx', 'message', ['author_id', 'archived_at'], unique=False)
+    op.create_index('msg_user_archived_idx', 'message', ['user_id', 'archived_at'], unique=False)
+    op.create_index('msg_course_member_archived_idx', 'message', ['course_member_id', 'archived_at'], unique=False)
+    op.create_index('msg_submission_group_archived_idx', 'message', ['course_submission_group_id', 'archived_at'], unique=False)
+    op.create_index('msg_course_group_archived_idx', 'message', ['course_group_id', 'archived_at'], unique=False)
+
+    op.create_table('message_read',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True),
+    sa.Column('updated_by', postgresql.UUID(), nullable=True),
+    sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('message_id', postgresql.UUID(), nullable=False),
+    sa.Column('reader_user_id', postgresql.UUID(), nullable=False),
+    sa.ForeignKeyConstraint(['message_id'], ['message.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['reader_user_id'], ['user.id'], onupdate='RESTRICT', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('msg_read_unique_idx', 'codeability_message_read', ['codeability_message_id', 'course_member_id'], unique=True)
+    op.create_index('msg_read_unique_idx', 'message_read', ['message_id', 'reader_user_id'], unique=True)
     op.create_table('course_submission_group_member',
     sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
     sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
@@ -595,12 +605,11 @@ def upgrade() -> None:
     sa.Column('created_by', postgresql.UUID(), nullable=True),
     sa.Column('updated_by', postgresql.UUID(), nullable=True),
     sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('grading', sa.Float(precision=53), nullable=True),
     sa.Column('course_id', postgresql.UUID(), nullable=False),
     sa.Column('course_submission_group_id', postgresql.UUID(), nullable=False),
     sa.Column('course_member_id', postgresql.UUID(), nullable=False),
-    sa.Column('course_content_id', postgresql.UUID(), nullable=False),
-    sa.ForeignKeyConstraint(['course_content_id'], ['course_content.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
+    # removed: course_content_id (redundant, group ties to content via group table)
+    # removed FK to course_content
     sa.ForeignKeyConstraint(['course_id'], ['course.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
@@ -608,7 +617,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index('course_submission_group_course_content_key', 'course_submission_group_member', ['course_member_id', 'course_content_id'], unique=True)
+    # removed unique index including course_content_id
     op.create_index('course_submission_group_member_key', 'course_submission_group_member', ['course_submission_group_id', 'course_member_id'], unique=True)
     op.create_index(op.f('ix_course_submission_group_member_course_id'), 'course_submission_group_member', ['course_id'], unique=False)
     op.create_table('result',
@@ -643,8 +652,46 @@ def upgrade() -> None:
     op.create_index(op.f('ix_result_course_member_id'), 'result', ['course_member_id'], unique=False)
     op.create_index(op.f('ix_result_course_submission_group_id'), 'result', ['course_submission_group_id'], unique=False)
     op.create_index('result_commit_test_system_key', 'result', ['test_system_id', 'execution_backend_id'], unique=True)
-    op.create_index('result_version_identifier_group_key', 'result', ['course_submission_group_id', 'version_identifier'], unique=True)
-    op.create_index('result_version_identifier_member_key', 'result', ['course_member_id', 'version_identifier'], unique=True)
+    op.create_index(
+        'result_version_identifier_member_content_partial_key',
+        'result',
+        ['course_member_id', 'version_identifier', 'course_content_id'],
+        unique=True,
+        postgresql_where=sa.text('status NOT IN (1, 2, 6)')
+    )
+    op.create_index(
+        'result_version_identifier_group_content_partial_key',
+        'result',
+        ['course_submission_group_id', 'version_identifier', 'course_content_id'],
+        unique=True,
+        postgresql_where=sa.text('status NOT IN (1, 2, 6)')
+    )
+
+    # Grading table for submission groups
+    op.create_table('course_submission_group_grading',
+    sa.Column('id', postgresql.UUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False),
+    sa.Column('version', sa.BigInteger(), server_default=sa.text('0'), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', postgresql.UUID(), nullable=True),
+    sa.Column('updated_by', postgresql.UUID(), nullable=True),
+    sa.Column('properties', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('course_submission_group_id', postgresql.UUID(), nullable=False),
+    sa.Column('graded_by_course_member_id', postgresql.UUID(), nullable=False),
+    sa.Column('result_id', postgresql.UUID(), nullable=True),
+    sa.Column('grading', sa.Float(precision=53), nullable=False),
+    sa.Column('status', sa.Integer(), server_default=sa.text('0'), nullable=False),
+    sa.Column('feedback', sa.String(length=4096), nullable=True),
+    sa.ForeignKeyConstraint(['course_submission_group_id'], ['course_submission_group.id'], onupdate='RESTRICT', ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['graded_by_course_member_id'], ['course_member.id'], onupdate='RESTRICT', ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['result_id'], ['result.id'], onupdate='RESTRICT', ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['created_by'], ['user.id'], ondelete='SET NULL'),
+    sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('idx_grading_submission_group', 'course_submission_group_grading', ['course_submission_group_id'], unique=False)
+    op.create_index('idx_grading_graded_by', 'course_submission_group_grading', ['graded_by_course_member_id'], unique=False)
+    op.create_index('idx_grading_result', 'course_submission_group_grading', ['result_id'], unique=False)
     # ### end Alembic commands ###
     
     # Create functions and triggers for CourseContent tree validation
@@ -849,8 +896,12 @@ def downgrade() -> None:
     """)
     
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index('result_version_identifier_member_key', table_name='result')
-    op.drop_index('result_version_identifier_group_key', table_name='result')
+    op.drop_index('result_version_identifier_member_content_partial_key', table_name='result')
+    op.drop_index('result_version_identifier_group_content_partial_key', table_name='result')
+    op.drop_index('idx_grading_result', table_name='course_submission_group_grading')
+    op.drop_index('idx_grading_graded_by', table_name='course_submission_group_grading')
+    op.drop_index('idx_grading_submission_group', table_name='course_submission_group_grading')
+    op.drop_table('course_submission_group_grading')
     op.drop_index('result_commit_test_system_key', table_name='result')
     op.drop_index(op.f('ix_result_course_submission_group_id'), table_name='result')
     op.drop_index(op.f('ix_result_course_member_id'), table_name='result')
@@ -858,18 +909,20 @@ def downgrade() -> None:
     op.drop_table('result')
     op.drop_index(op.f('ix_course_submission_group_member_course_id'), table_name='course_submission_group_member')
     op.drop_index('course_submission_group_member_key', table_name='course_submission_group_member')
-    op.drop_index('course_submission_group_course_content_key', table_name='course_submission_group_member')
     op.drop_table('course_submission_group_member')
-    op.drop_index('msg_read_unique_idx', table_name='codeability_message_read')
-    op.drop_table('codeability_message_read')
+    op.drop_index('msg_read_unique_idx', table_name='message_read')
+    op.drop_table('message_read')
     op.drop_table('course_submission_group')
     op.drop_index(op.f('ix_course_member_comment_transmitter_id'), table_name='course_member_comment')
     op.drop_index(op.f('ix_course_member_comment_course_member_id'), table_name='course_member_comment')
     op.drop_table('course_member_comment')
-    op.drop_index('msg_transmitter_archived_idx', table_name='codeability_message')
-    op.drop_index('msg_parent_archived_idx', table_name='codeability_message')
-    op.drop_index('msg_course_archived_idx', table_name='codeability_message')
-    op.drop_table('codeability_message')
+    op.drop_index('msg_course_group_archived_idx', table_name='message')
+    op.drop_index('msg_submission_group_archived_idx', table_name='message')
+    op.drop_index('msg_course_member_archived_idx', table_name='message')
+    op.drop_index('msg_user_archived_idx', table_name='message')
+    op.drop_index('msg_author_archived_idx', table_name='message')
+    op.drop_index('msg_parent_archived_idx', table_name='message')
+    op.drop_table('message')
     op.drop_index('course_member_key', table_name='course_member')
     op.drop_table('course_member')
     op.drop_table('example_dependency')

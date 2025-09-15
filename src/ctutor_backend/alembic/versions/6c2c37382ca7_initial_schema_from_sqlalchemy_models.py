@@ -235,7 +235,7 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', postgresql.UUID(), nullable=True, comment='User who created this example record'),
     sa.Column('updated_by', postgresql.UUID(), nullable=True, comment='User who last updated this example record'),
-    sa.CheckConstraint("directory ~ '^[a-zA-Z0-9_-]+$'", name='check_directory_format'),
+    sa.CheckConstraint("directory ~ '^[a-zA-Z0-9._-]+$'", name='check_directory_format'),
     sa.ForeignKeyConstraint(['created_by'], ['user.id'], ),
     sa.ForeignKeyConstraint(['example_repository_id'], ['example_repository.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['updated_by'], ['user.id'], ),

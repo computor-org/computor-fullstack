@@ -1,7 +1,7 @@
 from abc import ABC
 from datetime import datetime
 from typing import List, Optional, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 class ListQuery(BaseModel):
     skip: Optional[int] = 0
@@ -41,6 +41,9 @@ class EntityInterface(ABC):
 class BaseEntityList(BaseModel):
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Update timestamp")
+    
+    # Allow sandboxed datetime types in Temporal workflow sandbox
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 class BaseEntityGet(BaseEntityList):
     created_by: Optional[str] = None

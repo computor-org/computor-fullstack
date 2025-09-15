@@ -629,13 +629,40 @@ def _generate_student_templates(config: ComputorDeploymentConfig, auth: CLIAuthC
                     continue
                 course = courses[0]
                 
-                # Generate student template for this course
+                # First, generate assignments repository (initial populate from Example Library)
+                try:
+                    click.echo(f"  Initializing assignments repo for: {course_config.name} ({course_config.path})")
+                    custom_client.create(
+                        f"system/courses/{course.id}/generate-assignments",
+                        {
+                            "all": True,
+                            "overwrite_strategy": "skip_if_exists"
+                        }
+                    )
+                except Exception as e:
+                    click.echo(f"    ⚠️  Failed to initialize assignments: {e}")
+                
+                # Then, generate student template for this course
                 try:
                     click.echo(f"  Generating template for: {course_config.name} ({course_config.path})")
                     result = custom_client.create(f"system/courses/{course.id}/generate-student-template", {})
                     
                     if result and result.get('workflow_id'):
                         click.echo(f"    ✅ Template generation started (workflow: {result.get('workflow_id')})")
+                        # Wait for completion before proceeding to user repo creation
+                        workflow_id = result.get('workflow_id')
+                        import time
+                        for _ in range(120):  # up to 10 minutes, poll every 5s
+                            time.sleep(5)
+                            try:
+                                task_info = custom_client.get(f"tasks/{workflow_id}/status")
+                                status = (task_info or {}).get('status')
+                                if status in ['finished', 'failed', 'cancelled']:
+                                    click.echo(f"    ▶ Template generation status: {status}")
+                                    break
+                            except Exception:
+                                # Keep trying a bit
+                                continue
                         generated_count += 1
                     else:
                         click.echo(f"    ⚠️  Template generation response unclear")

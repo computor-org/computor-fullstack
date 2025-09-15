@@ -52,6 +52,13 @@ class CourseContentDeployment(Base):
         comment="The specific example version that is/was deployed"
     )
     
+    # Reference commit used for release from assignments repository
+    version_identifier = Column(
+        String(64),
+        nullable=True,
+        comment="Commit SHA in assignments repository used for this release"
+    )
+    
     # Deployment status tracking
     deployment_status = Column(
         String(32),

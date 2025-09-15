@@ -34,6 +34,9 @@ from . import temporal_student_template_v2
 # Import Temporal student repository tasks to auto-register
 from . import temporal_student_repository
 
+# Import Assignments repository tasks to auto-register
+from . import temporal_assignments_repository
+
 __all__ = [
     'TaskExecutor',
     'get_task_executor', 

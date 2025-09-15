@@ -20,6 +20,7 @@ class ResultCreate(BaseModel):
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
+    reference_version_identifier: Optional[str] = None
     status: TaskStatus
     
     model_config = ConfigDict(from_attributes=True)
@@ -37,6 +38,7 @@ class ResultGet(BaseEntityGet):
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
+    reference_version_identifier: Optional[str] = None
     status: TaskStatus
     # New: relationship to gradings
     grading_ids: Optional[List[str]] = []  # IDs of gradings that reference this result
@@ -54,6 +56,7 @@ class ResultList(BaseModel):
     test_system_id: str
     result: float
     version_identifier: str
+    reference_version_identifier: Optional[str] = None
     status: TaskStatus
 
     model_config = ConfigDict(from_attributes=True)
@@ -204,6 +207,7 @@ class ResultDetailed(BaseModel):
     result_json: Optional[dict | None] = None
     properties: Optional[dict | None] = None
     version_identifier: str
+    reference_version_identifier: Optional[str] = None
     status: TaskStatus
     
     # Grading information

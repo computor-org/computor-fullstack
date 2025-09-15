@@ -37,6 +37,8 @@ class Result(Base):
     result = Column(Float(53), nullable=False)
     result_json = Column(JSONB)
     version_identifier = Column(String(2048), nullable=False)
+    # Reference commit used for the assignment (from assignments repo)
+    reference_version_identifier = Column(String(64), nullable=True)
     status = Column(Integer, nullable=False)
 
     # Relationships

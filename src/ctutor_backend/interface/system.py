@@ -141,3 +141,20 @@ class BulkAssignExamplesRequest(BaseModel):
     assignments: List[Dict[str, str]] = Field(
         description="List of assignments with course_content_id, example_id, and example_version"
     )
+
+
+class GenerateAssignmentsRequest(BaseModel):
+    """Request to generate the assignments repository from Example Library."""
+    assignments_url: Optional[str] = Field(default=None)
+    course_content_ids: Optional[List[str]] = None
+    parent_id: Optional[str] = None
+    include_descendants: bool = True
+    all: bool = False
+    overwrite_strategy: str = Field(default="skip_if_exists", description="skip_if_exists|force_update")
+    commit_message: Optional[str] = None
+
+
+class GenerateAssignmentsResponse(BaseModel):
+    workflow_id: str
+    status: str = "started"
+    contents_to_process: int

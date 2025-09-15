@@ -276,10 +276,14 @@ async def create_test(
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path
         
-        # Use directory from example (retrieved from the query at position 5)
-        if not example:
-            raise BadRequestException(detail="No example associated with this assignment. Please ensure an example has been deployed.")
-        assignment_directory = example.directory
+        # Resolve deployment info (directory and reference commit)
+        deployment = db.query(CourseContentDeployment).filter(
+            CourseContentDeployment.course_content_id == assignment.id
+        ).first()
+        if not deployment or not deployment.deployment_path or not deployment.version_identifier:
+            raise BadRequestException(detail="Assignment not released: missing deployment path or version identifier")
+        assignment_directory = deployment.deployment_path
+        reference_commit = deployment.version_identifier
         
         token = decrypt_api_key(organization_properties.gitlab.token)
         
@@ -305,8 +309,8 @@ async def create_test(
             url=gitlab_path_reference,
             path=assignment_directory,
             token=token,
-            commit="main"
-        ) # TODO
+            commit=reference_commit
+        )
 
         job = TestJob(
             user_id=user_id,
@@ -337,7 +341,8 @@ async def create_test(
         result_json=None,
         properties=None,
         status=map_task_status_to_int(TaskStatus.QUEUED),  # Start as QUEUED
-        version_identifier=commit
+        version_identifier=commit,
+        reference_version_identifier=reference_commit
     )
 
     db.add(result_create)
@@ -393,5 +398,6 @@ async def create_test(
         result_json=result_create.result_json,
         properties=result_create.properties,
         status=result_create.status,
-        version_identifier=result_create.version_identifier
+        version_identifier=result_create.version_identifier,
+        reference_version_identifier=result_create.reference_version_identifier
     )

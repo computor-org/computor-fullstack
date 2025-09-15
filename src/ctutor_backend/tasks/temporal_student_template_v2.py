@@ -456,11 +456,12 @@ async def download_example_from_object_storage(
 # Activities
 @activity.defn(name="generate_student_template_activity_v2")
 async def generate_student_template_activity_v2(
-    course_id: str, 
+    course_id: str,
     student_template_url: str,
     assignments_url: str = None,
     workflow_id: str = None,
-    force_redeploy: bool = False
+    force_redeploy: bool = False,
+    release: Dict[str, Any] | None = None
 ) -> Dict[str, Any]:
     """
     Generate student template repository from examples assigned to course content.
@@ -516,15 +517,42 @@ async def generate_student_template_activity_v2(
             statuses_to_process = ["pending", "failed"]
             logger.info(f"Updating deployments to 'deploying' status for course {course_id}")
         
-        deployments_to_process = db.query(CourseContentDeployment).join(
-            CourseContent
-        ).filter(
-            and_(
-                CourseContent.course_id == course_id,
-                CourseContentDeployment.example_version_id.isnot(None),  # Has an assigned example
-                CourseContentDeployment.deployment_status.in_(statuses_to_process)  # Status filter based on force_redeploy
-            )
-        ).all()
+        # If a release selection is provided, restrict to selected contents; else fallback to status-based selection
+        selected_course_content_ids: List[str] = []
+        if release:
+            ids = release.get("course_content_ids") or []
+            if ids:
+                selected_course_content_ids = ids
+            elif release.get("parent_id"):
+                parent_id = release.get("parent_id")
+                include_desc = bool(release.get("include_descendants", True))
+                parent = db.query(CourseContent).filter(CourseContent.id == parent_id).first()
+                if parent:
+                    q = db.query(CourseContent).filter(CourseContent.course_id == course_id)
+                    if include_desc:
+                        q = q.filter(CourseContent.path.descendant_of(parent.path))
+                    else:
+                        q = q.filter(CourseContent.id == parent.id)
+                    selected_course_content_ids = [str(cc.id) for cc in q.all()]
+            elif release.get("all"):
+                selected_course_content_ids = [str(cc.id) for (cc,) in db.query(CourseContent.id).filter(CourseContent.course_id == course_id).all()]
+
+        if selected_course_content_ids:
+            deployments_to_process = db.query(CourseContentDeployment).join(CourseContent).filter(
+                and_(
+                    CourseContent.course_id == course_id,
+                    CourseContent.id.in_(selected_course_content_ids)
+                )
+            ).all()
+        else:
+            deployments_to_process = db.query(CourseContentDeployment).join(
+                CourseContent
+            ).filter(
+                and_(
+                    CourseContent.course_id == course_id,
+                    CourseContentDeployment.deployment_status.in_(statuses_to_process)
+                )
+            ).all()
         
         # Update all to 'deploying' and add history
         for deployment in deployments_to_process:
@@ -638,51 +666,77 @@ async def generate_student_template_activity_v2(
             template_repo.git.config('user.email', git_email)
             template_repo.git.config('user.name', git_name)
             
-            # Clean the repository to ensure only current content is present
-            # This removes old assignments that are no longer in the course
-            logger.info("Cleaning student template repository to sync with current course content")
-            
-            # Get list of all items in the repo (excluding .git)
-            repo_items = []
-            for item in os.listdir(template_repo_path):
-                if item != '.git' and item != '.gitignore':
-                    item_path = os.path.join(template_repo_path, item)
-                    repo_items.append((item, item_path))
-            
-            # Track how many items were cleaned for commit message
-            cleaned_items_count = len(repo_items)
-            
-            # Remove all existing content (except .git directory)
-            for item_name, item_path in repo_items:
-                if os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                    logger.debug(f"Removed directory: {item_name}")
+            # Clone assignments repository for reading released content
+            # Derive assignments_url if not provided
+            if not assignments_url:
+                course_props = course.properties or {}
+                course_gitlab = course_props.get('gitlab', {})
+                provider = (organization.properties or {}).get('gitlab', {}).get('url')
+                full_path_course = course_gitlab.get('full_path')
+                if provider and full_path_course:
+                    assignments_url = f"{provider}/{full_path_course}/assignments.git"
+            if not assignments_url:
+                raise ValueError("assignments_url is required or must be derivable from course properties")
+
+            # Transform localhost URL for Docker environment
+            assignments_url = transform_localhost_url(assignments_url)
+
+            # Prepare local path for assignments repo and authenticated URL
+            assignments_repo_path = os.path.join(temp_dir, 'assignments')
+            assignments_auth_url = assignments_url
+            if gitlab_token and 'http' in assignments_url:
+                from urllib.parse import urlparse, urlunparse
+                parsed = urlparse(assignments_url)
+                auth_netloc = f"oauth2:{gitlab_token}@{parsed.hostname}"
+                if parsed.port:
+                    auth_netloc += f":{parsed.port}"
+                assignments_auth_url = urlunparse((parsed.scheme, auth_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+
+            try:
+                if gitlab_token and 'http' in assignments_url:
+                    assignments_repo = git.Repo.clone_from(assignments_auth_url, assignments_repo_path)
                 else:
-                    os.remove(item_path)
-                    logger.debug(f"Removed file: {item_name}")
+                    assignments_repo = git.Repo.clone_from(assignments_url, assignments_repo_path)
+            except Exception as e:
+                logger.error(f"Failed to clone assignments repository: {e}")
+                # Mark all selected deployments as failed and record history
+                for deployment in deployments_to_process:
+                    if deployment.deployment_status == "deploying":
+                        deployment.deployment_status = "failed"
+                        deployment.deployment_message = f"Failed to clone assignments: {str(e)[:200]}"
+                        history = DeploymentHistory(
+                            deployment_id=deployment.id,
+                            action="failed",
+                            action_details="Failed to clone assignments repository",
+                            example_version_id=deployment.example_version_id
+                        )
+                        db.add(history)
+                db.commit()
+                return {"success": False, "error": f"Failed to clone assignments: {str(e)}"}
+
+            # Do not clean the whole repository; only update selected directories
             
-            if cleaned_items_count > 0:
-                logger.info(f"Cleaned {cleaned_items_count} items from student template repository")
+            # Determine course contents to deploy (selected or by status)
+            if selected_course_content_ids:
+                course_contents = db.query(CourseContent).options(
+                    joinedload(CourseContent.deployment)
+                        .joinedload(CourseContentDeployment.example_version)
+                        .joinedload(ExampleVersion.example)
+                ).filter(
+                    CourseContent.id.in_(selected_course_content_ids),
+                    CourseContent.archived_at.is_(None)
+                ).order_by(CourseContent.path).all()
+            else:
+                course_contents = db.query(CourseContent).options(
+                    joinedload(CourseContent.deployment)
+                        .joinedload(CourseContentDeployment.example_version)
+                        .joinedload(ExampleVersion.example)
+                ).filter(
+                    CourseContent.course_id == course_id,
+                    CourseContent.archived_at.is_(None)
+                ).order_by(CourseContent.path).all()
             
-            # Get ALL CourseContent with assigned examples (any deployment with an example_version)
-            # This ensures the repository contains ALL deployed examples, not just ones being updated
-            course_contents = db.query(CourseContent).options(
-                joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.versions),
-                joinedload(CourseContent.deployment).joinedload(CourseContentDeployment.example_version).joinedload(ExampleVersion.example).joinedload(Example.repository)
-            ).filter(
-                CourseContent.course_id == course_id,
-                CourseContent.id.in_(
-                    db.query(CourseContentDeployment.course_content_id)
-                    .filter(
-                        CourseContentDeployment.example_version_id.isnot(None)  # Has an assigned example
-                        # Note: We include ALL deployments with examples, regardless of status
-                        # This ensures the repository contains everything, not just newly deployed items
-                    )
-                ),
-                CourseContent.archived_at.is_(None)
-            ).order_by(CourseContent.path).all()
-            
-            logger.info(f"Found {len(course_contents)} course contents to deploy")
+            logger.info(f"Selected {len(course_contents)} course contents to deploy")
             
             if len(course_contents) == 0:
                 logger.warning(f"No course contents to deploy for course {course_id}. This will result in an empty student template.")
@@ -694,57 +748,109 @@ async def generate_student_template_activity_v2(
             
             for content in course_contents:
                 try:
-                    if not content.deployment or not content.deployment.example_version:
-                        logger.error(f"No deployment found for {content.path}")
-                        errors.append(f"No deployment found for {content.path}")
-                        continue
-                        
-                    example_version = content.deployment.example_version
-                    example = example_version.example
-                    
-                    logger.info(f"Processing {content.path} with example {example.id} version {example_version.version_tag}")
-                    
-                    if not example:
-                        logger.error(f"Example not found for deployment at {content.path}")
-                        errors.append(f"Example not found for {content.path}")
+                    if not content.deployment:
+                        # Skip non-assigned items (e.g., container units)
+                        logger.info(f"Skipping {content.path}: no deployment assigned")
                         continue
                     
-                    # Get the repository to determine bucket name
-                    repository = example.repository
-                    if not repository:
-                        logger.error(f"Repository not found for example {example.id}")
-                        errors.append(f"Repository not found for {content.path}")
-                        continue
-                    
-                    # Extract execution backend slug from meta_yaml and link to course_content
+                    # Ensure deployment path exists
+                    if not content.deployment.deployment_path:
+                        # Try to derive from assigned example identifier
+                        ev = content.deployment.example_version
+                        if ev and ev.example and ev.example.identifier:
+                            content.deployment.deployment_path = str(ev.example.identifier)
+                            logger.info(f"Derived deployment path for {content.path} -> {content.deployment.deployment_path}")
+                        else:
+                            logger.error(f"Deployment path not set for {content.path}")
+                            errors.append(f"Deployment path not set for {content.path}")
+                            continue
+
+                    # Resolve commit to use for this content
+                    overrides_list = []
+                    if release:
+                        try:
+                            raw_ovr = release.get('overrides')
+                            if isinstance(raw_ovr, list):
+                                overrides_list = raw_ovr
+                        except Exception:
+                            overrides_list = []
+                    commit_override_map = {}
+                    for ov in overrides_list:
+                        if not ov:
+                            continue
+                        cid = ov.get('course_content_id')
+                        vid = ov.get('version_identifier')
+                        if cid and vid:
+                            commit_override_map[str(cid)] = vid
+                    desired_commit = commit_override_map.get(str(content.id)) if release else None
+                    global_commit = release.get('global_commit') if release else None
+                    try:
+                        if desired_commit:
+                            commit_to_use = str(assignments_repo.commit(desired_commit).hexsha)
+                        elif global_commit:
+                            commit_to_use = str(assignments_repo.commit(global_commit).hexsha)
+                        else:
+                            commit_to_use = content.deployment.version_identifier
+                    except Exception as e:
+                        logger.warning(f"Failed to resolve commit for {content.path}: {e}")
+                        commit_to_use = None
+
+                    # Extract execution backend slug from meta.yaml (if needed) and link to course_content
                     if not content.execution_backend_id:
-                        backend_slug = example_version.get_execution_backend_slug()
-                        if backend_slug:
-                            # Find the execution backend by slug
-                            exec_backend = db.query(ExecutionBackend).filter(
-                                ExecutionBackend.slug == backend_slug
-                            ).first()
-                            
-                            if exec_backend:
-                                # Link the execution backend to the course content
-                                content.execution_backend_id = exec_backend.id
-                                logger.info(f"Linked execution backend '{backend_slug}' to course content {content.path}")
-                            else:
-                                logger.warning(f"Execution backend '{backend_slug}' not found in database for {content.path}")
-                    
-                    # Download example files based on repository source type
-                    files = await download_example_files(repository, example_version)
+                        try:
+                            commit_obj = assignments_repo.commit(commit_to_use)
+                            meta_blob = commit_obj.tree / content.deployment.deployment_path / 'meta.yaml'
+                            meta_yaml_bytes = meta_blob.data_stream.read()
+                            import yaml
+                            meta_data = yaml.safe_load(meta_yaml_bytes) if meta_yaml_bytes else None
+                            backend_slug = None
+                            if meta_data:
+                                props = (meta_data.get('properties') or {})
+                                eb = props.get('executionBackend') or {}
+                                backend_slug = eb.get('slug')
+                            if backend_slug:
+                                exec_backend = db.query(ExecutionBackend).filter(ExecutionBackend.slug == backend_slug).first()
+                                if exec_backend:
+                                    content.execution_backend_id = exec_backend.id
+                                    logger.info(f"Linked execution backend '{backend_slug}' to course content {content.path}")
+                        except Exception:
+                            pass
+
+                    # Build files map from assignments repo at the selected commit under deployment path
+                    files: Dict[str, bytes] = {}
+                    if commit_to_use:
+                        try:
+                            commit_obj = assignments_repo.commit(commit_to_use)
+                            sub_tree = commit_obj.tree / content.deployment.deployment_path
+                            for item in sub_tree.traverse():
+                                if item.type == 'blob':
+                                    rel_path = os.path.relpath(item.path, content.deployment.deployment_path)
+                                    files[rel_path] = item.data_stream.read()
+                        except Exception as e:
+                            logger.warning(f"Failed to load files from assignments for {content.path}: {e}")
+                            files = {}
                     
                     if not files:
-                        logger.error(f"No files downloaded for {content.path}")
-                        errors.append(f"No files downloaded for {content.path}")
+                        # Strict mode: fail when assignments does not provide files
+                        reason = "no files in assignments at commit" if commit_to_use else "no commit resolved"
+                        logger.error(f"Release failed for {content.path}: {reason}")
+                        content.deployment.deployment_status = "failed"
+                        content.deployment.deployment_message = f"Assignments {reason}"
+                        history = DeploymentHistory(
+                            deployment_id=content.deployment.id,
+                            action="failed",
+                            action_details=f"Assignments {reason}",
+                            example_version_id=content.deployment.example_version_id
+                        )
+                        db.add(history)
+                        errors.append(f"{str(content.path)}: {reason}")
                         continue
                     
                     logger.info(f"Downloaded {len(files)} files for {content.path}")
                     
                     # Determine target directory in student template
                     # Use the example identifier as directory name for better organization
-                    target_dir = str(example.identifier)
+                    target_dir = str(content.deployment.deployment_path)
                     full_target_path = os.path.join(template_repo_path, target_dir)
                     
                     # Process the example files for student template
@@ -754,7 +860,7 @@ async def generate_student_template_activity_v2(
                         example_files=files,
                         target_path=Path(full_target_path),
                         course_content=content,
-                        version=example_version
+                        version=None
                     )
                     
                     if not process_result.get("success"):
@@ -766,8 +872,10 @@ async def generate_student_template_activity_v2(
                     processed_count += 1
                     logger.info(f"Successfully processed {content.path}")
                     
-                    # Don't mark as deployed yet - wait until after successful git push
-                    # Just track that we processed it successfully
+                    # Update deployment version to the commit used for this content (only if from assignments)
+                    if commit_to_use:
+                        content.deployment.version_identifier = commit_to_use
+                    # Track that we processed it successfully
                     successfully_processed.append(content)
                     
                 except Exception as e:
@@ -862,10 +970,8 @@ async def generate_student_template_activity_v2(
                     
                     # Check if there are changes to commit
                     if template_repo.is_dirty() or template_repo.untracked_files:
-                        # Commit changes - message indicates full sync operation
-                        commit_message = f"Sync student template: Deploy {processed_count} examples from Example Library"
-                        if cleaned_items_count > 0:
-                            commit_message += f" (cleaned {cleaned_items_count} old items)"
+                        # Commit changes - selective release
+                        commit_message = f"Release {processed_count} assignments to student template"
                         template_repo.index.commit(commit_message)
                         logger.info(f"Committed changes: {commit_message}")
                         
@@ -925,22 +1031,8 @@ async def generate_student_template_activity_v2(
             # Now commit database changes
             db.commit()
             
-            # Generate assignments repository if URL provided
+            # Do not generate assignments repository automatically; managed manually by lecturers
             assignments_result = None
-            if assignments_url:
-                logger.info(f"Generating assignments repository at {assignments_url}")
-                assignments_result = await generate_assignments_repository(
-                    course_id=course_id,
-                    assignments_url=assignments_url,
-                    course_contents=course_contents,
-                    course=course,
-                    organization=organization,
-                    gitlab_token=gitlab_token,
-                    db=db
-                )
-                if not assignments_result.get("success", False):
-                    logger.warning(f"Failed to generate assignments repository: {assignments_result.get('error')}")
-                    errors.append(f"Assignments repository: {assignments_result.get('error')}")
             
             # Prepare result
             success = processed_count > 0 and len(errors) < len(course_contents)
@@ -1059,9 +1151,19 @@ class GenerateStudentTemplateWorkflowV2(BaseWorkflow):
         )
         
         try:
+            # Build release selection/options from params
+            release = params.get('release') or {
+                'course_content_ids': params.get('course_content_ids'),
+                'parent_id': params.get('parent_id'),
+                'include_descendants': params.get('include_descendants'),
+                'all': params.get('all'),
+                'global_commit': params.get('global_commit'),
+                'overrides': params.get('overrides'),
+            }
+
             result = await workflow.execute_activity(
                 generate_student_template_activity_v2,
-                args=[course_id, student_template_url, assignments_url, workflow_id, force_redeploy],
+                args=[course_id, student_template_url, assignments_url, workflow_id, force_redeploy, release],
                 start_to_close_timeout=timedelta(minutes=30),
                 retry_policy=retry_policy
             )

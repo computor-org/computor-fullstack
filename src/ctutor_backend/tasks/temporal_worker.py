@@ -48,6 +48,10 @@ from .temporal_student_template_v2 import (
     GenerateStudentTemplateWorkflowV2,
     generate_student_template_activity_v2
 )
+from .temporal_assignments_repository import (
+    GenerateAssignmentsRepositoryWorkflow,
+    generate_assignments_repository_activity
+)
 from .temporal_student_repository import (
     StudentRepositoryCreationWorkflow,
     create_student_repository,
@@ -91,6 +95,7 @@ class TemporalWorker:
             DeployComputorHierarchyWorkflow,
             # DeployExamplesToCourseWorkflow,  # Deprecated - removed
             GenerateStudentTemplateWorkflowV2,
+            GenerateAssignmentsRepositoryWorkflow,
             StudentRepositoryCreationWorkflow,  # Student repository forking
         ]
         
@@ -107,6 +112,7 @@ class TemporalWorker:
             create_course_activity,
             create_course_content_types_activity,
             generate_student_template_activity_v2,  # Student template generation
+            generate_assignments_repository_activity,  # Assignments init/populate
             create_student_repository,  # Fork student-template for individual student
             create_team_repository,  # Fork student-template for team
         ]

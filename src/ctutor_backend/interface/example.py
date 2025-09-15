@@ -153,6 +153,11 @@ class ExampleVersionList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ExampleVersionQuery(ListQuery):
+    """Query parameters for listing example versions (filtering)."""
+    version_tag: Optional[str] = None
+
+
 class ExampleDependencyCreate(BaseModel):
     """Create example dependency."""
     example_id: UUID

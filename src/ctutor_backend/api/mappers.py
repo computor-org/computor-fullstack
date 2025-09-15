@@ -53,8 +53,9 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
                 directory = example_version.example.directory
     
     # Fallback to properties if no example directory found
-    if not directory and course_content.properties:
-        directory = course_content.properties.get("gitlab", {}).get("directory")
+    # if not directory:
+    #     props = course_content.properties or {}
+    #     directory = props.get("gitlab", {}).get("directory")
 
     repository = None
     if course_submission_group != None and course_submission_group.properties != None:

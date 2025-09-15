@@ -251,8 +251,8 @@ class CourseFamilyConfig(BaseDeployment):
 
 class CourseContentConfig(BaseDeployment):
     """Configuration for course content (assignments, units, etc.)."""
-    title: str = Field(description="Title of the course content")
-    path: str = Field(description="Hierarchical path using dots (e.g., 'week1.assignment1')")
+    title: Optional[str] = Field(default=None, description="Title of the course content (defaults from example if submittable)")
+    path: Optional[str] = Field(default=None, description="Hierarchical path using dots (optional; generated when omitted)")
     description: Optional[str] = Field(None, description="Description of the content")
     content_type: str = Field(description="Slug of the course content type (must match a defined content_type)")
     position: Optional[float] = Field(None, description="Position for ordering (defaults to auto-increment)")

@@ -318,9 +318,13 @@ async def create_version(
     return db_version
 
 
+from ctutor_backend.interface.example import ExampleVersionQuery
+
+
 @examples_router.get("/{example_id}/versions", response_model=List[ExampleVersionList])
 async def list_versions(
     example_id: UUID,
+    params: ExampleVersionQuery = Depends(),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_permissions),
     redis_client=Depends(get_redis_client),
@@ -337,9 +341,10 @@ async def list_versions(
         return [ExampleVersionList.model_validate(v) for v in json.loads(cached_result)]
     
     # Get versions
-    versions = db.query(ExampleVersion).filter(
-        ExampleVersion.example_id == example_id
-    ).order_by(ExampleVersion.version_number.desc()).all()
+    query = db.query(ExampleVersion).filter(ExampleVersion.example_id == example_id)
+    if params and params.version_tag:
+        query = query.filter(ExampleVersion.version_tag == params.version_tag)
+    versions = query.order_by(ExampleVersion.version_number.desc()).all()
     
     # Cache result
     result = [ExampleVersionList.model_validate(v) for v in versions]

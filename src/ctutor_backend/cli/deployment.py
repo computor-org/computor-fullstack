@@ -448,11 +448,8 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
     
     for content_config in course_config.contents:
         try:
-            # Build the full path
-            if parent_path:
-                full_path = f"{parent_path}.{content_config.path}"
-            else:
-                full_path = content_config.path
+            # We may generate the full path later if not provided
+            full_path = None
             
             # Find the content type
             content_types = content_type_client.list(CourseContentTypeQuery(
@@ -466,6 +463,82 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             
             content_type = content_types[0]
             
+            # Determine if submittable by content kind (needed to fetch example metadata)
+            is_submittable = False
+            if content_type.course_content_kind_id:
+                content_kinds = content_kind_client.list(CourseContentKindQuery(
+                    id=content_type.course_content_kind_id
+                ))
+                if content_kinds and len(content_kinds) > 0:
+                    is_submittable = content_kinds[0].submittable
+            
+            # Prefetch example/version to derive defaults when missing
+            example = None
+            version = None
+            meta_title = None
+            meta_description = None
+            ex_title = None
+            if is_submittable and content_config.example_identifier:
+                try:
+                    examples = example_client.list(ExampleQuery(
+                        identifier=content_config.example_identifier
+                    ))
+                    if examples:
+                        example = examples[0]
+                        ex_title = getattr(example, 'title', None)
+                        version_tag = content_config.example_version_tag or "latest"
+                        try:
+                            if version_tag == "latest":
+                                all_versions = custom_client.list(f"examples/{example.id}/versions") or []
+                            else:
+                                all_versions = custom_client.list(
+                                    f"examples/{example.id}/versions",
+                                    params={"version_tag": version_tag}
+                                ) or []
+                        except Exception:
+                            all_versions = []
+                        if version_tag == "latest" and all_versions:
+                            version = all_versions[0]
+                        else:
+                            for v in all_versions:
+                                if v.get('version_tag') == version_tag:
+                                    version = v
+                                    break
+                        # Fetch full version details to access meta_yaml
+                        if version and not version.get('meta_yaml'):
+                            try:
+                                version = custom_client.get(f"examples/versions/{version['id']}") or version
+                            except Exception:
+                                pass
+                        if version and version.get('meta_yaml'):
+                            try:
+                                meta = yaml.safe_load(version.get('meta_yaml') or "") or {}
+                                meta_title = meta.get('title')
+                                meta_description = meta.get('description')
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+            # Decide path: prefer provided path, otherwise generate from title/meta/example id and ensure uniqueness
+            if content_config.path:
+                full_path = f"{parent_path}.{content_config.path}" if parent_path else content_config.path
+            else:
+                # Determine effective title now (may still be None)
+                eff_title_src = content_config.title or meta_title or ex_title or content_config.example_identifier or 'content'
+                import re
+                seg = re.sub(r"[^a-z0-9_]+", "", re.sub(r"[\s-]+", "_", (eff_title_src or 'content').lower().strip())) or 'content'
+                candidate = f"{parent_path}.{seg}" if parent_path else seg
+                idx = 1
+                while True:
+                    existing = content_client.list(CourseContentQuery(course_id=course_id, path=candidate))
+                    if not existing:
+                        full_path = candidate
+                        break
+                    idx += 1
+                    seg_try = f"{seg}_{idx}"
+                    candidate = f"{parent_path}.{seg_try}" if parent_path else seg_try
+
             # Check if content already exists
             existing_contents = content_client.list(CourseContentQuery(
                 course_id=course_id,
@@ -475,6 +548,19 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
             if existing_contents:
                 content = existing_contents[0]
                 click.echo(f"    ℹ️  Content already exists: {content.title} ({full_path})")
+                # Only update description if explicitly provided in deployment, otherwise if empty use meta_yaml.description
+                to_update = {}
+                if content_config.description is not None:
+                    if content_config.description != getattr(content, 'description', None):
+                        to_update['description'] = content_config.description
+                elif is_submittable and not getattr(content, 'description', None) and meta_description:
+                    to_update['description'] = meta_description
+                if to_update:
+                    try:
+                        content_client.update(str(content.id), to_update)
+                        click.echo(f"      ✏️  Updated content description")
+                    except Exception as e:
+                        click.echo(f"      ⚠️  Failed to update content description: {e}")
             else:
                 # Determine position
                 position = content_config.position if content_config.position is not None else position_counter[0]
@@ -487,10 +573,14 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     if backends:
                         execution_backend_id = str(backends[0].id)
                 
+                # Derive title/description defaults: description only from meta_yaml when not given
+                effective_title = content_config.title or meta_title or ex_title or full_path.split('.')[-1]
+                effective_description = content_config.description if content_config.description is not None else meta_description
+                
                 # Create the content
                 content_create = CourseContentCreate(
-                    title=content_config.title,
-                    description=content_config.description,
+                    title=effective_title,
+                    description=effective_description,
                     path=full_path,
                     course_id=course_id,
                     course_content_type_id=str(content_type.id),
@@ -503,73 +593,82 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 )
                 
                 content = content_client.create(content_create)
-                click.echo(f"    ✅ Created content: {content_config.title} ({full_path})")
-            
-            # Check if the content type is submittable by looking up its kind
-            is_submittable = False
-            if content_type.course_content_kind_id:
-                content_kinds = content_kind_client.list(CourseContentKindQuery(
-                    id=content_type.course_content_kind_id
-                ))
-                if content_kinds and len(content_kinds) > 0:
-                    is_submittable = content_kinds[0].submittable
+                click.echo(f"    ✅ Created content: {effective_title} ({full_path})")
             
             # Handle example deployment for submittable content
             if is_submittable and content_config.example_identifier:
-                # Find the example
-                examples = example_client.list(ExampleQuery(
-                    identifier=content_config.example_identifier
-                ))
-                
-                if not examples:
-                    click.echo(f"      ⚠️  Example not found: {content_config.example_identifier}")
-                else:
-                    example = examples[0]
-                    
-                    # Find the version using the API
-                    version_tag = content_config.example_version_tag or "latest"
-                    
-                    # Get all versions for this example through the API
+                if example and version:
+                    # Check if deployment already exists using the course-contents API
                     try:
-                        versions_response = custom_client.get(f"examples/{example.id}/versions")
-                        all_versions = versions_response if isinstance(versions_response, list) else []
+                        deployment_info = custom_client.get(f"course-contents/deployment/{content.id}")
+                        has_deployment = deployment_info and deployment_info.get('deployment_status') not in [None, 'unassigned']
                     except Exception:
-                        all_versions = []
+                        has_deployment = False
                     
-                    # Find the matching version
-                    version = None
-                    if version_tag == "latest" and all_versions:
-                        # Get the latest version (should already be sorted by version_number desc)
-                        version = all_versions[0]
+                    if has_deployment:
+                        click.echo(f"      ℹ️  Deployment already exists for example: {content_config.example_identifier}")
                     else:
-                        # Look for specific version tag
-                        for v in all_versions:
-                            if v.get('version_tag') == version_tag:
-                                version = v
-                                break
-                    
-                    if version:
-                        # Check if deployment already exists using the course-contents API
+                        # Assign example using the course-contents API
                         try:
-                            deployment_info = custom_client.get(f"course-contents/deployment/{content.id}")
-                            has_deployment = deployment_info and deployment_info.get('deployment_status') not in [None, 'unassigned']
-                        except Exception:
-                            has_deployment = False
-                        
-                        if has_deployment:
-                            click.echo(f"      ℹ️  Deployment already exists for example: {content_config.example_identifier}")
-                        else:
-                            # Assign example using the course-contents API
-                            try:
-                                assign_payload = {
-                                    "example_version_id": str(version['id'])
-                                }
-                                custom_client.create(f"course-contents/{content.id}/assign-example", assign_payload)
-                                click.echo(f"      ✅ Assigned example: {content_config.example_identifier} ({version_tag})")
-                            except Exception as e:
-                                click.echo(f"      ⚠️  Failed to assign example: {e}")
+                            assign_payload = {
+                                "example_version_id": str(version['id'])
+                            }
+                            custom_client.create(f"course-contents/{content.id}/assign-example", assign_payload)
+                            click.echo(f"      ✅ Assigned example: {content_config.example_identifier} ({version.get('version_tag')})")
+                            # Ensure deployment_path gets filled from example identifier by the release pipeline
+                        except Exception as e:
+                            click.echo(f"      ⚠️  Failed to assign example: {e}")
+                else:
+                    # Legacy fallback: look up again if prefetch failed
+                    examples = example_client.list(ExampleQuery(
+                        identifier=content_config.example_identifier
+                    ))
+                    if not examples:
+                        click.echo(f"      ⚠️  Example not found: {content_config.example_identifier}")
                     else:
-                        click.echo(f"      ⚠️  Example version not found: {content_config.example_identifier} ({version_tag})")
+                        example = examples[0]
+                        version_tag = content_config.example_version_tag or "latest"
+                        try:
+                            if version_tag == "latest":
+                                all_versions = custom_client.list(f"examples/{example.id}/versions") or []
+                            else:
+                                all_versions = custom_client.list(
+                                    f"examples/{example.id}/versions",
+                                    params={"version_tag": version_tag}
+                                ) or []
+                        except Exception:
+                            all_versions = []
+                        version = None
+                        if version_tag == "latest" and all_versions:
+                            version = all_versions[0]
+                        else:
+                            for v in all_versions:
+                                if v.get('version_tag') == version_tag:
+                                    version = v
+                                    break
+                        # Fetch full version details to access meta_yaml (if later needed)
+                        if version and not version.get('meta_yaml'):
+                            try:
+                                version = custom_client.get(f"examples/versions/{version['id']}") or version
+                            except Exception:
+                                pass
+                        if version:
+                            try:
+                                deployment_info = custom_client.get(f"course-contents/deployment/{content.id}")
+                                has_deployment = deployment_info and deployment_info.get('deployment_status') not in [None, 'unassigned']
+                            except Exception:
+                                has_deployment = False
+                            if has_deployment:
+                                click.echo(f"      ℹ️  Deployment already exists for example: {content_config.example_identifier}")
+                            else:
+                                try:
+                                    assign_payload = {"example_version_id": str(version['id'])}
+                                    custom_client.create(f"course-contents/{content.id}/assign-example", assign_payload)
+                                    click.echo(f"      ✅ Assigned example: {content_config.example_identifier} ({version_tag})")
+                                except Exception as e:
+                                    click.echo(f"      ⚠️  Failed to assign example: {e}")
+                        else:
+                            click.echo(f"      ⚠️  Example version not found: {content_config.example_identifier} ({version_tag})")
             
             # Recursively deploy nested contents
             if content_config.contents:

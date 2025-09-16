@@ -18,6 +18,8 @@ class MessageCreate(BaseModel):
     course_member_id: Optional[str] = None
     course_submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
+    course_content_id: Optional[str] = None
+    course_id: Optional[str] = None
 
 
 class MessageUpdate(BaseModel):
@@ -37,6 +39,8 @@ class MessageGet(BaseEntityGet):
     course_member_id: Optional[str] = None
     course_submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
+    course_content_id: Optional[str] = None
+    course_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -53,6 +57,8 @@ class MessageList(BaseEntityList):
     course_member_id: Optional[str] = None
     course_submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
+    course_content_id: Optional[str] = None
+    course_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,6 +71,8 @@ class MessageQuery(ListQuery):
     course_member_id: Optional[str] = None
     course_submission_group_id: Optional[str] = None
     course_group_id: Optional[str] = None
+    course_content_id: Optional[str] = None
+    course_id: Optional[str] = None
 
 
 def message_search(db: Session, query, params: Optional[MessageQuery]):
@@ -82,6 +90,26 @@ def message_search(db: Session, query, params: Optional[MessageQuery]):
         query = query.filter(Message.course_submission_group_id == params.course_submission_group_id)
     if params.course_group_id is not None:
         query = query.filter(Message.course_group_id == params.course_group_id)
+    if params.course_content_id is not None:
+        query = query.filter(Message.course_content_id == params.course_content_id)
+    if params.course_id is not None:
+        from ctutor_backend.model.course import CourseMember, CourseSubmissionGroup, CourseGroup, CourseContent
+        course_filters = []
+        course_filters.append(Message.course_id == params.course_id)
+        course_filters.append(Message.course_member_id.in_(
+            db.query(CourseMember.id).filter(CourseMember.course_id == params.course_id)
+        ))
+        course_filters.append(Message.course_submission_group_id.in_(
+            db.query(CourseSubmissionGroup.id).filter(CourseSubmissionGroup.course_id == params.course_id)
+        ))
+        course_filters.append(Message.course_group_id.in_(
+            db.query(CourseGroup.id).filter(CourseGroup.course_id == params.course_id)
+        ))
+        course_filters.append(Message.course_content_id.in_(
+            db.query(CourseContent.id).filter(CourseContent.course_id == params.course_id)
+        ))
+        from sqlalchemy import or_
+        query = query.filter(or_(*course_filters))
     return query
 
 

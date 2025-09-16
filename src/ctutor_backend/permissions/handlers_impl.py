@@ -657,7 +657,7 @@ class MessagePermissionHandler(PermissionHandler):
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
         from sqlalchemy import or_, and_
         from ctutor_backend.permissions.query_builders import CoursePermissionQueryBuilder
-        from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseGroup, CourseMember
+        from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseGroup, CourseMember, CourseSubmissionGroup, CourseContent
 
         base = db.query(self.entity)
 
@@ -689,6 +689,19 @@ class MessagePermissionHandler(PermissionHandler):
         )
         filters.append(self.entity.course_group_id.in_(cg_subq))
 
+        cc_subq = (
+            db.query(CourseContent.id)
+            .join(CourseMember, CourseMember.course_id == CourseContent.course_id)
+            .filter(CourseMember.user_id == principal.user_id)
+        )
+        filters.append(self.entity.course_content_id.in_(cc_subq))
+
+        course_ids_subq = (
+            db.query(CourseMember.course_id)
+            .filter(CourseMember.user_id == principal.user_id)
+        )
+        filters.append(self.entity.course_id.in_(course_ids_subq))
+
         # Tutors/lecturers: include messages in courses where principal has required role
         permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(principal.user_id, "_tutor", db)
         if permitted_courses is not None:
@@ -699,7 +712,6 @@ class MessagePermissionHandler(PermissionHandler):
                 )
             )
             # From submission group
-            from ctutor_backend.model.course import CourseSubmissionGroup
             filters.append(
                 self.entity.course_submission_group_id.in_(
                     db.query(CourseSubmissionGroup.id).filter(CourseSubmissionGroup.course_id.in_(permitted_courses))
@@ -710,6 +722,15 @@ class MessagePermissionHandler(PermissionHandler):
                 self.entity.course_group_id.in_(
                     db.query(CourseGroup.id).filter(CourseGroup.course_id.in_(permitted_courses))
                 )
+            )
+            # From course content
+            filters.append(
+                self.entity.course_content_id.in_(
+                    db.query(CourseContent.id).filter(CourseContent.course_id.in_(permitted_courses))
+                )
+            )
+            filters.append(
+                self.entity.course_id.in_(permitted_courses)
             )
 
         query = base.filter(or_(*filters))

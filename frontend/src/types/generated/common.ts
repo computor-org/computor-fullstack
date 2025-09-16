@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-05T13:28:29.867300
+ * Generated on: 2025-09-16T13:29:53.120295
 
  * Category: Common
 
@@ -90,6 +90,58 @@ export interface ProfileUpdate {
   url?: string | null;
   /** Additional properties */
   properties?: any | null;
+}
+
+export interface MessageCreate {
+  parent_id?: string | null;
+  level?: number;
+  title: string;
+  content: string;
+  user_id?: string | null;
+  course_member_id?: string | null;
+  course_submission_group_id?: string | null;
+  course_group_id?: string | null;
+}
+
+export interface MessageUpdate {
+  title?: string | null;
+  content?: string | null;
+}
+
+export interface MessageGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  title: string;
+  content: string;
+  level: number;
+  parent_id?: string | null;
+  author_id: string;
+  user_id?: string | null;
+  course_member_id?: string | null;
+  course_submission_group_id?: string | null;
+  course_group_id?: string | null;
+}
+
+export interface MessageList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  id: string;
+  title: string;
+  content: string;
+  level: number;
+  parent_id?: string | null;
+  author_id: string;
+  user_id?: string | null;
+  course_member_id?: string | null;
+  course_submission_group_id?: string | null;
+  course_group_id?: string | null;
 }
 
 export interface CourseMemberGitLabConfig {
@@ -193,6 +245,8 @@ export interface CourseContentDeploymentUpdate {
   last_attempt_at?: string | null;
   deployment_path?: string | null;
   deployment_metadata?: DeploymentMetadata | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
 }
 
 /**
@@ -208,16 +262,18 @@ export interface CourseContentDeploymentGet {
   id: string;
   course_content_id: string;
   example_version_id: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
   deployment_status: string;
   deployment_message: string | null;
   assigned_at: string;
   deployed_at: string | null;
   last_attempt_at: string | null;
   deployment_path: string | null;
+  version_identifier: string | null;
   deployment_metadata: Record<string, any> | null;
   workflow_id: string | null;
   example_version?: any | null;
-  course_content?: any | null;
 }
 
 /**
@@ -227,9 +283,12 @@ export interface CourseContentDeploymentList {
   id: string;
   course_content_id: string;
   example_version_id: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
   deployment_status: string;
   assigned_at: string;
   deployed_at: string | null;
+  version_identifier: string | null;
   example_version?: ExampleVersionList | null;
 }
 
@@ -241,6 +300,8 @@ export interface DeploymentHistoryCreate {
   action: any;
   action_details?: string | null;
   example_version_id?: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
   previous_example_version_id?: string | null;
   metadata?: Record<string, any> | null;
   workflow_id?: string | null;
@@ -256,6 +317,8 @@ export interface DeploymentHistoryGet {
   action_details: string | null;
   example_version_id: string | null;
   previous_example_version_id: string | null;
+  example_identifier?: string | null;
+  version_tag?: string | null;
   meta?: Record<string, any> | null;
   workflow_id: string | null;
   created_at: string;
@@ -308,8 +371,12 @@ export interface DeploymentSummary {
  * Request to assign an example to course content.
  */
 export interface AssignExampleRequest {
-  /** Example version to assign */
-  example_version_id: string;
+  /** Example version to assign (optional if providing identifier+version_tag) */
+  example_version_id?: string | null;
+  /** Hierarchical identifier (ltree string) for the example source */
+  example_identifier?: string | null;
+  /** Version tag for the example source */
+  version_tag?: string | null;
   /** Optional message about this assignment */
   deployment_message?: string | null;
 }
@@ -461,6 +528,7 @@ export interface ResultCreate {
   result_json?: any | null;
   properties?: any | null;
   version_identifier: string;
+  reference_version_identifier?: string | null;
   status: any;
 }
 
@@ -483,7 +551,9 @@ export interface ResultGet {
   result_json?: any | null;
   properties?: any | null;
   version_identifier: string;
+  reference_version_identifier?: string | null;
   status: any;
+  grading_ids?: string[] | null;
 }
 
 export interface ResultList {
@@ -497,6 +567,7 @@ export interface ResultList {
   test_system_id: string;
   result: number;
   version_identifier: string;
+  reference_version_identifier?: string | null;
   status: any;
 }
 
@@ -507,6 +578,62 @@ export interface ResultUpdate {
   status?: any | null;
   test_system_id?: string | null;
   properties?: any | null;
+}
+
+/**
+ * Detailed result information including submission group and grading.
+ */
+export interface ResultDetailed {
+  id: string;
+  submit: boolean;
+  course_member_id: string;
+  course_member_name?: string | null;
+  course_content_id: string;
+  course_content_title?: string | null;
+  course_content_path?: string | null;
+  course_content_type_id: string;
+  course_submission_group_id?: string | null;
+  submission_group_members?: any[] | null;
+  execution_backend_id: string;
+  test_system_id: string;
+  result: number;
+  result_json?: any | null;
+  properties?: any | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: any;
+  gradings?: any[];
+  latest_grade?: number | null;
+  latest_grading_status?: number | null;
+  latest_grading_feedback?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/**
+ * Simplified grading view for students.
+ */
+export interface GradingStudentView {
+  id: string;
+  grading: number;
+  status: any;
+  feedback?: string | null;
+  graded_by_name?: string | null;
+  graded_at: string;
+}
+
+/**
+ * Summary of gradings for a course content.
+ */
+export interface GradingSummary {
+  course_content_id: string;
+  total_submissions: number;
+  graded_count: number;
+  ungraded_count: number;
+  corrected_count: number;
+  correction_necessary_count: number;
+  improvement_possible_count: number;
+  average_grade?: number | null;
 }
 
 export interface TestCreate {
@@ -688,17 +815,68 @@ export interface PendingChangesResponse {
 }
 
 /**
+ * Per-item override for release commit selection.
+ */
+export interface ReleaseOverride {
+  course_content_id: any;
+  /** Commit SHA to use for this content */
+  version_identifier: string;
+}
+
+/**
+ * Selection of contents and commits for a release.
+ */
+export interface ReleaseSelection {
+  /** Explicit list of course content IDs to release */
+  course_content_ids?: any[] | null;
+  /** Parent content ID; combined with include_descendants */
+  parent_id?: (string | string) | null;
+  /** Whether to include descendants of parent_id */
+  include_descendants?: boolean;
+  /** Select all contents in the course */
+  all?: boolean;
+  /** Commit SHA to apply to all selected contents (overridden by per-item overrides) */
+  global_commit?: string | null;
+  /** Per-content commit overrides */
+  overrides?: ReleaseOverride[] | null;
+}
+
+/**
  * Request to generate student template.
  */
 export interface GenerateTemplateRequest {
   /** Custom commit message (optional) */
   commit_message?: string | null;
+  /** Force redeployment of already deployed content */
+  force_redeploy?: boolean;
+  /** Selection of contents and commits to release */
+  release?: ReleaseSelection | null;
 }
 
 /**
  * Response for template generation request.
  */
 export interface GenerateTemplateResponse {
+  workflow_id: string;
+  status?: string;
+  contents_to_process: number;
+}
+
+/**
+ * Request to generate the assignments repository from Example Library.
+ */
+export interface GenerateAssignmentsRequest {
+  assignments_url?: string | null;
+  course_content_ids?: string[] | null;
+  parent_id?: string | null;
+  include_descendants?: boolean;
+  all?: boolean;
+  /** skip_if_exists|force_update */
+  overwrite_strategy?: string;
+  commit_message?: string | null;
+}
+
+export interface GenerateAssignmentsResponse {
   workflow_id: string;
   status?: string;
   contents_to_process: number;
@@ -753,6 +931,7 @@ export interface SubmissionGroupGet {
   updated_by?: string | null;
   id: string;
   course_id: string;
+  last_submitted_result_id?: string | null;
 }
 
 export interface SubmissionGroupList {
@@ -763,6 +942,7 @@ export interface SubmissionGroupList {
   course_id: string;
   course_content_id: string;
   status?: string | null;
+  last_submitted_result_id?: string | null;
 }
 
 export interface SubmissionGroupUpdate {
@@ -780,6 +960,29 @@ export interface SubmissionGroupStudentQuery {
   course_content_id?: string | null;
   has_repository?: boolean | null;
   is_graded?: boolean | null;
+}
+
+/**
+ * Detailed submission group information including members and gradings.
+ */
+export interface SubmissionGroupDetailed {
+  id: string;
+  course_id: string;
+  course_content_id: string;
+  properties?: SubmissionGroupProperties | null;
+  max_group_size: number;
+  max_submissions?: number | null;
+  max_test_runs?: number | null;
+  members?: any[];
+  gradings?: any[];
+  last_submitted_result?: any | null;
+  current_group_size?: number;
+  submission_count?: number;
+  test_run_count?: number;
+  latest_grade?: number | null;
+  latest_grading_status?: any | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SubmissionGroupMemberProperties {
@@ -1218,6 +1421,38 @@ export interface CourseFamilyConfig {
 }
 
 /**
+ * Configuration for course content (assignments, units, etc.).
+ */
+export interface CourseContentConfig {
+  /** Title of the course content (defaults from example if submittable) */
+  title?: string | null;
+  /** Hierarchical path using dots (optional; generated when omitted) */
+  path?: string | null;
+  /** Description of the content */
+  description?: string | null;
+  /** Slug of the course content type (must match a defined content_type) */
+  content_type: string;
+  /** Position for ordering (defaults to auto-increment) */
+  position?: number | null;
+  /** Maximum group size for submissions */
+  max_group_size?: number | null;
+  /** Maximum test runs allowed */
+  max_test_runs?: number | null;
+  /** Maximum submissions allowed */
+  max_submissions?: number | null;
+  /** Example identifier (e.g., 'week1.fibonacci') - required for submittable content */
+  example_identifier?: string | null;
+  /** Version tag of the example (e.g., 'v1.0', 'latest') - defaults to latest */
+  example_version_tag?: string | null;
+  /** Override execution backend slug for this content */
+  execution_backend?: string | null;
+  /** Nested course contents (for units containing assignments) */
+  contents?: CourseContentConfig[] | null;
+  /** Additional properties for the content */
+  properties?: Record<string, any> | null;
+}
+
+/**
  * Course configuration.
  */
 export interface CourseConfig {
@@ -1233,6 +1468,8 @@ export interface CourseConfig {
   execution_backends?: ExecutionBackendReference[] | null;
   /** Course content types to be created (assignments, units, etc.) */
   content_types?: CourseContentTypeConfig[] | null;
+  /** Course contents hierarchy (assignments, units, etc.) */
+  contents?: CourseContentConfig[] | null;
   /** Course-specific settings */
   settings?: Record<string, any> | null;
 }
@@ -1253,6 +1490,8 @@ export interface HierarchicalCourseConfig {
   execution_backends?: ExecutionBackendReference[] | null;
   /** Course content types to be created (assignments, units, etc.) */
   content_types?: CourseContentTypeConfig[] | null;
+  /** Course contents hierarchy (assignments, units, etc.) */
+  contents?: CourseContentConfig[] | null;
   /** Course-specific settings */
   settings?: Record<string, any> | null;
 }
@@ -1307,6 +1546,8 @@ export interface ComputorDeploymentConfig {
   users?: UserAccountDeployment[];
   /** Global deployment settings */
   settings?: Record<string, any> | null;
+  /** If provided, uploads examples before hierarchy deployment */
+  examples_upload?: ExamplesUploadConfig | null;
 }
 
 export interface GitlabGroupProjectConfig {
@@ -1400,4 +1641,38 @@ export interface GitlabSignup {
 
 export interface GitlabSignupResponse {
   courses?: CourseSignupResponse[];
+}
+
+/**
+ * Request model for creating a merge request submission.
+ */
+export interface SubmitRequest {
+  /** The branch name to create merge request from */
+  branch_name: string;
+  /** GitLab Personal Access Token for authentication */
+  gitlab_token: string;
+  /** Optional title for the merge request */
+  title?: string | null;
+  /** Optional description for the merge request */
+  description?: string | null;
+}
+
+/**
+ * Response model for merge request submission.
+ */
+export interface SubmitResponse {
+  /** The ID of the created merge request */
+  merge_request_id: number;
+  /** The internal ID of the merge request */
+  merge_request_iid: number;
+  /** The web URL of the merge request */
+  web_url: string;
+  /** The source branch of the merge request */
+  source_branch: string;
+  /** The target branch of the merge request */
+  target_branch: string;
+  /** The title of the merge request */
+  title: string;
+  /** The state of the merge request */
+  state: string;
 }

@@ -158,16 +158,76 @@ async def assign_example_to_content(
             detail="Cannot assign examples to non-submittable content types"
         )
     
-    # Validate example version exists
-    example_version = db.query(ExampleVersion).options(
-        joinedload(ExampleVersion.example)
-    ).filter(ExampleVersion.id == request.example_version_id).first()
-    
-    if not example_version:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Example version {request.example_version_id} not found"
-        )
+    # Resolve source: either by ExampleVersion ID, or resolve identifier+version_tag to a concrete ExampleVersion
+    example_version = None
+    src_identifier: Optional[str] = None
+    src_version_tag: Optional[str] = None
+
+    if request.example_version_id is not None:
+        example_version = db.query(ExampleVersion).options(
+            joinedload(ExampleVersion.example)
+        ).filter(ExampleVersion.id == request.example_version_id).first()
+        if not example_version:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Example version {request.example_version_id} not found"
+            )
+        if example_version.example:
+            src_identifier = str(example_version.example.identifier)
+        src_version_tag = example_version.version_tag
+    else:
+        # identifier + version_tag (may be 'latest')
+        if not request.example_identifier:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either example_version_id or example_identifier must be provided"
+            )
+        src_identifier = request.example_identifier
+        requested_tag = (request.version_tag or '').strip() if request.version_tag else None
+        from ctutor_backend.custom_types import Ltree
+        from ctutor_backend.model.example import Example as ExampleModel
+        # Try to resolve to Example/ExampleVersion from DB
+        example_row = db.query(ExampleModel).filter(ExampleModel.identifier == Ltree(src_identifier)).first()
+        if example_row:
+            # Determine concrete tag: resolve 'latest' or missing to newest version
+            if not requested_tag or requested_tag.lower() == 'latest':
+                latest_ev = (
+                    db.query(ExampleVersion)
+                    .filter(ExampleVersion.example_id == example_row.id)
+                    .order_by(ExampleVersion.version_number.desc())
+                    .first()
+                )
+                if not latest_ev:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No versions found for example"
+                    )
+                example_version = latest_ev
+                src_version_tag = latest_ev.version_tag
+            else:
+                ev = (
+                    db.query(ExampleVersion)
+                    .filter(
+                        ExampleVersion.example_id == example_row.id,
+                        ExampleVersion.version_tag == requested_tag
+                    )
+                    .first()
+                )
+                if not ev:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Version '{requested_tag}' not found for example"
+                    )
+                example_version = ev
+                src_version_tag = ev.version_tag
+        else:
+            # Custom (non-library) source: require explicit non-'latest' tag
+            if not requested_tag or requested_tag.lower() == 'latest':
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="version_tag is required and cannot be 'latest' for non-library sources"
+                )
+            src_version_tag = requested_tag
     
     # Get or create deployment record
     deployment = db.query(CourseContentDeployment).filter(
@@ -177,18 +237,28 @@ async def assign_example_to_content(
     if deployment:
         # Update existing deployment (reassignment)
         previous_version_id = deployment.example_version_id
-        deployment.example_version_id = str(request.example_version_id)
+        deployment.example_version_id = str(example_version.id) if example_version else None
+        # Always store source identity for traceability
+        from ctutor_backend.custom_types import Ltree
+        deployment.example_identifier = Ltree(src_identifier) if src_identifier else None
+        deployment.version_tag = src_version_tag
         deployment.deployment_status = "pending"
         deployment.deployment_message = request.deployment_message
         deployment.updated_by = permissions.user_id if hasattr(permissions, 'user_id') else None
         deployment.updated_at = datetime.utcnow()
         
         # Add history entry for reassignment
+        from ctutor_backend.custom_types import Ltree
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
             action="reassigned" if previous_version_id else "assigned",
-            action_details=f"Assigned {example_version.example.title} v{example_version.version_tag}",
-            example_version_id=str(request.example_version_id),
+            action_details=(
+                f"Assigned {example_version.example.title} v{example_version.version_tag}"
+                if example_version and example_version.example else "Assigned custom source"
+            ),
+            example_version_id=str(example_version.id) if example_version else None,
+            example_identifier=Ltree(src_identifier) if src_identifier else None,
+            version_tag=src_version_tag,
             previous_example_version_id=str(previous_version_id) if previous_version_id else None,
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
@@ -196,9 +266,12 @@ async def assign_example_to_content(
         
     else:
         # Create new deployment
+        from ctutor_backend.custom_types import Ltree
         deployment = CourseContentDeployment(
             course_content_id=str(content_id),
-            example_version_id=str(request.example_version_id),
+            example_version_id=str(example_version.id) if example_version else None,
+            example_identifier=Ltree(src_identifier) if src_identifier else None,
+            version_tag=src_version_tag,
             deployment_status="pending",
             deployment_message=request.deployment_message,
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None,
@@ -208,11 +281,17 @@ async def assign_example_to_content(
         db.flush()  # Get the ID
         
         # Add initial history entry
+        from ctutor_backend.custom_types import Ltree
         history_entry = DeploymentHistory(
             deployment_id=deployment.id,
             action="assigned",
-            action_details=f"Assigned {example_version.example.title} v{example_version.version_tag}",
-            example_version_id=str(request.example_version_id),
+            action_details=(
+                f"Assigned {example_version.example.title} v{example_version.version_tag}"
+                if example_version and example_version.example else "Assigned custom source"
+            ),
+            example_version_id=str(example_version.id) if example_version else None,
+            example_identifier=Ltree(src_identifier) if src_identifier else None,
+            version_tag=src_version_tag,
             created_by=permissions.user_id if hasattr(permissions, 'user_id') else None
         )
         db.add(history_entry)
@@ -234,8 +313,11 @@ async def assign_example_to_content(
         "id": deployment.id,
         "course_content_id": deployment.course_content_id,
         "example_version_id": deployment.example_version_id,
+        "example_identifier": str(deployment.example_identifier) if getattr(deployment, 'example_identifier', None) is not None else None,
+        "version_tag": deployment.version_tag,
         "deployment_status": deployment.deployment_status,
         "deployment_path": deployment.deployment_path,
+        "version_identifier": deployment.version_identifier,
         "assigned_at": deployment.assigned_at,  # Required field
         "deployed_at": deployment.deployed_at,
         "last_attempt_at": deployment.last_attempt_at,
@@ -259,6 +341,8 @@ async def assign_example_to_content(
             "action_details": h.action_details,
             "example_version_id": h.example_version_id,
             "previous_example_version_id": h.previous_example_version_id,
+            "example_identifier": str(h.example_identifier) if getattr(h, 'example_identifier', None) is not None else None,
+            "version_tag": h.version_tag,
             "meta": h.meta,  # Use the correct field name
             "workflow_id": h.workflow_id,
             "created_at": h.created_at,
@@ -391,12 +475,15 @@ async def get_deployment_status_with_workflow(
         "id": str(deployment.id),
         "course_content_id": str(deployment.course_content_id),
         "example_version_id": str(deployment.example_version_id) if deployment.example_version_id else None,
+        "example_identifier": str(deployment.example_identifier) if getattr(deployment, 'example_identifier', None) is not None else None,
+        "version_tag": deployment.version_tag,
         "deployment_status": deployment.deployment_status,
         "deployment_message": deployment.deployment_message,
         "assigned_at": deployment.assigned_at.isoformat() if deployment.assigned_at else None,
         "deployed_at": deployment.deployed_at.isoformat() if deployment.deployed_at else None,
         "last_attempt_at": deployment.last_attempt_at.isoformat() if deployment.last_attempt_at else None,
         "deployment_path": deployment.deployment_path,
+        "version_identifier": deployment.version_identifier,
         "workflow_id": deployment.workflow_id
     }
     

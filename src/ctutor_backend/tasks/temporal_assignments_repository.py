@@ -208,12 +208,31 @@ async def generate_assignments_repository_activity(
                     for content in contents:
                         if content.deployment:
                             content.deployment.version_identifier = head_sha
+                            # Ensure source identity is stored
+                            try:
+                                ev = content.deployment.example_version
+                                if ev and ev.example and not content.deployment.example_identifier:
+                                    from ctutor_backend.custom_types import Ltree
+                                    content.deployment.example_identifier = Ltree(str(ev.example.identifier))
+                                if ev and ev.version_tag and not content.deployment.version_tag:
+                                    content.deployment.version_tag = ev.version_tag
+                            except Exception:
+                                pass
                             # History entry
+                            # Ensure history example_identifier is proper ltree
+                            from ctutor_backend.custom_types import Ltree
                             hist = DeploymentHistory(
                                 deployment_id=content.deployment.id,
-                                action="assigned",
+                                action="updated",
                                 action_details=f"Assignments repo updated to {head_sha[:8]}",
-                                example_version_id=content.deployment.example_version_id
+                                example_version_id=content.deployment.example_version_id,
+                                example_identifier=(
+                                    Ltree(str(ev.example.identifier)) if ev and ev.example
+                                    else (
+                                        getattr(content.deployment, 'example_identifier', None)
+                                    )
+                                ),
+                                version_tag=(ev.version_tag if ev else getattr(content.deployment, 'version_tag', None))
                             )
                             db.add(hist)
                     db.commit()

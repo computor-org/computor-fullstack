@@ -13,6 +13,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
+try:
+    from ..custom_types import LtreeType
+except ImportError:
+    # Fallback for Alembic context
+    from ctutor_backend.custom_types import LtreeType
 from sqlalchemy.sql import func
 
 from .base import Base
@@ -50,6 +55,18 @@ class CourseContentDeployment(Base):
         ForeignKey("example_version.id", ondelete="SET NULL"),
         nullable=True,
         comment="The specific example version that is/was deployed"
+    )
+    
+    # Source identity (supports DB-backed and custom assignments)
+    example_identifier = Column(
+        LtreeType,
+        nullable=True,
+        comment="Hierarchical identifier (ltree) of the example source; present even if no DB Example exists"
+    )
+    version_tag = Column(
+        String(64),
+        nullable=True,
+        comment="Version tag of the example source; may be null for custom assignments"
     )
     
     # Reference commit used for release from assignments repository
@@ -153,6 +170,8 @@ class CourseContentDeployment(Base):
         Index("idx_deployment_status", "deployment_status"),
         Index("idx_deployment_deployed_at", "deployed_at"),
         Index("idx_deployment_example_version", "example_version_id"),
+        Index("idx_deployment_example_identifier", "example_identifier"),
+        Index("idx_deployment_version_tag", "version_tag"),
     )
     
     def __repr__(self):
@@ -242,6 +261,18 @@ class DeploymentHistory(Base):
         comment="Previous example version (for reassignments)"
     )
     
+    # Snapshot of source identity at the time of action
+    example_identifier = Column(
+        LtreeType,
+        nullable=True,
+        comment="Hierarchical identifier (ltree) of the example at action time"
+    )
+    version_tag = Column(
+        String(64),
+        nullable=True,
+        comment="Version tag of the example at action time"
+    )
+    
     # Additional data
     meta = Column(
         JSONB,
@@ -285,6 +316,8 @@ class DeploymentHistory(Base):
         Index("idx_history_action", "action"),
         Index("idx_history_created_at", "created_at"),
         Index("idx_history_workflow_id", "workflow_id"),
+        Index("idx_history_example_identifier", "example_identifier"),
+        Index("idx_history_version_tag", "version_tag"),
     )
     
     def __repr__(self):

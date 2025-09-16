@@ -117,6 +117,43 @@ class PendingChangesResponse(BaseModel):
     last_release: Optional[Dict[str, Any]] = None
 
 
+class ReleaseOverride(BaseModel):
+    """Per-item override for release commit selection."""
+    course_content_id: UUID | str
+    version_identifier: str = Field(description="Commit SHA to use for this content")
+
+
+class ReleaseSelection(BaseModel):
+    """Selection of contents and commits for a release."""
+    # Selection scope
+    course_content_ids: Optional[List[UUID | str]] = Field(
+        default=None,
+        description="Explicit list of course content IDs to release"
+    )
+    parent_id: Optional[UUID | str] = Field(
+        default=None,
+        description="Parent content ID; combined with include_descendants"
+    )
+    include_descendants: bool = Field(
+        default=True,
+        description="Whether to include descendants of parent_id"
+    )
+    all: bool = Field(
+        default=False,
+        description="Select all contents in the course"
+    )
+
+    # Commit selection
+    global_commit: Optional[str] = Field(
+        default=None,
+        description="Commit SHA to apply to all selected contents (overridden by per-item overrides)"
+    )
+    overrides: Optional[List[ReleaseOverride]] = Field(
+        default=None,
+        description="Per-content commit overrides"
+    )
+
+
 class GenerateTemplateRequest(BaseModel):
     """Request to generate student template."""
     commit_message: Optional[str] = Field(
@@ -126,6 +163,10 @@ class GenerateTemplateRequest(BaseModel):
     force_redeploy: bool = Field(
         default=False,
         description="Force redeployment of already deployed content"
+    )
+    release: Optional[ReleaseSelection] = Field(
+        default=None,
+        description="Selection of contents and commits to release"
     )
 
 

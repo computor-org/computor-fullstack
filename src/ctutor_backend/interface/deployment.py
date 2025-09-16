@@ -7,7 +7,7 @@ example assignments to course content.
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Literal, TYPE_CHECKING
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from uuid import UUID
 
 from ctutor_backend.interface.example import ExampleVersionList
@@ -54,6 +54,9 @@ class CourseContentDeploymentUpdate(BaseModel):
     last_attempt_at: Optional[datetime] = None
     deployment_path: Optional[str] = None
     deployment_metadata: Optional[DeploymentMetadata] = None
+    # Optional source identity updates (rare)
+    example_identifier: Optional[str] = None
+    version_tag: Optional[str] = None
     
     model_config = ConfigDict(use_enum_values=True)
 
@@ -63,12 +66,16 @@ class CourseContentDeploymentGet(BaseEntityGet):
     id: UUID
     course_content_id: UUID
     example_version_id: Optional[UUID]
+    # Source identity (works even without DB Example)
+    example_identifier: Optional[str] = None
+    version_tag: Optional[str] = None
     deployment_status: str
     deployment_message: Optional[str]
     assigned_at: datetime
     deployed_at: Optional[datetime]
     last_attempt_at: Optional[datetime]
     deployment_path: Optional[str]
+    version_identifier: Optional[str]
     deployment_metadata: Optional[Dict[str, Any]]
     workflow_id: Optional[str]  # Current/last Temporal workflow ID
     
@@ -78,19 +85,46 @@ class CourseContentDeploymentGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
+    @staticmethod
+    def _cast_ltree(value):
+        try:
+            return str(value) if value is not None else None
+        except Exception:
+            return value
+
+    @field_validator('example_identifier', mode='before')
+    @classmethod
+    def cast_source_identifier(cls, v):
+        return cls._cast_ltree(v)
+
 
 class CourseContentDeploymentList(BaseModel):
     """List view of deployments."""
     id: UUID
     course_content_id: UUID
     example_version_id: Optional[UUID]
+    example_identifier: Optional[str] = None
+    version_tag: Optional[str] = None
     deployment_status: str
     assigned_at: datetime
     deployed_at: Optional[datetime]
+    version_identifier: Optional[str]
 
     example_version: Optional['ExampleVersionList'] = None
     
     model_config = ConfigDict(from_attributes=True)
+
+    @staticmethod
+    def _cast_ltree(value):
+        try:
+            return str(value) if value is not None else None
+        except Exception:
+            return value
+
+    @field_validator('example_identifier', mode='before')
+    @classmethod
+    def cast_source_identifier(cls, v):
+        return cls._cast_ltree(v)
 
 
 class CourseContentDeploymentQuery(ListQuery):
@@ -110,6 +144,8 @@ class DeploymentHistoryCreate(BaseModel):
     action: Literal["assigned", "reassigned", "deployed", "failed", "unassigned", "updated", "migrated"]
     action_details: Optional[str] = None
     example_version_id: Optional[UUID] = None
+    example_identifier: Optional[str] = None
+    version_tag: Optional[str] = None
     previous_example_version_id: Optional[UUID] = None
     metadata: Optional[Dict[str, Any]] = None
     workflow_id: Optional[str] = None
@@ -125,6 +161,8 @@ class DeploymentHistoryGet(BaseModel):
     action_details: Optional[str]
     example_version_id: Optional[UUID]
     previous_example_version_id: Optional[UUID]
+    example_identifier: Optional[str] = None
+    version_tag: Optional[str] = None
     meta: Optional[Dict[str, Any]] = Field(None, alias="meta")  # Database column is 'meta'
     workflow_id: Optional[str]
     created_at: datetime
@@ -174,7 +212,17 @@ class DeploymentSummary(BaseModel):
 
 class AssignExampleRequest(BaseModel):
     """Request to assign an example to course content."""
-    example_version_id: UUID = Field(description="Example version to assign")
+    # Either provide an existing ExampleVersion ID, or supply
+    # a source identifier/version_tag for custom assignments.
+    example_version_id: Optional[UUID] = Field(
+        None, description="Example version to assign (optional if providing identifier+version_tag)"
+    )
+    example_identifier: Optional[str] = Field(
+        None, description="Hierarchical identifier (ltree string) for the example source"
+    )
+    version_tag: Optional[str] = Field(
+        None, description="Version tag for the example source"
+    )
     deployment_message: Optional[str] = Field(None, description="Optional message about this assignment")
 
 

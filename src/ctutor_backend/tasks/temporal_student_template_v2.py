@@ -760,6 +760,9 @@ async def generate_student_template_activity_v2(
                         if ev and ev.example and ev.example.identifier:
                             content.deployment.deployment_path = str(ev.example.identifier)
                             logger.info(f"Derived deployment path for {content.path} -> {content.deployment.deployment_path}")
+                        elif getattr(content.deployment, 'example_identifier', None):
+                            content.deployment.deployment_path = str(content.deployment.example_identifier)
+                            logger.info(f"Derived deployment path from source identifier for {content.path} -> {content.deployment.deployment_path}")
                         else:
                             logger.error(f"Deployment path not set for {content.path}")
                             errors.append(f"Deployment path not set for {content.path}")

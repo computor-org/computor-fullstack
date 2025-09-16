@@ -878,7 +878,9 @@ async def generate_student_template(
             "student_template_url": student_template_url,
             "assignments_url": assignments_url,
             "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
-            "force_redeploy": request.force_redeploy
+            "force_redeploy": request.force_redeploy,
+            # Pass through optional release selection for strict commit/path control
+            "release": (request.release.model_dump() if request.release else None),
         },
         queue="computor-tasks"
     )

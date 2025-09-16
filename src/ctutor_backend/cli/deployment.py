@@ -525,7 +525,13 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                 full_path = f"{parent_path}.{content_config.path}" if parent_path else content_config.path
             else:
                 # Determine effective title now (may still be None)
-                eff_title_src = content_config.title or meta_title or ex_title or content_config.example_identifier or 'content'
+                identifier_last = None
+                if content_config.example_identifier:
+                    try:
+                        identifier_last = content_config.example_identifier.split('.')[-1]
+                    except Exception:
+                        identifier_last = content_config.example_identifier
+                eff_title_src = content_config.title or meta_title or ex_title or identifier_last or 'content'
                 import re
                 seg = re.sub(r"[^a-z0-9_]+", "", re.sub(r"[\s-]+", "_", (eff_title_src or 'content').lower().strip())) or 'content'
                 candidate = f"{parent_path}.{seg}" if parent_path else seg
@@ -538,6 +544,13 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     idx += 1
                     seg_try = f"{seg}_{idx}"
                     candidate = f"{parent_path}.{seg_try}" if parent_path else seg_try
+
+            # Helper to humanize a slug/segment to a friendly title
+            def _humanize(seg: str) -> str:
+                try:
+                    return ' '.join([w.capitalize() for w in seg.replace('_', ' ').replace('-', ' ').split() if w]) or seg
+                except Exception:
+                    return seg
 
             # Check if content already exists
             existing_contents = content_client.list(CourseContentQuery(
@@ -555,9 +568,18 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                         to_update['description'] = content_config.description
                 elif is_submittable and not getattr(content, 'description', None) and meta_description:
                     to_update['description'] = meta_description
+                # Opportunistically improve title if it's empty or looks like a slug and we have a better source
+                current_title = getattr(content, 'title', None)
+                fallback_seg = full_path.split('.')[-1]
+                friendly_fallback = _humanize(fallback_seg)
+                better_title = content_config.title or meta_title or ex_title or friendly_fallback
+                if (current_title is None) or (current_title == fallback_seg) or (current_title == friendly_fallback and better_title not in [None, friendly_fallback]):
+                    if better_title and better_title != current_title:
+                        to_update['title'] = better_title
                 if to_update:
                     try:
-                        content_client.update(str(content.id), to_update)
+                        from ctutor_backend.interface.course_contents import CourseContentUpdate
+                        content_client.update(str(content.id), CourseContentUpdate(**to_update))
                         click.echo(f"      ✏️  Updated content description")
                     except Exception as e:
                         click.echo(f"      ⚠️  Failed to update content description: {e}")
@@ -574,7 +596,12 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                         execution_backend_id = str(backends[0].id)
                 
                 # Derive title/description defaults: description only from meta_yaml when not given
-                effective_title = content_config.title or meta_title or ex_title or full_path.split('.')[-1]
+                fallback_seg = None
+                try:
+                    fallback_seg = full_path.split('.')[-1]
+                except Exception:
+                    fallback_seg = full_path
+                effective_title = content_config.title or meta_title or ex_title or _humanize(fallback_seg)
                 effective_description = content_config.description if content_config.description is not None else meta_description
                 
                 # Create the content
@@ -624,7 +651,23 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                         identifier=content_config.example_identifier
                     ))
                     if not examples:
-                        click.echo(f"      ⚠️  Example not found: {content_config.example_identifier}")
+                        click.echo(f"      ⚠️  Example not found in DB: {content_config.example_identifier}")
+                        # Fallback: assign by identifier/version_tag (custom assignment)
+                        # Enforce explicit version_tag to avoid ambiguous 'latest'
+                        vt = content_config.example_version_tag
+                        if not vt:
+                            click.echo(f"      ❌ Skipping custom assignment: version_tag required for {content_config.example_identifier}")
+                            continue
+                        try:
+                            assign_payload = {
+                                "example_identifier": content_config.example_identifier,
+                                "version_tag": vt
+                            }
+                            custom_client.create(f"course-contents/{content.id}/assign-example", assign_payload)
+                            click.echo(f"      ✅ Assigned custom example: {content_config.example_identifier} ({vt})")
+                        except Exception as e:
+                            click.echo(f"      ⚠️  Failed to assign custom example: {e}")
+                        continue
                     else:
                         example = examples[0]
                         version_tag = content_config.example_version_tag or "latest"

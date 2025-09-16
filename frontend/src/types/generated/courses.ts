@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-05T13:28:29.862255
+ * Generated on: 2025-09-16T13:29:53.115296
 
  * Category: Courses
 
@@ -250,6 +250,59 @@ export interface CourseGroupUpdate {
 }
 
 /**
+ * Create a new grading for a submission group.
+ */
+export interface CourseSubmissionGroupGradingCreate {
+  course_submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status?: any;
+  feedback?: string | null;
+}
+
+/**
+ * Full grading information.
+ */
+export interface CourseSubmissionGroupGradingGet {
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status: any;
+  feedback?: string | null;
+}
+
+/**
+ * List view of grading.
+ */
+export interface CourseSubmissionGroupGradingList {
+  id: string;
+  course_submission_group_id: string;
+  graded_by_course_member_id: string;
+  result_id?: string | null;
+  grading: number;
+  status: any;
+  feedback?: string | null;
+  created_at: string;
+}
+
+/**
+ * Update grading information.
+ */
+export interface CourseSubmissionGroupGradingUpdate {
+  grading?: number | null;
+  status?: any | null;
+  feedback?: string | null;
+  result_id?: string | null;
+}
+
+/**
  * Repository information for a submission group
  */
 export interface SubmissionGroupRepository {
@@ -294,7 +347,6 @@ export interface SubmissionGroupStudentList {
   current_group_size?: number;
   members?: SubmissionGroupMemberBasic[];
   repository?: SubmissionGroupRepository | null;
-  latest_grading?: SubmissionGroupGradingStudent | null;
   status?: string | null;
   grading?: number | null;
   count?: number;
@@ -360,6 +412,7 @@ export interface CourseContentStudentList {
 export interface CourseContentStudentUpdate {
   status?: any | null;
   grading?: number | null;
+  feedback?: string | null;
 }
 
 export interface CourseStudentRepository {
@@ -692,18 +745,15 @@ export interface CourseSignupResponse {
   repository: string;
 }
 
-export interface CourseContentMessage {
-  body: string;
-}
-
 export interface CourseContentFileQuery {
   filename?: string | null;
 }
 
-export interface CourseMemberCommentTutorCreate {
+export interface CommentCreate {
+  course_member_id: any;
   message: string;
 }
 
-export interface CourseMemberCommentTutorUpdate {
+export interface CommentUpdate {
   message: string;
 }

@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-05T13:28:29.864004
+ * Generated on: 2025-09-16T13:29:53.116882
 
  * Category: Examples
 
@@ -222,8 +222,8 @@ export interface ExampleDependencyGet {
 export interface ExampleUploadRequest {
   repository_id: string;
   directory: string;
-  /** Map of filename to content (must include meta.yaml) */
-  files: Record<string, string>;
+  /** Map of filename to content. Text files as UTF-8 strings, binary files as either base64-encoded strings or raw bytes. Must include meta.yaml */
+  files: Record<string, string | any>;
 }
 
 /**

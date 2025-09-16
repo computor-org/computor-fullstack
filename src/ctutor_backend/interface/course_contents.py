@@ -2,7 +2,7 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import Optional, Dict, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
-from ctutor_backend.interface.course_content_types import CourseContentTypeGet
+from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from ctutor_backend.interface.deployments import GitLabConfig, GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.model.course import CourseContent
@@ -110,7 +110,7 @@ class CourseContentList(BaseModel):
     execution_backend_id: Optional[str] = None
     is_submittable: bool = False  # Add this field to list view
     
-    course_content_type: Optional[CourseContentTypeGet] = None
+    course_content_type: Optional['CourseContentTypeList'] = None
     
     # Optional deployment summary for list views
     has_deployment: Optional[bool] = Field(

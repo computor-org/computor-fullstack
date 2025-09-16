@@ -17,6 +17,8 @@ class Message(Base):
         Index('msg_course_member_archived_idx', 'course_member_id', 'archived_at'),
         Index('msg_submission_group_archived_idx', 'course_submission_group_id', 'archived_at'),
         Index('msg_course_group_archived_idx', 'course_group_id', 'archived_at'),
+        Index('msg_course_content_archived_idx', 'course_content_id', 'archived_at'),
+        Index('msg_course_archived_idx', 'course_id', 'archived_at'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -44,6 +46,8 @@ class Message(Base):
     course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
     course_group_id = Column(ForeignKey('course_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
 
     # Relationships
     author = relationship('User', foreign_keys=[author_id])
@@ -55,6 +59,8 @@ class Message(Base):
     course_member = relationship('CourseMember', foreign_keys=[course_member_id])
     course_submission_group = relationship('CourseSubmissionGroup', foreign_keys=[course_submission_group_id])
     course_group = relationship('CourseGroup', foreign_keys=[course_group_id])
+    course_content = relationship('CourseContent', foreign_keys=[course_content_id])
+    course = relationship('Course', foreign_keys=[course_id])
 
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
 

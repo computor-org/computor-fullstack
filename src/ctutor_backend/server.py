@@ -10,7 +10,7 @@ from ctutor_backend.model.auth import User
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.role import UserRole
 from ctutor_backend.redis_cache import get_redis_client
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
@@ -333,3 +333,9 @@ app.include_router(
 @app.head("/", status_code=204)
 def get_status_head():
     return
+
+
+@app.get("/health", status_code=204, include_in_schema=False)
+async def health_check() -> Response:
+    """Simple health probe endpoint."""
+    return Response(status_code=204)

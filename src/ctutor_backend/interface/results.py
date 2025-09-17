@@ -1,5 +1,5 @@
 import json
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
@@ -7,7 +7,7 @@ from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQu
 from ctutor_backend.model import CourseContentType, CourseSubmissionGroupMember
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.result import Result
-from ctutor_backend.interface.tasks import TaskStatus
+from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status
 
 class ResultCreate(BaseModel):
     submit: bool
@@ -24,6 +24,13 @@ class ResultCreate(BaseModel):
     status: TaskStatus
     
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, value):
+        if isinstance(value, TaskStatus):
+            return value
+        return map_int_to_task_status(value)
 
 class ResultGet(BaseEntityGet):
     id: str
@@ -45,6 +52,13 @@ class ResultGet(BaseEntityGet):
     
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, value):
+        if isinstance(value, TaskStatus):
+            return value
+        return map_int_to_task_status(value)
+
 class ResultList(BaseModel):
     id: str
     submit: bool
@@ -60,6 +74,13 @@ class ResultList(BaseModel):
     status: TaskStatus
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, value):
+        if isinstance(value, TaskStatus):
+            return value
+        return map_int_to_task_status(value)
     
 class ResultUpdate(BaseModel):
     submit: Optional[bool | None] = None
@@ -70,6 +91,13 @@ class ResultUpdate(BaseModel):
     properties: Optional[dict | None] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_status(cls, value):
+        if value is None or isinstance(value, TaskStatus):
+            return value
+        return map_int_to_task_status(value)
 
 class ResultQuery(ListQuery):
     id: Optional[str] = None

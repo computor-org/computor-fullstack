@@ -48,6 +48,6 @@ result_router = CrudRouter(ResultInterface)
 @result_router.router.get("/{result_id}/status", response_model=TaskStatus)
 async def result_status(permissions: Annotated[Principal, Depends(get_current_permissions)], result_id: UUID | str, db: Session = Depends(get_db)):
    
-   result = check_permissions(permissions,Result,"get",db).filter(Result.id == result_id).first()
+    result = check_permissions(permissions,Result,"get",db).filter(Result.id == result_id).first()
 
-   return await get_result_status(result)
+    return await get_result_status(result)

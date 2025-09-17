@@ -17,7 +17,7 @@ from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.repositories import Repository
 from ctutor_backend.interface.results import ResultCreate
-from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
+from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status, map_task_status_to_int
 from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import User
@@ -31,6 +31,24 @@ from ..custom_types import Ltree
 from ctutor_backend.tasks import get_task_executor, TaskSubmission
 class TestRunResponse(ResultCreate):
     id: str
+
+def build_test_run_response(result: Result) -> TestRunResponse:
+    """Convert a Result ORM instance into the API response model."""
+    return TestRunResponse(
+        id=str(result.id),
+        submit=result.submit,
+        course_member_id=str(result.course_member_id),
+        course_content_id=str(result.course_content_id),
+        course_submission_group_id=str(result.course_submission_group_id) if result.course_submission_group_id else None,
+        execution_backend_id=str(result.execution_backend_id),
+        test_system_id=result.test_system_id,
+        result=result.result,
+        result_json=result.result_json,
+        properties=result.properties,
+        status=map_int_to_task_status(result.status),
+        version_identifier=result.version_identifier,
+        reference_version_identifier=result.reference_version_identifier,
+    )
 
 tests_router = APIRouter()
 
@@ -193,7 +211,7 @@ async def create_test(
                 # Check Temporal status
                 if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
                     # Still running, return the existing one
-                    return TestRunResponse(**latest_result.__dict__)
+                    return build_test_run_response(latest_result)
                 elif actual_status.status == TaskStatus.FINISHED:
                     # Workflow finished, but we need to check if it succeeded or failed
                     actual_result = await task_executor.get_task_result(latest_result.test_system_id)
@@ -212,7 +230,7 @@ async def create_test(
                                 latest_result.submit = True
                                 db.commit()
                                 db.refresh(latest_result)
-                            return TestRunResponse(**latest_result.__dict__)
+                            return build_test_run_response(latest_result)
                         else:
                             # Failed or other non-success status
                             latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
@@ -245,7 +263,7 @@ async def create_test(
                 latest_result.submit = True
                 db.commit()
                 db.refresh(latest_result)
-            return TestRunResponse(**latest_result.__dict__)
+            return build_test_run_response(latest_result)
         
         # If failed/crashed/cancelled, we'll create a new run below
 
@@ -386,18 +404,4 @@ async def create_test(
         db.refresh(result_create)
         raise
 
-    return TestRunResponse(
-        id=str(result_create.id),
-        submit=result_create.submit,
-        course_member_id=result_create.course_member_id,
-        course_submission_group_id=result_create.course_submission_group_id,
-        course_content_id=result_create.course_content_id,
-        execution_backend_id=result_create.execution_backend_id,
-        test_system_id=result_create.test_system_id,
-        result=result_create.result,
-        result_json=result_create.result_json,
-        properties=result_create.properties,
-        status=result_create.status,
-        version_identifier=result_create.version_identifier,
-        reference_version_identifier=result_create.reference_version_identifier
-    )
+    return build_test_run_response(result_create)

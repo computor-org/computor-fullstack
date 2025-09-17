@@ -612,7 +612,7 @@ def _deploy_course_contents(course_id: str, course_config: HierarchicalCourseCon
                     course_id=course_id,
                     course_content_type_id=str(content_type.id),
                     position=position,
-                    max_group_size=content_config.max_group_size,
+                    max_group_size=content_config.max_group_size or 1,
                     max_test_runs=content_config.max_test_runs,
                     max_submissions=content_config.max_submissions,
                     execution_backend_id=execution_backend_id,

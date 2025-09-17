@@ -115,8 +115,11 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
 
     # 3) Get the last submitted result if we want to link the grading to it
     last_result_id = None
-    if course_submission_group.last_submitted_result:
-        last_result_id = course_submission_group.last_submitted_result
+    last_result = course_submission_group.last_submitted_result
+    if last_result:
+        # Hybrid property returns a Result model instance in Python mode
+        # or the UUID when evaluated via SQL expression; normalise to ID.
+        last_result_id = getattr(last_result, "id", last_result)
 
     # 4) Map status string to GradingStatus enum value
     grading_status = GradingStatus.NOT_REVIEWED  # Default

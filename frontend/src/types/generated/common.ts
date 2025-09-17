@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-16T13:29:53.120295
+ * Generated on: 2025-09-16T23:19:37.589990
 
  * Category: Common
 
@@ -101,6 +101,8 @@ export interface MessageCreate {
   course_member_id?: string | null;
   course_submission_group_id?: string | null;
   course_group_id?: string | null;
+  course_content_id?: string | null;
+  course_id?: string | null;
 }
 
 export interface MessageUpdate {
@@ -125,6 +127,8 @@ export interface MessageGet {
   course_member_id?: string | null;
   course_submission_group_id?: string | null;
   course_group_id?: string | null;
+  course_content_id?: string | null;
+  course_id?: string | null;
 }
 
 export interface MessageList {
@@ -142,6 +146,8 @@ export interface MessageList {
   course_member_id?: string | null;
   course_submission_group_id?: string | null;
   course_group_id?: string | null;
+  course_content_id?: string | null;
+  course_id?: string | null;
 }
 
 export interface CourseMemberGitLabConfig {

@@ -1,12 +1,13 @@
 /**
  * Auto-generated TypeScript interfaces from Pydantic models
- * Generated on: 2025-09-16T23:19:37.590353
+ * Generated on: 2025-09-17T14:46:20.422605
  */
 
 export * from './auth';
 export * from './common';
 export * from './courses';
 export * from './examples';
+export * from './messages';
 export * from './organizations';
 export * from './roles';
 export * from './sso';

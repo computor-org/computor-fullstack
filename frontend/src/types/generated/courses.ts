@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-16T13:29:53.115296
+ * Generated on: 2025-09-16T23:19:37.585044
 
  * Category: Courses
 
@@ -205,6 +205,7 @@ export interface CourseContentTypeList {
   color: string;
   course_id: string;
   course_content_kind_id: string;
+  course_content_kind?: CourseContentKindList | null;
 }
 
 export interface CourseContentTypeUpdate {
@@ -651,7 +652,7 @@ export interface CourseContentList {
   max_submissions?: number | null;
   execution_backend_id?: string | null;
   is_submittable?: boolean;
-  course_content_type?: CourseContentTypeGet | null;
+  course_content_type?: CourseContentTypeList | null;
   /** Whether this content has an example deployment */
   has_deployment?: boolean | null;
   /** Current deployment status if has_deployment=true */

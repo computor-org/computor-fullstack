@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-16T23:19:37.589990
+ * Generated on: 2025-09-17T14:46:20.422345
 
  * Category: Common
 
@@ -90,64 +90,6 @@ export interface ProfileUpdate {
   url?: string | null;
   /** Additional properties */
   properties?: any | null;
-}
-
-export interface MessageCreate {
-  parent_id?: string | null;
-  level?: number;
-  title: string;
-  content: string;
-  user_id?: string | null;
-  course_member_id?: string | null;
-  course_submission_group_id?: string | null;
-  course_group_id?: string | null;
-  course_content_id?: string | null;
-  course_id?: string | null;
-}
-
-export interface MessageUpdate {
-  title?: string | null;
-  content?: string | null;
-}
-
-export interface MessageGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  id: string;
-  title: string;
-  content: string;
-  level: number;
-  parent_id?: string | null;
-  author_id: string;
-  user_id?: string | null;
-  course_member_id?: string | null;
-  course_submission_group_id?: string | null;
-  course_group_id?: string | null;
-  course_content_id?: string | null;
-  course_id?: string | null;
-}
-
-export interface MessageList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  id: string;
-  title: string;
-  content: string;
-  level: number;
-  parent_id?: string | null;
-  author_id: string;
-  user_id?: string | null;
-  course_member_id?: string | null;
-  course_submission_group_id?: string | null;
-  course_group_id?: string | null;
-  course_content_id?: string | null;
-  course_id?: string | null;
 }
 
 export interface CourseMemberGitLabConfig {
@@ -1554,6 +1496,13 @@ export interface ComputorDeploymentConfig {
   settings?: Record<string, any> | null;
   /** If provided, uploads examples before hierarchy deployment */
   examples_upload?: ExamplesUploadConfig | null;
+}
+
+export interface ExamplesUploadConfig {
+  /** Name of the Example Repository to use/create */
+  repository: string;
+  /** Relative path to directory containing example subdirectories */
+  path: string;
 }
 
 export interface GitlabGroupProjectConfig {

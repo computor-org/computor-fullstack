@@ -178,56 +178,75 @@ class TypeScriptGenerator:
             # Skip test files and __pycache__
             if '__pycache__' in str(py_file) or 'test_' in py_file.name:
                 continue
-            
+
             try:
-                # Parse the file to find class definitions
                 with open(py_file, 'r', encoding='utf-8') as f:
                     content = f.read()
-                
                 tree = ast.parse(content)
-                
-                # Look for Pydantic model classes
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.ClassDef):
-                        # Check if it inherits from BaseModel or other known base classes
-                        for base in node.bases:
-                            base_name = ''
-                            if isinstance(base, ast.Name):
-                                base_name = base.id
-                            elif isinstance(base, ast.Attribute):
-                                base_name = base.attr
-                            
-                            # Check for BaseModel or classes that might inherit from it
-                            if base_name in ['BaseModel', 'BaseDeployment', 'RepositoryConfig', 
-                                           'GitLabConfigGet', 'BaseEntityList', 'BaseEntityGet',
-                                           'BaseEntityCreate', 'BaseEntityUpdate',
-                                           # Add deployment configuration classes
-                                           'OrganizationConfig', 'CourseFamilyConfig', 'CourseConfig',
-                                           'HierarchicalOrganizationConfig', 'HierarchicalCourseFamilyConfig',
-                                           'HierarchicalCourseConfig']:
-                                # Try to import the module and get the class
-                                try:
-                                    # Convert file path to module path
-                                    relative_path = py_file.relative_to(Path(__file__).parent.parent.parent)
-                                    module_path = str(relative_path).replace('/', '.').replace('.py', '')
-                                    
-                                    # Import the module
-                                    spec = importlib.util.spec_from_file_location(module_path, py_file)
-                                    if spec and spec.loader:
-                                        module = importlib.util.module_from_spec(spec)
-                                        spec.loader.exec_module(module)
-                                        
-                                        # Get the class
-                                        if hasattr(module, node.name):
-                                            model_class = getattr(module, node.name)
-                                            if inspect.isclass(model_class) and issubclass(model_class, BaseModel):
-                                                models.append(model_class)
-                                except Exception as e:
-                                    print(f"Warning: Could not import {node.name} from {py_file}: {e}")
-                
             except Exception as e:
                 print(f"Warning: Could not parse {py_file}: {e}")
-        
+                continue
+
+            # Try to import the module once so we can inspect classes (including nested)
+            module = None
+            try:
+                relative_path = py_file.relative_to(Path(__file__).parent.parent.parent)
+                module_path = str(relative_path).replace('/', '.').replace('.py', '')
+                spec = importlib.util.spec_from_file_location(module_path, py_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+            except Exception as e:
+                print(f"Warning: Could not import module {py_file}: {e}")
+
+            if module is None:
+                continue
+
+            base_class_names = {
+                'BaseModel', 'BaseDeployment', 'RepositoryConfig', 'GitLabConfigGet',
+                'BaseEntityList', 'BaseEntityGet', 'BaseEntityCreate', 'BaseEntityUpdate',
+                'OrganizationConfig', 'CourseFamilyConfig', 'CourseConfig',
+                'HierarchicalOrganizationConfig', 'HierarchicalCourseFamilyConfig',
+                'HierarchicalCourseConfig'
+            }
+
+            def process_class(node: ast.ClassDef, parent_chain: List[str]):
+                current_chain = parent_chain + [node.name]
+
+                inherits_base = False
+                for base in node.bases:
+                    base_name = ''
+                    if isinstance(base, ast.Name):
+                        base_name = base.id
+                    elif isinstance(base, ast.Attribute):
+                        base_name = base.attr
+
+                    if base_name in base_class_names:
+                        inherits_base = True
+                        break
+
+                if inherits_base:
+                    try:
+                        attr = module
+                        for name in current_chain:
+                            if not hasattr(attr, name):
+                                attr = None
+                                break
+                            attr = getattr(attr, name)
+
+                        if attr and inspect.isclass(attr) and issubclass(attr, BaseModel):
+                            models.append(attr)
+                    except Exception as e:
+                        print(f"Warning: Could not resolve {'.'.join(current_chain)} in {py_file}: {e}")
+
+                for child in node.body:
+                    if isinstance(child, ast.ClassDef):
+                        process_class(child, current_chain)
+
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    process_class(node, [])
+
         return models
     
     def generate_index_file(self, models: List[type[BaseModel]], module_name: str) -> str:
@@ -268,6 +287,7 @@ class TypeScriptGenerator:
             'sso': [],
             'tasks': [],
             'examples': [],
+            'messages': [],
             'common': [],
         }
         
@@ -308,6 +328,8 @@ class TypeScriptGenerator:
                 category = 'tasks'
             elif 'example' in module_name or 'example' in model_name:
                 category = 'examples'
+            elif 'message' in module_name or 'message' in model_name:
+                category = 'messages'
             
             model_categories[category].append(model)
             model_to_category[model.__name__] = category
@@ -463,7 +485,9 @@ python ctutor_backend/scripts/generate_typescript_interfaces.py
 - **organizations.ts** - Organization interfaces
 - **roles.ts** - Roles and permissions interfaces
 - **sso.ts** - SSO provider interfaces
-- **tasks.ts** - Task and job interfaces  
+- **tasks.ts** - Task and job interfaces
+- **messages.ts** - Messaging and discussion interfaces
+- **examples.ts** - Example and template interfaces
 - **common.ts** - Common/shared interfaces
 
 ## Usage

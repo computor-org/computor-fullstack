@@ -6,6 +6,7 @@ from ctutor_backend.interface.student_course_contents import (
     SubmissionGroupRepository, SubmissionGroupMemberBasic, SubmissionGroupGradingStudent
 )
 from ctutor_backend.interface.grading import GradingStatus
+from ctutor_backend.interface.tasks import map_int_to_task_status
 from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseMember, CourseContent, CourseSubmissionGroupGrading
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.deployment import CourseContentDeployment
@@ -44,13 +45,15 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         from ctutor_backend.model.example import Example, ExampleVersion
         
         deployment = course_content.deployment
-        if deployment.example_version_id:
-            # Get example version and then example
-            example_version = db.query(ExampleVersion).filter(
-                ExampleVersion.id == deployment.example_version_id
-            ).first()
-            if example_version and example_version.example:
-                directory = example_version.example.directory
+
+        directory = deployment.deployment_path
+        # if deployment.example_version_id:
+        #     # Get example version and then example
+        #     example_version = db.query(ExampleVersion).filter(
+        #         ExampleVersion.id == deployment.example_version_id
+        #     ).first()
+        #     if example_version and example_version.example:
+        #         directory = example_version.example.directory
     
     # Fallback to properties if no example directory found
     # if not directory:
@@ -90,7 +93,7 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
                 execution_backend_id=result.execution_backend_id,
                 test_system_id=result.test_system_id,
                 version_identifier=result.version_identifier,
-                status=result.status,
+                status=map_int_to_task_status(result.status),
                 result=result.result,
                 result_json=result.result_json,
                 submit=result.submit

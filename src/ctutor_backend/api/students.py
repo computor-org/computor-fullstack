@@ -85,7 +85,9 @@ def student_list_course_contents(permissions: Annotated[Principal, Depends(get_c
     response_list: list[CourseContentStudentList] = []
 
     for course_contents_result in course_contents_results:
-        response_list.append(course_member_course_content_result_mapper(course_contents_result, db))
+        asdf= course_member_course_content_result_mapper(course_contents_result, db)
+        print(asdf.model_dump_json(indent=1))
+        response_list.append(asdf)
 
     return response_list
 

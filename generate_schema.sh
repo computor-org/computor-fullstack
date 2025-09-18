@@ -1,23 +1,22 @@
 #!/bin/bash
 
-# Script to generate JSON Schema for VS Code from Pydantic models
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# shellcheck disable=SC1090
+source "${ROOT_DIR}/scripts/utilities/ensure_venv.sh"
 
 echo "🔧 Generating JSON Schema for meta.yaml files..."
 
-# Navigate to the project root
-cd "$(dirname "$0")"
+ensure_venv
 
-# Activate virtual environment if it exists
-if [ -d ".venv" ]; then
-    source .venv/bin/activate
+PYTHON_BIN="${PYTHON_BIN:-python}"
+if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
 fi
 
-# Run the schema generation script
-python src/ctutor_backend/scripts/generate_json_schema.py
+PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
+    "${PYTHON_BIN}" -m ctutor_backend.cli.cli generate-schema "$@"
 
-if [ $? -eq 0 ]; then
-    echo "✅ JSON Schema generation completed successfully!"
-else
-    echo "❌ JSON Schema generation failed!"
-    exit 1
-fi
+echo "✅ JSON Schema generation completed successfully!"

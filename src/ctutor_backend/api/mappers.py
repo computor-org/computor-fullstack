@@ -6,7 +6,9 @@ from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentGet,
     ResultStudentList,
     SubmissionGroupStudentList,
+    SubmissionGroupStudentGet,
     SubmissionGroupRepository,
+    SubmissionGroupMemberBasic,
 )
 from ctutor_backend.interface.grading import GradingStatus, CourseSubmissionGroupGradingList
 from ctutor_backend.interface.tasks import map_int_to_task_status
@@ -95,18 +97,54 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
             submit=result.submit,
         )
 
+    gradings_payload = []
+    if course_submission_group is not None and getattr(course_submission_group, 'gradings', None):
+        sorted_gradings = sorted(
+            course_submission_group.gradings,
+            key=lambda g: g.created_at,
+            reverse=True,
+        )
+        for grading in sorted_gradings:
+            gradings_payload.append(CourseSubmissionGroupGradingList.model_validate(grading))
+
     submission_group_payload = None
+    submission_group_detail = None
     if course_submission_group is not None:
-        submission_group_payload = SubmissionGroupStudentList(
+        submission_group_base = dict(
             id=str(course_submission_group.id),
+            course_content_title=None,
+            course_content_path=None,
+            example_identifier=None,
+            max_group_size=course_submission_group.max_group_size,
+            current_group_size=len(course_submission_group.members) if getattr(course_submission_group, 'members', None) else 1,
+            members=[
+                SubmissionGroupMemberBasic(
+                    id=str(member.id),
+                    user_id=member.course_member.user_id if member.course_member else '',
+                    course_member_id=str(member.course_member_id),
+                    username=member.course_member.user.username if member.course_member and member.course_member.user else None,
+                    full_name=(
+                        f"{member.course_member.user.given_name} {member.course_member.user.family_name}".strip()
+                        if member.course_member and member.course_member.user
+                        else None
+                    ),
+                )
+                for member in getattr(course_submission_group, 'members', [])
+            ],
+            repository=repository,
             status=submission_status,
             grading=submission_grading,
             count=submitted_count if submitted_count is not None else 0,
             max_submissions=course_submission_group.max_submissions,
-            max_group_size=course_submission_group.max_group_size,
-            repository=repository,
             unread_message_count=submission_group_unread_count,
         )
+
+        submission_group_payload = SubmissionGroupStudentList(**submission_group_base)
+
+        if gradings_payload:
+            submission_group_detail = SubmissionGroupStudentGet(**submission_group_base, gradings=gradings_payload)
+        else:
+            submission_group_detail = SubmissionGroupStudentGet(**submission_group_base)
 
     list_obj = CourseContentStudentList(
         id=course_content.id,
@@ -131,16 +169,6 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     if not detailed:
         return list_obj
 
-    gradings_payload = []
-    if course_submission_group is not None and getattr(course_submission_group, 'gradings', None):
-        sorted_gradings = sorted(
-            course_submission_group.gradings,
-            key=lambda g: g.created_at,
-            reverse=True,
-        )
-        for grading in sorted_gradings:
-            gradings_payload.append(CourseSubmissionGroupGradingList.model_validate(grading))
-
     return CourseContentStudentGet(
         created_at=course_content.created_at,
         updated_at=course_content.updated_at,
@@ -160,6 +188,10 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         max_test_runs=list_obj.max_test_runs,
         unread_message_count=list_obj.unread_message_count,
         result=list_obj.result,
-        submission_group=list_obj.submission_group,
-        gradings=gradings_payload,
+        directory=list_obj.directory,
+        color=list_obj.color,
+        submission_group=submission_group_detail or (
+            SubmissionGroupStudentGet(**submission_group_payload.model_dump())
+            if submission_group_payload is not None else None
+        ),
     )

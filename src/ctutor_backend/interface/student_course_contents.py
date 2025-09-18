@@ -8,7 +8,6 @@ from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.tasks import TaskStatus
 from ctutor_backend.interface.grading import CourseSubmissionGroupGradingList
-from ctutor_backend.interface.grading import CourseSubmissionGroupGradingList
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
 from ..custom_types import Ltree
@@ -44,7 +43,7 @@ class SubmissionGroupMemberBasic(BaseModel):
 #     model_config = ConfigDict(from_attributes=True)
 
 class SubmissionGroupStudentList(BaseModel):
-    """Enhanced submission group data for course contents"""
+    """Submission group data for course contents (list view)."""
     id: Optional[str] = None
     course_content_title: Optional[str] = None
     course_content_path: Optional[str] = None
@@ -58,9 +57,12 @@ class SubmissionGroupStudentList(BaseModel):
     count: int = 0  # Backward compatibility - submission count
     max_submissions: Optional[int] = None  # Backward compatibility
     unread_message_count: int = 0
-    gradings: List[CourseSubmissionGroupGradingList] = Field(default_factory=list)
-    
+
     model_config = ConfigDict(from_attributes=True)
+
+class SubmissionGroupStudentGet(SubmissionGroupStudentList):
+    """Detailed submission group view including grading history."""
+    gradings: List[CourseSubmissionGroupGradingList] = Field(default_factory=list)
 
 class ResultStudentList(BaseModel):
     execution_backend_id: Optional[str] = None
@@ -95,7 +97,9 @@ class CourseContentStudentGet(BaseEntityGet):
     max_test_runs: Optional[int] = None
     unread_message_count: int = 0
     result: Optional[ResultStudentList] = None
-    submission_group: Optional[SubmissionGroupStudentList] = None
+    directory: Optional[str] = None
+    color: str
+    submission_group: Optional[SubmissionGroupStudentGet] = None
 
     @field_validator('path', mode='before')
     @classmethod

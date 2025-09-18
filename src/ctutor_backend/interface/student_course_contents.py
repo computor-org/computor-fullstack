@@ -89,6 +89,7 @@ class CourseContentStudentGet(BaseEntityGet):
     course_content_types: CourseContentTypeGet
     result_count: int
     max_test_runs: Optional[int] = None
+    unread_message_count: int = 0
 
     @field_validator('path', mode='before')
     @classmethod
@@ -117,6 +118,7 @@ class CourseContentStudentList(BaseModel):
     result: Optional[ResultStudentList] = None
 
     submission_group:  Optional[SubmissionGroupStudentList] = None
+    unread_message_count: int = 0
     
     @field_validator('path', mode='before')
     @classmethod

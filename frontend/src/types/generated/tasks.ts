@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-18T17:27:35.884978
+ * Generated on: 2025-09-18T19:32:54.823062
 
  * Category: Tasks
 

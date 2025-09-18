@@ -1,12 +1,13 @@
 from typing import Optional
 from uuid import UUID
-from sqlalchemy import func, case, select
+from sqlalchemy import func, case, select, and_, literal
 from sqlalchemy.orm import Session
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import CourseSubmissionGroupMember
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseSubmissionGroup, CourseSubmissionGroupGrading
+from ctutor_backend.model.message import Message, MessageRead
 
 def latest_result_subquery(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session, submission: Optional[bool] = None):
 
@@ -80,11 +81,75 @@ def latest_grading_subquery(db: Session):
         ).label('rn')
     ).subquery()
 
+
+def message_unread_by_content_subquery(reader_user_id: UUID | str | None, db: Session):
+    if reader_user_id is None:
+        return None
+
+    return (
+        db.query(
+            Message.course_content_id.label("course_content_id"),
+            func.count(Message.id).label("unread_count"),
+        )
+        .outerjoin(
+            MessageRead,
+            and_(
+                MessageRead.message_id == Message.id,
+                MessageRead.reader_user_id == reader_user_id,
+            ),
+        )
+        .filter(Message.archived_at.is_(None))
+        .filter(Message.course_content_id.isnot(None))
+        .filter(Message.course_submission_group_id.is_(None))
+        .filter(MessageRead.id.is_(None))
+        .filter(Message.author_id != reader_user_id)
+        .group_by(Message.course_content_id)
+        .subquery()
+    )
+
+
+def message_unread_by_submission_group_subquery(reader_user_id: UUID | str | None, db: Session):
+    if reader_user_id is None:
+        return None
+
+    return (
+        db.query(
+            Message.course_submission_group_id.label("course_submission_group_id"),
+            func.count(Message.id).label("unread_count"),
+        )
+        .outerjoin(
+            MessageRead,
+            and_(
+                MessageRead.message_id == Message.id,
+                MessageRead.reader_user_id == reader_user_id,
+            ),
+        )
+        .filter(Message.archived_at.is_(None))
+        .filter(Message.course_submission_group_id.isnot(None))
+        .filter(MessageRead.id.is_(None))
+        .filter(Message.author_id != reader_user_id)
+        .group_by(Message.course_submission_group_id)
+        .subquery()
+    )
+
 def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str, db: Session):
 
     latest_result_sub = latest_result_subquery(user_id,None,course_content_id,db)
     results_count_sub = results_count_subquery(user_id,None,course_content_id,db)
     latest_grading_sub = latest_grading_subquery(db)
+    content_unread_sub = message_unread_by_content_subquery(user_id, db)
+    submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+
+    content_unread_column = (
+        func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
+        if content_unread_sub is not None
+        else literal(0).label("content_unread_count")
+    )
+    submission_group_unread_column = (
+        func.coalesce(submission_group_unread_sub.c.unread_count, 0).label("submission_group_unread_count")
+        if submission_group_unread_sub is not None
+        else literal(0).label("submission_group_unread_count")
+    )
 
     # Subquery to get only the user's submission groups
     # Use select() explicitly to avoid SQLAlchemy warning
@@ -101,15 +166,19 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     ).subquery()
 
     # Query specific course content including those without submission groups
-    course_contents_result = db.query(
-            CourseContent,
-            results_count_sub.c.total_results_count,
-            Result,
-            CourseSubmissionGroup,
-            results_count_sub.c.submitted_count,
-            latest_grading_sub.c.status,
-            latest_grading_sub.c.grading
-        ) \
+    query_columns = [
+        CourseContent,
+        results_count_sub.c.total_results_count,
+        Result,
+        CourseSubmissionGroup,
+        results_count_sub.c.submitted_count,
+        latest_grading_sub.c.status,
+        latest_grading_sub.c.grading,
+        content_unread_column,
+        submission_group_unread_column,
+    ]
+
+    course_contents_query = db.query(*query_columns) \
         .select_from(User) \
         .filter(User.id == user_id) \
         .join(CourseMember, CourseMember.user_id == User.id) \
@@ -137,7 +206,21 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
             latest_grading_sub,
             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
-        ).distinct().first()
+        )
+
+    if content_unread_sub is not None:
+        course_contents_query = course_contents_query.outerjoin(
+            content_unread_sub,
+            CourseContent.id == content_unread_sub.c.course_content_id,
+        )
+
+    if submission_group_unread_sub is not None:
+        course_contents_query = course_contents_query.outerjoin(
+            submission_group_unread_sub,
+            CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
+        )
+
+    course_contents_result = course_contents_query.distinct().first()
         
     if course_contents_result == None:
         raise NotFoundException()
@@ -149,6 +232,19 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     latest_result_sub = latest_result_subquery(user_id,None,None,db)
     results_count_sub = results_count_subquery(user_id,None,None,db)
     latest_grading_sub = latest_grading_subquery(db)
+    content_unread_sub = message_unread_by_content_subquery(user_id, db)
+    submission_group_unread_sub = message_unread_by_submission_group_subquery(user_id, db)
+
+    content_unread_column = (
+        func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
+        if content_unread_sub is not None
+        else literal(0).label("content_unread_count")
+    )
+    submission_group_unread_column = (
+        func.coalesce(submission_group_unread_sub.c.unread_count, 0).label("submission_group_unread_count")
+        if submission_group_unread_sub is not None
+        else literal(0).label("submission_group_unread_count")
+    )
 
     # Subquery to get only the user's submission groups
     # Use select() explicitly to avoid SQLAlchemy warning
@@ -165,15 +261,19 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     ).subquery()
 
     # Query ALL course contents where the user is a member, including those without submission groups
-    query = db.query(
-            CourseContent,
-            results_count_sub.c.total_results_count,
-            Result,
-            CourseSubmissionGroup,
-            results_count_sub.c.submitted_count,
-            latest_grading_sub.c.status,
-            latest_grading_sub.c.grading
-        ) \
+    query_columns = [
+        CourseContent,
+        results_count_sub.c.total_results_count,
+        Result,
+        CourseSubmissionGroup,
+        results_count_sub.c.submitted_count,
+        latest_grading_sub.c.status,
+        latest_grading_sub.c.grading,
+        content_unread_column,
+        submission_group_unread_column,
+    ]
+
+    query = db.query(*query_columns) \
         .select_from(User) \
         .filter(User.id == user_id) \
         .join(CourseMember, CourseMember.user_id == User.id) \
@@ -201,24 +301,53 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             latest_grading_sub,
             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
-        ).distinct()
+        )
+
+    if content_unread_sub is not None:
+        query = query.outerjoin(
+            content_unread_sub,
+            CourseContent.id == content_unread_sub.c.course_content_id,
+        )
+
+    if submission_group_unread_sub is not None:
+        query = query.outerjoin(
+            submission_group_unread_sub,
+            CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
+        )
+
+    query = query.distinct()
 
     return query
 
-def course_member_course_content_query(course_member_id: UUID | str, course_content_id: UUID | str, db: Session):
+def course_member_course_content_query(course_member_id: UUID | str, course_content_id: UUID | str, db: Session, reader_user_id: UUID | str | None = None):
 
     latest_result_sub = latest_result_subquery(None,course_member_id,course_content_id,db)
     results_count_sub = results_count_subquery(None,course_member_id,course_content_id,db)
     latest_grading_sub = latest_grading_subquery(db)
+    content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
+    submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
 
-    course_contents_result = db.query(
+    content_unread_column = (
+        func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
+        if content_unread_sub is not None
+        else literal(0).label("content_unread_count")
+    )
+    submission_group_unread_column = (
+        func.coalesce(submission_group_unread_sub.c.unread_count, 0).label("submission_group_unread_count")
+        if submission_group_unread_sub is not None
+        else literal(0).label("submission_group_unread_count")
+    )
+
+    course_contents_query = db.query(
             CourseContent,
             results_count_sub.c.total_results_count,
             Result,
             CourseSubmissionGroup,
             results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
-            latest_grading_sub.c.grading
+            latest_grading_sub.c.grading,
+            content_unread_column,
+            submission_group_unread_column,
         ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
@@ -241,18 +370,45 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
             latest_grading_sub,
             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
-        ).first()
+        )
+
+    if content_unread_sub is not None:
+        course_contents_query = course_contents_query.outerjoin(
+            content_unread_sub,
+            CourseContent.id == content_unread_sub.c.course_content_id,
+        )
+
+    if submission_group_unread_sub is not None:
+        course_contents_query = course_contents_query.outerjoin(
+            submission_group_unread_sub,
+            CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
+        )
+
+    course_contents_result = course_contents_query.first()
         
     if course_contents_result == None:
         raise NotFoundException()
 
     return course_contents_result
 
-def course_member_course_content_list_query(course_member_id: UUID | str, db: Session):
+def course_member_course_content_list_query(course_member_id: UUID | str, db: Session, reader_user_id: UUID | str | None = None):
 
     latest_result_sub = latest_result_subquery(None,course_member_id,None,db,True)
     results_count_sub = results_count_subquery(None,course_member_id,None,db)
     latest_grading_sub = latest_grading_subquery(db)
+    content_unread_sub = message_unread_by_content_subquery(reader_user_id, db)
+    submission_group_unread_sub = message_unread_by_submission_group_subquery(reader_user_id, db)
+
+    content_unread_column = (
+        func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
+        if content_unread_sub is not None
+        else literal(0).label("content_unread_count")
+    )
+    submission_group_unread_column = (
+        func.coalesce(submission_group_unread_sub.c.unread_count, 0).label("submission_group_unread_count")
+        if submission_group_unread_sub is not None
+        else literal(0).label("submission_group_unread_count")
+    )
 
     # Subquery to get the member's submission groups
     member_submission_groups = select(CourseSubmissionGroup).select_from(
@@ -272,7 +428,9 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             CourseSubmissionGroup,
             results_count_sub.c.submitted_count,
             latest_grading_sub.c.status,
-            latest_grading_sub.c.grading
+            latest_grading_sub.c.grading,
+            content_unread_column,
+            submission_group_unread_column,
         ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
@@ -297,6 +455,18 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             latest_grading_sub,
             (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
             & (latest_grading_sub.c.rn == 1)
+        )
+
+    if content_unread_sub is not None:
+        query = query.outerjoin(
+            content_unread_sub,
+            CourseContent.id == content_unread_sub.c.course_content_id,
+        )
+
+    if submission_group_unread_sub is not None:
+        query = query.outerjoin(
+            submission_group_unread_sub,
+            CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
         )
 
     return query

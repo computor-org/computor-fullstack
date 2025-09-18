@@ -40,6 +40,7 @@ class MessageGet(BaseEntityGet):
     parent_id: Optional[str] = None
     author_id: str
     author: Optional[MessageAuthor] = Field(None, description="Author details")
+    is_read: bool = False
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
@@ -59,6 +60,7 @@ class MessageList(BaseEntityList):
     parent_id: Optional[str] = None
     author_id: str
     author: Optional[MessageAuthor] = Field(None, description="Author details")
+    is_read: bool = False
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None

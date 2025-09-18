@@ -16,7 +16,7 @@ export const courseKeys = {
   contentKinds: () => [...courseKeys.all, 'content-kinds'] as const,
 };
 
-type CourseQueryOptions<T> = Omit<UseQueryOptions<T>, 'queryKey' | 'queryFn'>;
+export type CourseQueryOptions<T> = Omit<UseQueryOptions<T>, 'queryKey' | 'queryFn'>;
 
 export const useCourseQuery = (
   courseId: string,

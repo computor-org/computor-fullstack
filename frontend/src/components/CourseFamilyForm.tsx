@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   TextField,
   Select,
   MenuItem,
@@ -18,8 +19,10 @@ interface CourseFamilyFormProps {
   courseFamily?: CourseFamilyGet | null;
   organizations: OrganizationGet[];
   mode: 'create' | 'edit';
-  onSubmit: (data: CourseFamilyCreate | CourseFamilyUpdate) => void;
+  onSubmit: (data: CourseFamilyCreate | CourseFamilyUpdate) => Promise<void> | void;
   onClose?: () => void;
+  loading?: boolean;
+  error?: string | null;
 }
 
 const CourseFamilyForm: React.FC<CourseFamilyFormProps> = ({
@@ -28,6 +31,8 @@ const CourseFamilyForm: React.FC<CourseFamilyFormProps> = ({
   mode,
   onSubmit,
   onClose,
+  loading = false,
+  error = null,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -51,7 +56,7 @@ const CourseFamilyForm: React.FC<CourseFamilyFormProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (mode === 'create') {
@@ -59,7 +64,7 @@ const CourseFamilyForm: React.FC<CourseFamilyFormProps> = ({
         ...formData,
         properties: {},
       };
-      onSubmit(createData);
+      await onSubmit(createData);
     } else {
       // For update, only send changed fields
       const updateData: CourseFamilyUpdate = {};
@@ -69,12 +74,21 @@ const CourseFamilyForm: React.FC<CourseFamilyFormProps> = ({
           (updateData as any)[key] = value || null;
         }
       });
-      onSubmit(updateData);
+      if (Object.keys(updateData).length > 0) {
+        await onSubmit(updateData);
+      } else {
+        onClose?.();
+      }
     }
   };
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <TextField
@@ -132,12 +146,12 @@ const CourseFamilyForm: React.FC<CourseFamilyFormProps> = ({
       </Grid>
       <DialogActions>
         {onClose && (
-          <Button onClick={onClose} color="inherit">
+          <Button onClick={onClose} color="inherit" disabled={loading}>
             Cancel
           </Button>
         )}
-        <Button type="submit" variant="contained" color="primary">
-          {mode === 'create' ? 'Create' : 'Update'}
+        <Button type="submit" variant="contained" color="primary" disabled={loading}>
+          {loading ? 'Saving...' : mode === 'create' ? 'Create' : 'Update'}
         </Button>
       </DialogActions>
     </Box>

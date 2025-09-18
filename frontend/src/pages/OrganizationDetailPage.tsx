@@ -1,120 +1,68 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  Grid,
-  Chip,
-  Stack,
-  Divider,
   Alert,
+  Box,
+  Button,
+  Chip,
   CircularProgress,
+  Grid,
   IconButton,
+  Paper,
+  Stack,
+  Typography,
 } from '@mui/material';
 import {
+  AccountTree as AccountTreeIcon,
   ArrowBack as ArrowBackIcon,
-  Edit as EditIcon,
   Business as BusinessIcon,
-  Group as GroupIcon,
-  Person as PersonIcon,
   Email as EmailIcon,
+  Group as GroupIcon,
+  LocationOn as LocationIcon,
+  Person as PersonIcon,
   Phone as PhoneIcon,
   Web as WebIcon,
-  LocationOn as LocationIcon,
 } from '@mui/icons-material';
-import { OrganizationGet } from '../types/generated/organizations';
-import { CourseFamilyGet } from '../types/generated/courses';
-import { apiClient } from '../services/apiClient';
-import { DataTable, Column } from '../components/common/DataTable';
 import { formatDistanceToNow } from 'date-fns';
+import { useOrganizationQuery } from '../app/queries/organizationQueries';
+import { useCourseFamilyListQuery } from '../app/queries/courseFamilyQueries';
+
+const getOrgTypeIcon = (type: string) => {
+  switch (type) {
+    case 'user':
+      return <PersonIcon fontSize="small" />;
+    case 'community':
+      return <GroupIcon fontSize="small" />;
+    case 'organization':
+      return <BusinessIcon fontSize="small" />;
+    default:
+      return <BusinessIcon fontSize="small" />;
+  }
+};
 
 const OrganizationDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const organizationId = id ?? '';
   const navigate = useNavigate();
-  const [organization, setOrganization] = useState<OrganizationGet | null>(null);
-  const [courseFamilies, setCourseFamilies] = useState<CourseFamilyGet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadOrganizationDetails();
-  }, [id]);
+  const organizationQuery = useOrganizationQuery(organizationId, {
+    enabled: Boolean(organizationId),
+  });
 
-  const loadOrganizationDetails = async () => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Load organization details
-      const orgData = await apiClient.get<OrganizationGet>(`/organizations/${id}`);
-      setOrganization(orgData);
-
-      // Load course families for this organization
-      try {
-        const courseFamiliesData = await apiClient.get<CourseFamilyGet[]>(`/course-families?organization_id=${id}`);
-        setCourseFamilies(courseFamiliesData || []);
-      } catch (cfError) {
-        console.error('Error loading course families:', cfError);
-        // Continue with empty course families if API fails
-        setCourseFamilies([]);
-      }
-    } catch (err: any) {
-      console.error('Error loading organization details:', err);
-      setError('Failed to load organization details');
-    } finally {
-      setLoading(false);
+  const courseFamilyQuery = useCourseFamilyListQuery(
+    {
+      organization_id: organizationId,
+      limit: 500,
+    },
+    {
+      enabled: Boolean(organizationId),
     }
-  };
+  );
 
-  const getOrgTypeIcon = (type: string) => {
-    switch (type) {
-      case 'user':
-        return <PersonIcon fontSize="small" />;
-      case 'community':
-        return <GroupIcon fontSize="small" />;
-      case 'organization':
-        return <BusinessIcon fontSize="small" />;
-      default:
-        return <BusinessIcon fontSize="small" />;
-    }
-  };
+  const organization = organizationQuery.data;
+  const courseFamilies = courseFamilyQuery.data?.items ?? [];
 
-  const courseFamilyColumns: Column<CourseFamilyGet>[] = [
-    {
-      id: 'title',
-      label: 'Course Family',
-      render: (value, row) => (
-        <Box>
-          <Typography variant="subtitle2">
-            {value || 'Untitled Course Family'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {row.path}
-          </Typography>
-        </Box>
-      ),
-    },
-    {
-      id: 'description',
-      label: 'Description',
-      render: (value) => (
-        <Typography variant="body2" color="text.secondary">
-          {value || '-'}
-        </Typography>
-      ),
-    },
-    {
-      id: 'created_at',
-      label: 'Created',
-      render: (value) => value ? formatDistanceToNow(new Date(value), { addSuffix: true }) : '-',
-    },
-  ];
-
-  if (loading) {
+  if (organizationQuery.isLoading || courseFamilyQuery.isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
         <CircularProgress />
@@ -122,11 +70,19 @@ const OrganizationDetailPage: React.FC = () => {
     );
   }
 
-  if (error || !organization) {
+  if (organizationQuery.error || !organization) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error || 'Organization not found'}</Alert>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/admin/organizations')} sx={{ mt: 2 }}>
+        <Alert severity="error">
+          {organizationQuery.error instanceof Error
+            ? organizationQuery.error.message
+            : 'Organization not found'}
+        </Alert>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/admin/organizations')}
+          sx={{ mt: 2 }}
+        >
           Back to Organizations
         </Button>
       </Box>
@@ -135,129 +91,142 @@ const OrganizationDetailPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* Header */}
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <IconButton onClick={() => navigate('/admin/organizations')}>
           <ArrowBackIcon />
         </IconButton>
         <Typography variant="h4">Organization Details</Typography>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          variant="outlined"
+          startIcon={<AccountTreeIcon />}
+          onClick={() => navigate(`/admin/organizations/${organization.id}/edit`)}
+        >
+          Edit Organization
+        </Button>
       </Box>
 
       <Grid container spacing={3}>
-        {/* Organization Information Card */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3 }}>
             <Stack spacing={3} alignItems="center">
               <Box sx={{ textAlign: 'center' }}>
-                <Box sx={{ mb: 2 }}>
-                  {getOrgTypeIcon(organization.organization_type)}
-                </Box>
+                <Box sx={{ mb: 2 }}>{getOrgTypeIcon(organization.organization_type)}</Box>
                 <Typography variant="h5">
-                  {organization.title || `User Organization (${organization.user_id?.substring(0, 8)}...)`}
+                  {organization.title ||
+                    `User Organization (${organization.user_id?.substring(0, 8)}...)`}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {organization.path}
                 </Typography>
               </Box>
 
-              <Chip 
+              <Chip
                 icon={getOrgTypeIcon(organization.organization_type)}
-                label={organization.organization_type} 
-                size="small" 
+                label={organization.organization_type}
+                size="small"
                 variant="outlined"
               />
 
-              <Divider sx={{ width: '100%' }} />
-
-              {/* Contact Information */}
-              <Box sx={{ width: '100%' }}>
-                <Typography variant="h6" gutterBottom>
-                  Contact Information
-                </Typography>
-                
+              <Stack spacing={1} sx={{ width: '100%' }}>
                 {organization.email && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
                     <EmailIcon fontSize="small" color="action" />
                     <Typography variant="body2">{organization.email}</Typography>
-                  </Box>
+                  </Stack>
                 )}
-                
                 {organization.telephone && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
                     <PhoneIcon fontSize="small" color="action" />
                     <Typography variant="body2">{organization.telephone}</Typography>
-                  </Box>
+                  </Stack>
                 )}
-                
                 {organization.url && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
                     <WebIcon fontSize="small" color="action" />
                     <Typography variant="body2">
                       <a href={organization.url} target="_blank" rel="noopener noreferrer">
                         {organization.url}
                       </a>
                     </Typography>
-                  </Box>
+                  </Stack>
                 )}
-              </Box>
-
-              {/* Location Information */}
-              {(organization.street_address || organization.locality || organization.region || organization.country) && (
-                <>
-                  <Divider sx={{ width: '100%' }} />
-                  <Box sx={{ width: '100%' }}>
-                    <Typography variant="h6" gutterBottom>
-                      <LocationIcon fontSize="small" sx={{ mr: 1 }} />
-                      Location
-                    </Typography>
-                    
-                    {organization.street_address && (
-                      <Typography variant="body2" color="text.secondary">
-                        {organization.street_address}
-                      </Typography>
-                    )}
-                    
+                {(organization.street_address ||
+                  organization.locality ||
+                  organization.region ||
+                  organization.postal_code ||
+                  organization.country) && (
+                  <Stack direction="row" spacing={1} alignItems="flex-start">
+                    <LocationIcon fontSize="small" color="action" />
                     <Typography variant="body2" color="text.secondary">
-                      {[organization.locality, organization.region, organization.postal_code, organization.country]
+                      {[organization.street_address, organization.locality]
                         .filter(Boolean)
                         .join(', ')}
+                      <br />
+                      {[organization.region, organization.postal_code]
+                        .filter(Boolean)
+                        .join(' ')}
+                      <br />
+                      {organization.country}
                     </Typography>
-                  </Box>
-                </>
-              )}
-
-              <Divider sx={{ width: '100%' }} />
-
-              <Button
-                fullWidth
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={() => navigate(`/admin/organizations/${id}/edit`)}
-              >
-                Edit Organization
-              </Button>
+                  </Stack>
+                )}
+              </Stack>
             </Stack>
           </Paper>
         </Grid>
 
-        {/* Course Families */}
         <Grid item xs={12} md={8}>
-          <Stack spacing={3}>
-            <DataTable
-              title="Course Families"
-              columns={courseFamilyColumns}
-              data={courseFamilies.map(cf => ({ ...cf, id: cf.id }))}
-              loading={false}
-              error={null}
-              page={0}
-              rowsPerPage={10}
-              onPageChange={() => {}}
-              onRowsPerPageChange={() => {}}
-              totalCount={courseFamilies.length}
-              onRowClick={(cf) => navigate(`/admin/course-families/${cf.id}`)}
-              emptyMessage="No course families found for this organization"
-            />
-          </Stack>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Course Families
+            </Typography>
+            <Stack spacing={2}>
+              {courseFamilyQuery.isFetching && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              )}
+
+              {courseFamilyQuery.error instanceof Error && (
+                <Alert severity="error">
+                  {courseFamilyQuery.error.message}
+                </Alert>
+              )}
+
+              {courseFamilies.length === 0 && !courseFamilyQuery.isFetching ? (
+                <Typography variant="body2" color="text.secondary">
+                  No course families found for this organization.
+                </Typography>
+              ) : (
+                courseFamilies.map((family) => (
+                  <Paper
+                    key={family.id}
+                    variant="outlined"
+                    sx={{ p: 2, cursor: 'pointer' }}
+                    onClick={() => navigate(`/admin/course-families/${family.id}`)}
+                  >
+                    <Stack spacing={0.5}>
+                      <Typography variant="subtitle2">
+                        {family.title || 'Untitled Course Family'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {family.path}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Created{' '}
+                        {family.created_at
+                          ? formatDistanceToNow(new Date(family.created_at), {
+                              addSuffix: true,
+                            })
+                          : '—'}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                ))
+              )}
+            </Stack>
+          </Paper>
         </Grid>
       </Grid>
     </Box>

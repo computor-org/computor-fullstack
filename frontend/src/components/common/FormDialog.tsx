@@ -3,8 +3,6 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
-  Button,
   Box,
   CircularProgress,
 } from '@mui/material';
@@ -30,6 +28,11 @@ export const FormDialog: React.FC<FormDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth={maxWidth} fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
+        {loading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+            <CircularProgress size={24} />
+          </Box>
+        )}
         <Box sx={{ pt: 2 }}>{children}</Box>
       </DialogContent>
     </Dialog>

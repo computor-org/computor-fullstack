@@ -31,6 +31,7 @@ export class SSOIntegration {
       // Transform to frontend user format
       const user: AuthUser = {
         id: userInfo.user.id,
+        username: userInfo.user.username || userInfo.user.email,
         email: userInfo.user.email,
         givenName: userInfo.user.given_name || 'User',
         familyName: userInfo.user.family_name || '',

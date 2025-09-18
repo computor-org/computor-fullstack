@@ -4,6 +4,7 @@ import { LoginCredentials, AuthResponse, AuthUser, AuthToken } from '../types/au
 const mockUsers: (AuthUser & { password: string })[] = [
   {
     id: '1',
+    username: 'admin',
     email: 'admin@university.edu',
     password: 'admin123',
     givenName: 'John',
@@ -24,6 +25,7 @@ const mockUsers: (AuthUser & { password: string })[] = [
   },
   {
     id: '2',
+    username: 'lecturer',
     email: 'lecturer@university.edu',
     password: 'lecturer123',
     givenName: 'Jane',
@@ -40,6 +42,7 @@ const mockUsers: (AuthUser & { password: string })[] = [
   },
   {
     id: '3',
+    username: 'student',
     email: 'student@university.edu',
     password: 'student123',
     givenName: 'Bob',
@@ -71,7 +74,7 @@ export class AuthService {
     await delay(800); // Simulate network delay
 
     // Find user by email
-    const user = mockUsers.find(u => u.email === credentials.email);
+    const user = mockUsers.find(u => u.username === credentials.username || u.email === credentials.username);
     
     if (!user) {
       return {
@@ -173,6 +176,7 @@ export class AuthService {
         const ssoData = JSON.parse(storedUser);
         user = {
           id: ssoData.id || '1',
+          username: 'admin',
           email: 'admin@university.edu',
           givenName: 'Admin',
           familyName: 'User',
@@ -210,9 +214,9 @@ export class AuthService {
   // Helper method to get demo credentials
   static getDemoCredentials() {
     return {
-      admin: { email: 'admin@university.edu', password: 'admin123' },
-      lecturer: { email: 'lecturer@university.edu', password: 'lecturer123' },
-      student: { email: 'student@university.edu', password: 'student123' },
+      admin: { username: 'admin', password: 'admin123' },
+      lecturer: { username: 'lecturer', password: 'lecturer123' },
+      student: { username: 'student', password: 'student123' },
     };
   }
 }

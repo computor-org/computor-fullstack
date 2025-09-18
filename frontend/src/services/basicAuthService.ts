@@ -13,7 +13,7 @@ export class BasicAuthService {
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
       // Create basic auth header
-      const authString = btoa(`${credentials.email}:${credentials.password}`);
+      const authString = btoa(`${credentials.username}:${credentials.password}`);
       
       // Try to authenticate by fetching user info
       const response = await fetch(`${API_BASE_URL}/auth/me`, {
@@ -26,7 +26,7 @@ export class BasicAuthService {
         if (response.status === 401) {
           return {
             success: false,
-            error: 'Invalid email or password',
+            error: 'Invalid username or password',
           };
         }
         throw new Error('Authentication failed');
@@ -37,6 +37,7 @@ export class BasicAuthService {
       // Transform backend user data to frontend format
       const user: AuthUser = {
         id: userInfo.user.id,
+        username: userInfo.user.username || userInfo.user.email,
         email: userInfo.user.email,
         givenName: userInfo.user.given_name,
         familyName: userInfo.user.family_name,

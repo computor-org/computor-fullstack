@@ -22,7 +22,7 @@ describe('AuthService', () => {
   describe('login', () => {
     it('should successfully login with valid credentials', async () => {
       const credentials: LoginCredentials = {
-        email: 'admin@university.edu',
+        username: 'admin',
         password: 'admin123',
       };
 
@@ -30,15 +30,15 @@ describe('AuthService', () => {
 
       expect(result.success).toBe(true);
       expect(result.user).toBeDefined();
-      expect(result.user?.email).toBe(credentials.email);
+      expect(result.user?.username).toBe(credentials.username);
       expect(result.user?.role).toBe('admin');
       expect(result.token).toBeDefined();
       expect(localStorageMock.setItem).toHaveBeenCalledTimes(2);
     });
 
-    it('should fail login with invalid email', async () => {
+    it('should fail login with invalid username', async () => {
       const credentials: LoginCredentials = {
-        email: 'nonexistent@university.edu',
+        username: 'nonexistent',
         password: 'admin123',
       };
 
@@ -52,7 +52,7 @@ describe('AuthService', () => {
 
     it('should fail login with invalid password', async () => {
       const credentials: LoginCredentials = {
-        email: 'admin@university.edu',
+        username: 'admin',
         password: 'wrongpassword',
       };
 
@@ -66,12 +66,12 @@ describe('AuthService', () => {
 
     it('should return different users based on role', async () => {
       const adminLogin = await AuthService.login({
-        email: 'admin@university.edu',
+        username: 'admin',
         password: 'admin123',
       });
 
       const studentLogin = await AuthService.login({
-        email: 'student@university.edu',
+        username: 'student',
         password: 'student123',
       });
 
@@ -95,6 +95,7 @@ describe('AuthService', () => {
     it('should successfully refresh valid token', async () => {
       const mockUser = {
         id: '1',
+        username: 'admin',
         email: 'admin@university.edu',
         givenName: 'John',
         familyName: 'Admin',
@@ -122,6 +123,7 @@ describe('AuthService', () => {
     it('should fail refresh with expired token', async () => {
       const mockUser = {
         id: '1',
+        username: 'admin',
         email: 'admin@university.edu',
         givenName: 'John',
         familyName: 'Admin',
@@ -158,6 +160,7 @@ describe('AuthService', () => {
     it('should return stored auth when valid', () => {
       const mockUser = {
         id: '1',
+        username: 'admin',
         email: 'admin@university.edu',
         givenName: 'John',
         familyName: 'Admin',
@@ -186,6 +189,7 @@ describe('AuthService', () => {
     it('should return null when token is expired', () => {
       const mockUser = {
         id: '1',
+        username: 'admin',
         email: 'admin@university.edu',
         givenName: 'John',
         familyName: 'Admin',
@@ -221,15 +225,15 @@ describe('AuthService', () => {
       const credentials = AuthService.getDemoCredentials();
 
       expect(credentials.admin).toEqual({
-        email: 'admin@university.edu',
+        username: 'admin',
         password: 'admin123',
       });
       expect(credentials.lecturer).toEqual({
-        email: 'lecturer@university.edu',
+        username: 'lecturer',
         password: 'lecturer123',
       });
       expect(credentials.student).toEqual({
-        email: 'student@university.edu',
+        username: 'student',
         password: 'student123',
       });
     });

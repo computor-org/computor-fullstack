@@ -1,10 +1,10 @@
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.message import Message
-
+from ctutor_backend.model.course import CourseMember, CourseSubmissionGroup, CourseGroup, CourseContent
 class MessageAuthor(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's family name")
@@ -85,8 +85,6 @@ class MessageQuery(ListQuery):
 
 
 def message_search(db: Session, query, params: Optional[MessageQuery]):
-    from sqlalchemy.orm import selectinload
-
     query = query.options(selectinload(Message.author))
     if params.id is not None:
         query = query.filter(Message.id == params.id)
@@ -105,7 +103,7 @@ def message_search(db: Session, query, params: Optional[MessageQuery]):
     if params.course_content_id is not None:
         query = query.filter(Message.course_content_id == params.course_content_id)
     if params.course_id is not None:
-        from ctutor_backend.model.course import CourseMember, CourseSubmissionGroup, CourseGroup, CourseContent
+
         course_filters = []
         course_filters.append(Message.course_id == params.course_id)
         course_filters.append(Message.course_member_id.in_(

@@ -3,7 +3,7 @@
  * Endpoint: /tutors
  */
 
-import type { CourseContentStudentList, CourseContentStudentUpdate, CourseMemberProperties, CourseTutorGet, CourseTutorList, TutorCourseMemberGet, TutorCourseMemberList } from 'types/generated';
+import type { CourseContentStudentGet, CourseContentStudentList, CourseContentStudentUpdate, CourseMemberProperties, CourseTutorGet, CourseTutorList, TutorCourseMemberGet, TutorCourseMemberList } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -15,8 +15,8 @@ export class TutorsClient extends BaseEndpointClient {
   /**
    * Tutor Get Course Contents
    */
-  async tutorGetCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet({ courseContentId, courseMemberId }: { courseContentId: string | string; courseMemberId: string | string }): Promise<CourseContentStudentList> {
-    return this.client.get<CourseContentStudentList>(this.buildPath('course-members', courseMemberId, 'course-contents', courseContentId));
+  async tutorGetCourseContentsTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet({ courseContentId, courseMemberId }: { courseContentId: string | string; courseMemberId: string | string }): Promise<CourseContentStudentGet> {
+    return this.client.get<CourseContentStudentGet>(this.buildPath('course-members', courseMemberId, 'course-contents', courseContentId));
   }
 
   /**

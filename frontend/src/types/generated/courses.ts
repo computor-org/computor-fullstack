@@ -423,17 +423,6 @@ export interface SubmissionGroupMemberBasic {
 }
 
 /**
- * Student's view of grading
- */
-export interface SubmissionGroupGradingStudent {
-  id: string;
-  grading: number;
-  status?: string | null;
-  graded_by?: string | null;
-  created_at: string;
-}
-
-/**
  * Enhanced submission group data for course contents
  */
 export interface SubmissionGroupStudentList {
@@ -450,6 +439,7 @@ export interface SubmissionGroupStudentList {
   count?: number;
   max_submissions?: number | null;
   unread_message_count?: number;
+  gradings?: CourseSubmissionGroupGradingList[];
 }
 
 export interface ResultStudentList {
@@ -488,6 +478,8 @@ export interface CourseContentStudentGet {
   result_count: number;
   max_test_runs?: number | null;
   unread_message_count?: number;
+  result?: ResultStudentList | null;
+  submission_group?: SubmissionGroupStudentList | null;
 }
 
 export interface CourseContentStudentList {

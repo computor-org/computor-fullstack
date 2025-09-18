@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict, Field
 from typing import Literal, Optional, List
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
@@ -7,6 +7,8 @@ from ctutor_backend.interface.course_content_types import CourseContentTypeGet, 
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
 from ctutor_backend.interface.tasks import TaskStatus
+from ctutor_backend.interface.grading import CourseSubmissionGroupGradingList
+from ctutor_backend.interface.grading import CourseSubmissionGroupGradingList
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
 from ..custom_types import Ltree
@@ -56,6 +58,7 @@ class SubmissionGroupStudentList(BaseModel):
     count: int = 0  # Backward compatibility - submission count
     max_submissions: Optional[int] = None  # Backward compatibility
     unread_message_count: int = 0
+    gradings: List[CourseSubmissionGroupGradingList] = Field(default_factory=list)
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -91,6 +94,8 @@ class CourseContentStudentGet(BaseEntityGet):
     result_count: int
     max_test_runs: Optional[int] = None
     unread_message_count: int = 0
+    result: Optional[ResultStudentList] = None
+    submission_group: Optional[SubmissionGroupStudentList] = None
 
     @field_validator('path', mode='before')
     @classmethod

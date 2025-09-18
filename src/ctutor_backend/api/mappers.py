@@ -1,11 +1,14 @@
 import logging
 from sqlalchemy.orm import Session, joinedload
-from ctutor_backend.interface.course_content_types import CourseContentTypeList
+from ctutor_backend.interface.course_content_types import CourseContentTypeList, CourseContentTypeGet
 from ctutor_backend.interface.student_course_contents import (
-    CourseContentStudentList, ResultStudentList, SubmissionGroupStudentList,
-    SubmissionGroupRepository
+    CourseContentStudentList,
+    CourseContentStudentGet,
+    ResultStudentList,
+    SubmissionGroupStudentList,
+    SubmissionGroupRepository,
 )
-from ctutor_backend.interface.grading import GradingStatus
+from ctutor_backend.interface.grading import GradingStatus, CourseSubmissionGroupGradingList
 from ctutor_backend.interface.tasks import map_int_to_task_status
 from ctutor_backend.model.course import CourseSubmissionGroupMember, CourseMember, CourseContent, CourseSubmissionGroupGrading
 from ctutor_backend.model.auth import User
@@ -14,7 +17,7 @@ from ctutor_backend.model.example import ExampleVersion, Example
 
 logger = logging.getLogger(__name__)
 
-def course_member_course_content_result_mapper(course_member_course_content_result, db: Session = None):
+def course_member_course_content_result_mapper(course_member_course_content_result, db: Session = None, detailed: bool = False):
 
     query = course_member_course_content_result
 
@@ -80,39 +83,83 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
                             clone_url=clone_url,
                             web_url=gitlab_info.get('web_url'))
     
-    return CourseContentStudentList(
-            id=course_content.id,
-            title=course_content.title,
-            path=course_content.path,
-            course_id=course_content.course_id,
-            course_content_type_id=course_content.course_content_type_id,
-            course_content_kind_id=course_content.course_content_kind_id,
-            course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
-            position=course_content.position,
-            max_group_size=course_content.max_group_size,
-            directory=directory,
-            color=course_content.course_content_type.color,
-            submitted=True if submitted_count != None and submitted_count > 0 else False,
-            result_count=result_count if result_count != None else 0,
-            max_test_runs=course_content.max_test_runs,
-            result=ResultStudentList(
-                execution_backend_id=result.execution_backend_id,
-                test_system_id=result.test_system_id,
-                version_identifier=result.version_identifier,
-                status=map_int_to_task_status(result.status),
-                result=result.result,
-                result_json=result.result_json,
-                submit=result.submit
-            ) if result != None and result.test_system_id != None else None,
-            submission_group=SubmissionGroupStudentList(
-                    id=str(course_submission_group.id) if course_submission_group else None,
-                    status=submission_status,
-                    grading=submission_grading,
-                    count=submitted_count if submitted_count != None else 0,
-                    max_submissions=course_submission_group.max_submissions if course_submission_group else None,
-                    max_group_size=course_submission_group.max_group_size if course_submission_group else None,
-                    repository=repository,
-                    unread_message_count=submission_group_unread_count
-                ) if course_submission_group != None else None,
-            unread_message_count=unread_message_count
+    result_payload = None
+    if result is not None and result.test_system_id is not None:
+        result_payload = ResultStudentList(
+            execution_backend_id=result.execution_backend_id,
+            test_system_id=result.test_system_id,
+            version_identifier=result.version_identifier,
+            status=map_int_to_task_status(result.status),
+            result=result.result,
+            result_json=result.result_json,
+            submit=result.submit,
         )
+
+    submission_group_payload = None
+    if course_submission_group is not None:
+        submission_group_payload = SubmissionGroupStudentList(
+            id=str(course_submission_group.id),
+            status=submission_status,
+            grading=submission_grading,
+            count=submitted_count if submitted_count is not None else 0,
+            max_submissions=course_submission_group.max_submissions,
+            max_group_size=course_submission_group.max_group_size,
+            repository=repository,
+            unread_message_count=submission_group_unread_count,
+        )
+
+    list_obj = CourseContentStudentList(
+        id=course_content.id,
+        title=course_content.title,
+        path=course_content.path,
+        course_id=course_content.course_id,
+        course_content_type_id=course_content.course_content_type_id,
+        course_content_kind_id=course_content.course_content_kind_id,
+        position=course_content.position,
+        max_group_size=course_content.max_group_size,
+        submitted=True if submitted_count not in (None, 0) else False,
+        course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
+        result_count=result_count if result_count is not None else 0,
+        max_test_runs=course_content.max_test_runs,
+        directory=directory,
+        color=course_content.course_content_type.color,
+        result=result_payload,
+        submission_group=submission_group_payload,
+        unread_message_count=unread_message_count,
+    )
+
+    if not detailed:
+        return list_obj
+
+    gradings_payload = []
+    if course_submission_group is not None and getattr(course_submission_group, 'gradings', None):
+        sorted_gradings = sorted(
+            course_submission_group.gradings,
+            key=lambda g: g.created_at,
+            reverse=True,
+        )
+        for grading in sorted_gradings:
+            gradings_payload.append(CourseSubmissionGroupGradingList.model_validate(grading))
+
+    return CourseContentStudentGet(
+        created_at=course_content.created_at,
+        updated_at=course_content.updated_at,
+        id=list_obj.id,
+        archived_at=course_content.archived_at,
+        title=list_obj.title,
+        description=course_content.description,
+        path=list_obj.path,
+        course_id=list_obj.course_id,
+        course_content_type_id=list_obj.course_content_type_id,
+        course_content_kind_id=list_obj.course_content_kind_id,
+        position=list_obj.position,
+        max_group_size=list_obj.max_group_size,
+        submitted=list_obj.submitted,
+        course_content_types=CourseContentTypeGet.model_validate(course_content.course_content_type),
+        result_count=list_obj.result_count,
+        max_test_runs=list_obj.max_test_runs,
+        unread_message_count=list_obj.unread_message_count,
+        result=list_obj.result,
+        submission_group=list_obj.submission_group,
+        gradings=gradings_payload,
+    )

@@ -22,7 +22,15 @@ from ctutor_backend.interface.tutor_courses import CourseTutorGet, CourseTutorLi
 from ctutor_backend.model.auth import User
 from ctutor_backend.model.course import Course, CourseContent, CourseContentKind, CourseMember, CourseMemberComment, CourseSubmissionGroup, CourseSubmissionGroupMember, CourseSubmissionGroupGrading
 from ctutor_backend.api.queries import course_course_member_list_query, course_member_course_content_list_query, course_member_course_content_query, latest_result_subquery, results_count_subquery, latest_grading_subquery
-from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery, CourseContentStudentUpdate, ResultStudentList, SubmissionGroupStudentList
+from ctutor_backend.interface.student_course_contents import (
+    CourseContentStudentInterface,
+    CourseContentStudentList,
+    CourseContentStudentQuery,
+    CourseContentStudentUpdate,
+    ResultStudentList,
+    SubmissionGroupStudentList,
+    CourseContentStudentGet,
+)
 from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.model.result import Result
 from ctutor_backend.redis_cache import get_redis_client
@@ -45,7 +53,7 @@ async def set_cached_data(course_id: str, data: dict):
 
 tutor_router = APIRouter()
 
-@tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentList)
+@tutor_router.get("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
 def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
     
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
@@ -54,7 +62,7 @@ def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: U
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db, reader_user_id=reader_user_id)
 
-    return course_member_course_content_result_mapper(course_contents_result, db)
+    return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
@@ -150,7 +158,7 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
     # 6) Return fresh data using shared mapper and latest grading subquery
     reader_user_id = permissions.get_user_id_or_throw()
     course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db, reader_user_id=reader_user_id)
-    return course_member_course_content_result_mapper(course_contents_result, db)
+    return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
 async def tutor_get_courses(course_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):

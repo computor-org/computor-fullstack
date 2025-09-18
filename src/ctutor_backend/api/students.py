@@ -13,7 +13,12 @@ from ctutor_backend.permissions.principal import Principal
 from ctutor_backend.api.queries import user_course_content_list_query, user_course_content_query
 from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.course_members import CourseMemberProperties
-from ctutor_backend.interface.student_course_contents import CourseContentStudentInterface, CourseContentStudentList, CourseContentStudentQuery
+from ctutor_backend.interface.student_course_contents import (
+    CourseContentStudentInterface,
+    CourseContentStudentList,
+    CourseContentStudentQuery,
+    CourseContentStudentGet,
+)
 from ctutor_backend.permissions.auth import get_current_permissions
 from ctutor_backend.database import get_db
 from ctutor_backend.interface.student_courses import CourseStudentGet, CourseStudentInterface, CourseStudentList, CourseStudentQuery, CourseStudentRepository
@@ -68,12 +73,12 @@ async def student_get_course_content_cached(course_content_id: str, permissions:
 
 ## MR-based course-content messages removed (deprecated)
 
-@student_router.get("/course-contents/{course_content_id}", response_model=CourseContentStudentList)
+@student_router.get("/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
 def student_get_course_content(course_content_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], db: Session = Depends(get_db)):
 
     course_contents_result = user_course_content_query(permissions.get_user_id_or_throw(),course_content_id,db)
  
-    return course_member_course_content_result_mapper(course_contents_result, db)
+    return course_member_course_content_result_mapper(course_contents_result, db, detailed=True)
 
 @student_router.get("/course-contents", response_model=list[CourseContentStudentList])
 def student_list_course_contents(permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):

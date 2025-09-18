@@ -3,7 +3,7 @@
  * Endpoint: /students
  */
 
-import type { CourseContentStudentList, CourseStudentGet, CourseStudentList, SubmitRequest, SubmitResponse } from 'types/generated';
+import type { CourseContentStudentGet, CourseContentStudentList, CourseStudentGet, CourseStudentList, SubmitRequest, SubmitResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -15,8 +15,8 @@ export class StudentsClient extends BaseEndpointClient {
   /**
    * Student Get Course Content
    */
-  async studentGetCourseContentStudentsCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentStudentList> {
-    return this.client.get<CourseContentStudentList>(this.buildPath('course-contents', courseContentId));
+  async studentGetCourseContentStudentsCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentStudentGet> {
+    return this.client.get<CourseContentStudentGet>(this.buildPath('course-contents', courseContentId));
   }
 
   /**

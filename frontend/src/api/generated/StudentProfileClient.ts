@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for StudentProfileInterface.
  * Endpoint: /student-profiles
- * Generated on: 2025-09-18T12:49:52.898437
  */
+
 import type { StudentProfileCreate, StudentProfileGet, StudentProfileList, StudentProfileQuery, StudentProfileUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

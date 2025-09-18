@@ -28,12 +28,14 @@ import inspect
 
 class TypeScriptGenerator:
     """Generates TypeScript interfaces from Pydantic models."""
-    
-    def __init__(self):
+
+    def __init__(self, include_timestamp: bool = False):
         self.interfaces: Dict[str, str] = {}
         self.imports: Set[str] = set()
         self.processed_models: Set[str] = set()
-        
+        self.include_timestamp = include_timestamp
+        self._timestamp_value: Optional[str] = None
+
         # Python to TypeScript type mappings
         self.type_map = {
             'str': 'string',
@@ -47,6 +49,14 @@ class TypeScriptGenerator:
             'None': 'null',
             'NoneType': 'null',
         }
+
+    def _current_timestamp(self) -> str:
+        """Lazily compute a stable timestamp for this generator run."""
+        if not self.include_timestamp:
+            raise RuntimeError("Timestamp requested but include_timestamp is False")
+        if self._timestamp_value is None:
+            self._timestamp_value = datetime.now().isoformat()
+        return self._timestamp_value
     
     def python_type_to_typescript(self, py_type: Any) -> str:
         """Convert Python type annotation to TypeScript type."""
@@ -276,7 +286,11 @@ class TypeScriptGenerator:
     def generate_all(self, scan_dirs: List[Path], output_dir: Path):
         """Generate TypeScript interfaces for all models found."""
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
+        if self.include_timestamp:
+            # Reset timestamp so each generation produces a fresh value
+            self._timestamp_value = None
+
         # Dictionary to group models by category
         model_categories: Dict[str, List[type[BaseModel]]] = {
             'auth': [],
@@ -359,8 +373,9 @@ class TypeScriptGenerator:
                 
                 # Add header
                 file_content.append("/**")
-                file_content.append(f" * Auto-generated TypeScript interfaces from Pydantic models")
-                file_content.append(f" * Generated on: {datetime.now().isoformat()}")
+                file_content.append(" * Auto-generated TypeScript interfaces from Pydantic models")
+                if self.include_timestamp:
+                    file_content.append(f" * Generated on: {self._current_timestamp()}")
                 file_content.append(f" * Category: {category.title()}")
                 file_content.append(" */")
                 file_content.append("")
@@ -412,7 +427,8 @@ class TypeScriptGenerator:
             index_content = []
             index_content.append("/**")
             index_content.append(" * Auto-generated TypeScript interfaces from Pydantic models")
-            index_content.append(f" * Generated on: {datetime.now().isoformat()}")
+            if self.include_timestamp:
+                index_content.append(f" * Generated on: {self._current_timestamp()}")
             index_content.append(" */")
             index_content.append("")
             
@@ -462,6 +478,10 @@ def main():
     print(f"✅ Generated {len(generated_files)} TypeScript files")
     
     # Generate a README for the generated files
+    timestamp_line = ""
+    if generator.include_timestamp:
+        timestamp_line = f"Generated on: {generator._current_timestamp()}\n"
+
     readme_content = f"""# Generated TypeScript Interfaces
 
 This directory contains auto-generated TypeScript interfaces from Python Pydantic models.
@@ -499,8 +519,7 @@ import {{ User, Account }} from '@/types/generated/users';
 import {{ LoginRequest, AuthResponse }} from '@/types/generated/auth';
 ```
 
-Generated on: {datetime.now().isoformat()}
-"""
+{timestamp_line}"""
     
     readme_file = output_dir / "README.md"
     with open(readme_file, 'w', encoding='utf-8') as f:

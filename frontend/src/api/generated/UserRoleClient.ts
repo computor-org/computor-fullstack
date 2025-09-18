@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for UserRoleInterface.
  * Endpoint: /user-roles
- * Generated on: 2025-09-18T12:49:52.899012
  */
+
 import type { UserRoleCreate, UserRoleGet, UserRoleList, UserRoleQuery, UserRoleUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

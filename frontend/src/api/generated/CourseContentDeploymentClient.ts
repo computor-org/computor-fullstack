@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseContentDeploymentInterface.
  * Endpoint: /deployments
- * Generated on: 2025-09-18T12:49:52.895712
  */
+
 import type { CourseContentDeploymentCreate, CourseContentDeploymentGet, CourseContentDeploymentList, CourseContentDeploymentQuery, CourseContentDeploymentUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

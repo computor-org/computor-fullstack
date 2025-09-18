@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseContentTypeInterface.
  * Endpoint: /course-content-types
- * Generated on: 2025-09-18T12:49:52.896215
  */
+
 import type { CourseContentTypeCreate, CourseContentTypeGet, CourseContentTypeList, CourseContentTypeQuery, CourseContentTypeUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

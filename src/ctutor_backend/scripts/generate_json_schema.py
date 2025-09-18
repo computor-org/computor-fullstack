@@ -6,6 +6,7 @@ Generate JSON Schema from Pydantic models for VS Code YAML validation.
 import json
 import sys
 import os
+from datetime import datetime
 from pathlib import Path
 
 # Add parent directories to path
@@ -15,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from ctutor_backend.interface.codeability_meta import CodeAbilityMeta
 
 
-def generate_schema():
+def generate_schema(include_timestamp: bool = False):
     """Generate JSON Schema from CodeAbilityMeta Pydantic model."""
     
     # Get the JSON schema from the Pydantic model
@@ -25,15 +26,18 @@ def generate_schema():
     schema['$schema'] = 'http://json-schema.org/draft-07/schema#'
     schema['title'] = 'CodeAbility Meta Schema'
     schema['description'] = 'Schema for meta.yaml files in Computor examples (auto-generated from codeability_meta.py)'
+
+    if include_timestamp:
+        schema['x-generated-on'] = datetime.utcnow().isoformat()
     
     return schema
 
 
-def main():
+def main(include_timestamp: bool = False):
     """Main function to generate and save the schema."""
     
     # Generate the schema
-    schema = generate_schema()
+    schema = generate_schema(include_timestamp=include_timestamp)
     
     # Determine output path (VS Code extension schemas directory)
     vscode_ext_path = Path(__file__).parent.parent.parent.parent.parent / 'computor-vsc-extension'

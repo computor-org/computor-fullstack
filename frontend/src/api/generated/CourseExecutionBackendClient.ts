@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseExecutionBackendInterface.
  * Endpoint: /course-execution-backends
- * Generated on: 2025-09-18T12:49:52.896295
  */
+
 import type { CourseExecutionBackendCreate, CourseExecutionBackendGet, CourseExecutionBackendList, CourseExecutionBackendQuery, CourseExecutionBackendUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

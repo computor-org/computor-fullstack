@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseGroupInterface.
  * Endpoint: /course-groups
- * Generated on: 2025-09-18T12:49:52.896465
  */
+
 import type { CourseGroupCreate, CourseGroupGet, CourseGroupList, CourseGroupQuery, CourseGroupUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

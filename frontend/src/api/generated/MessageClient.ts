@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for MessageInterface.
  * Endpoint: /messages
- * Generated on: 2025-09-18T12:49:52.897653
  */
+
 import type { MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

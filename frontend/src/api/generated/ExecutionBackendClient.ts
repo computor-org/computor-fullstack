@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for ExecutionBackendInterface.
  * Endpoint: /execution-backends
- * Generated on: 2025-09-18T12:49:52.897416
  */
+
 import type { ExecutionBackendCreate, ExecutionBackendGet, ExecutionBackendList, ExecutionBackendQuery, ExecutionBackendUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

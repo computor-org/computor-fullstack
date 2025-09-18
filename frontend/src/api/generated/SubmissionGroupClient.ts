@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for SubmissionGroupInterface.
  * Endpoint: /submission-groups
- * Generated on: 2025-09-18T12:49:52.898606
  */
+
 import type { SubmissionGroupCreate, SubmissionGroupGet, SubmissionGroupList, SubmissionGroupQuery, SubmissionGroupUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

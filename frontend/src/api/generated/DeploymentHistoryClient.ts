@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for DeploymentHistoryInterface.
  * Endpoint: /deployment-history
- * Generated on: 2025-09-18T12:49:52.897111
  */
+
 import type { DeploymentHistoryCreate, DeploymentHistoryGet, DeploymentHistoryList, ListQuery } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

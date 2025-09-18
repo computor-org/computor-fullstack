@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseMemberCommentInterface.
  * Endpoint: /course-member-comments
- * Generated on: 2025-09-18T12:49:52.896637
  */
+
 import type { CourseMemberCommentCreate, CourseMemberCommentGet, CourseMemberCommentList, CourseMemberCommentQuery, CourseMemberCommentUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

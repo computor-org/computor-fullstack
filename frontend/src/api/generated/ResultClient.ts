@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for ResultInterface.
  * Endpoint: /results
- * Generated on: 2025-09-18T12:49:52.897931
  */
+
 import type { ResultCreate, ResultGet, ResultList, ResultQuery, ResultUpdate, TaskStatus } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

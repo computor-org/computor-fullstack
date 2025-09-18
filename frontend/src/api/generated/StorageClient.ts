@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for StorageInterface.
  * Endpoint: /storage
- * Generated on: 2025-09-18T12:49:52.898286
  */
+
 import type { BucketCreate, BucketInfo, PresignedUrlRequest, PresignedUrlResponse, StorageObjectCreate, StorageObjectGet, StorageObjectList, StorageObjectQuery, StorageObjectUpdate, StorageUsageStats } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

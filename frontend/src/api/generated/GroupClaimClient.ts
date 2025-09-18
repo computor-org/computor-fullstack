@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for GroupClaimInterface.
  * Endpoint: /group-claims
- * Generated on: 2025-09-18T12:49:52.897492
  */
+
 import type { GroupClaimCreate, GroupClaimGet, GroupClaimList, GroupClaimQuery, GroupClaimUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseRoleInterface.
  * Endpoint: /course-roles
- * Generated on: 2025-09-18T12:49:52.896799
  */
+
 import type { CourseRoleGet, CourseRoleList, CourseRoleQuery } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

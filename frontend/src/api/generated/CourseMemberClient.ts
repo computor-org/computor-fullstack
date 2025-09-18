@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseMemberInterface.
  * Endpoint: /course-members
- * Generated on: 2025-09-18T12:49:52.896717
  */
+
 import type { CourseMemberCreate, CourseMemberGet, CourseMemberList, CourseMemberQuery, CourseMemberUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

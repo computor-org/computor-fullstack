@@ -26,7 +26,7 @@ interface DeleteCourseContentDialogProps {
   onClose: () => void;
   content: CourseContentGet | null;
   allContent: CourseContentGet[];
-  onContentDeleted: () => void;
+  onContentDeleted: () => Promise<void> | void;
 }
 
 const DeleteCourseContentDialog: React.FC<DeleteCourseContentDialogProps> = ({
@@ -59,8 +59,8 @@ const DeleteCourseContentDialog: React.FC<DeleteCourseContentDialogProps> = ({
       setError(null);
 
       await apiClient.delete(`/course-contents/${content.id}`);
-      
-      onContentDeleted();
+
+      await onContentDeleted();
       handleClose();
     } catch (err: any) {
       console.error('Error deleting content:', err);

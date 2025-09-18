@@ -34,7 +34,7 @@ interface MoveCourseContentDialogProps {
   allContent: CourseContentGet[];
   contentTypes: CourseContentTypeGet[];
   contentKinds: CourseContentKindGet[];
-  onContentMoved: () => void;
+  onContentMoved: () => Promise<void> | void;
 }
 
 const MoveCourseContentDialog: React.FC<MoveCourseContentDialogProps> = ({
@@ -146,8 +146,8 @@ const MoveCourseContentDialog: React.FC<MoveCourseContentDialogProps> = ({
       };
 
       await apiClient.patch(`/course-contents/${content.id}`, updateData);
-      
-      onContentMoved();
+
+      await onContentMoved();
       handleClose();
     } catch (err: any) {
       console.error('Error moving content:', err);

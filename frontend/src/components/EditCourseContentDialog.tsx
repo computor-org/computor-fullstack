@@ -34,7 +34,8 @@ interface EditCourseContentDialogProps {
   onClose: () => void;
   content: CourseContentGet | null;
   contentTypes: CourseContentTypeGet[];
-  onContentUpdated: () => void;
+  contentKinds: CourseContentKindGet[];
+  onContentUpdated: () => Promise<void> | void;
 }
 
 const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
@@ -42,11 +43,11 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
   onClose,
   content,
   contentTypes,
+  contentKinds,
   onContentUpdated,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [contentKinds, setContentKinds] = useState<CourseContentKindGet[]>([]);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -55,13 +56,6 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
     contentTypeId: '',
     position: 10,
   });
-
-  // Load content kinds
-  useEffect(() => {
-    if (open) {
-      loadContentKinds();
-    }
-  }, [open]);
 
   // Update form when content changes
   useEffect(() => {
@@ -74,20 +68,6 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
       });
     }
   }, [content]);
-
-  const loadContentKinds = async () => {
-    try {
-      const response = await apiClient.get<CourseContentKindGet[]>('/course-content-kinds', {
-        params: {
-          limit: 100,
-        },
-      });
-      const data = Array.isArray(response) ? response : (response as any).data || [];
-      setContentKinds(data);
-    } catch (err) {
-      console.error('Error loading content kinds:', err);
-    }
-  };
 
   const getContentIcon = (kind: string) => {
     switch (kind) {
@@ -139,8 +119,8 @@ const EditCourseContentDialog: React.FC<EditCourseContentDialogProps> = ({
       }
 
       await apiClient.patch(`/course-contents/${content.id}`, updateData);
-      
-      onContentUpdated();
+
+      await onContentUpdated();
       handleClose();
     } catch (err: any) {
       console.error('Error updating content:', err);

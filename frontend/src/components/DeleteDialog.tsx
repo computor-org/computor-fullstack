@@ -6,6 +6,7 @@ import {
   DialogActions,
   Button,
   Typography,
+  CircularProgress,
 } from '@mui/material';
 
 interface DeleteDialogProps {
@@ -14,6 +15,9 @@ interface DeleteDialogProps {
   onConfirm: () => void;
   title: string;
   message: string;
+  loading?: boolean;
+  confirmLabel?: string;
+  cancelLabel?: string;
 }
 
 const DeleteDialog: React.FC<DeleteDialogProps> = ({
@@ -22,6 +26,9 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
   onConfirm,
   title,
   message,
+  loading = false,
+  confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
 }) => {
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -30,9 +37,11 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
         <Typography>{message}</Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button onClick={onConfirm} color="error" variant="contained">
-          Delete
+        <Button onClick={onClose} disabled={loading}>
+          {cancelLabel}
+        </Button>
+        <Button onClick={onConfirm} color="error" variant="contained" disabled={loading}>
+          {loading ? <CircularProgress size={20} color="inherit" /> : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

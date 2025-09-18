@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -35,7 +35,9 @@ interface AddCourseContentDialogProps {
   onClose: () => void;
   courseId: string;
   existingContent: CourseContentGet[];
-  onContentAdded: () => void;
+  contentTypes: CourseContentTypeGet[];
+  contentKinds: CourseContentKindGet[];
+  onContentAdded: () => Promise<void> | void;
 }
 
 const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
@@ -43,12 +45,12 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
   onClose,
   courseId,
   existingContent,
+  contentTypes,
+  contentKinds,
   onContentAdded,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [contentTypes, setContentTypes] = useState<CourseContentTypeGet[]>([]);
-  const [contentKinds, setContentKinds] = useState<CourseContentKindGet[]>([]);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -62,74 +64,32 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
   const [selectedParent, setSelectedParent] = useState<CourseContentGet | null>(null);
   const [selectedContentType, setSelectedContentType] = useState<CourseContentTypeGet | null>(null);
 
-  // Load content types and kinds
-  useEffect(() => {
-    if (open) {
-      loadContentTypes();
-      loadContentKinds();
-    }
-  }, [open, courseId]);
-
-  const loadContentTypes = async () => {
-    try {
-      const response = await apiClient.get<CourseContentTypeGet[]>('/course-content-types', {
-        params: {
-          course_id: courseId,
-          limit: 100,
-        },
-      });
-      const data = Array.isArray(response) ? response : (response as any).data || [];
-      console.log('Loaded content types:', data);
-      setContentTypes(data);
-    } catch (err) {
-      console.error('Error loading content types:', err);
-    }
-  };
-
-  const loadContentKinds = async () => {
-    try {
-      const response = await apiClient.get<CourseContentKindGet[]>('/course-content-kinds', {
-        params: {
-          limit: 100,
-        },
-      });
-      const data = Array.isArray(response) ? response : (response as any).data || [];
-      setContentKinds(data);
-    } catch (err) {
-      console.error('Error loading content kinds:', err);
-    }
-  };
-
   // Filter available parents based on selected content type
-  const getAvailableParents = () => {
+  const availableParents = useMemo(() => {
     if (!selectedContentType) {
       return existingContent;
     }
 
-    // Find the content kind for this content type
     const selectedKind = contentKinds.find(kind => kind.id === selectedContentType.course_content_kind_id);
     if (!selectedKind) {
       console.warn('Could not find content kind for type:', selectedContentType);
       return existingContent;
     }
-    
-    // If this kind doesn't allow ascendants, it can only be at root level
+
     if (!selectedKind.has_ascendants) {
       return [];
     }
 
-    // Filter parents that allow descendants
     return existingContent.filter(content => {
       const contentType = contentTypes.find(ct => ct.id === content.course_content_type_id);
       if (!contentType) return false;
-      
-      // Find the content kind for the parent
+
       const parentKind = contentKinds.find(kind => kind.id === contentType.course_content_kind_id);
       if (!parentKind) return false;
-      
+
       return parentKind.has_descendants;
     });
-  };
+  }, [selectedContentType, contentKinds, existingContent, contentTypes]);
 
   const generatePath = () => {
     const baseTitle = formData.title || 'untitled';
@@ -165,8 +125,8 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
       };
 
       await apiClient.post('/course-contents', newContent);
-      
-      onContentAdded();
+
+      await onContentAdded();
       handleClose();
     } catch (err: any) {
       console.error('Error creating content:', err);
@@ -325,7 +285,7 @@ const AddCourseContentDialog: React.FC<AddCourseContentDialogProps> = ({
                     </Typography>
                   </Stack>
                 </MenuItem>
-                {getAvailableParents()
+                {availableParents
                   .sort((a, b) => {
                     // Sort by path to maintain hierarchy
                     return a.path.localeCompare(b.path);

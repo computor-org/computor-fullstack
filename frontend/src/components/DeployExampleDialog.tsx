@@ -81,7 +81,7 @@ interface DeployExampleDialogProps {
   onClose: () => void;
   courseId: string;
   content: CourseContentGet;
-  onDeploymentStarted: () => void;
+  onDeploymentStarted: () => Promise<void> | void;
 }
 
 const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
@@ -202,8 +202,8 @@ const DeployExampleDialog: React.FC<DeployExampleDialogProps> = ({
       });
 
       setSuccess(true);
-      setTimeout(() => {
-        onDeploymentStarted();
+      setTimeout(async () => {
+        await onDeploymentStarted();
         onClose();
       }, 1500);
     } catch (err: any) {

@@ -18,6 +18,16 @@ export interface MessageAuthor {
 export interface AuthConfig {
 }
 
+export interface GLPAuthConfig {
+  url: string;
+  token: string;
+}
+
+export interface BasicAuthConfig {
+  username: string;
+  password: string;
+}
+
 /**
  * SSO Bearer token credentials.
  */

@@ -325,8 +325,8 @@ const UsersPage: React.FC<UsersPageProps> = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={user.user_type}
-                        color={getUserTypeColor(user.user_type)}
+                        label={user.user_type ?? 'user'}
+                        color={getUserTypeColor(user.user_type ?? 'user')}
                         size="small"
                       />
                     </TableCell>

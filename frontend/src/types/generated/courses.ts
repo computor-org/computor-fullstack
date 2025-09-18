@@ -8,9 +8,11 @@
 
 
 
-import type { ComputorDeploymentConfig, CourseContentDeploymentGet, CourseContentDeploymentList, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials } from './common';
+import type { ComputorDeploymentConfig, CourseContentDeploymentGet, CourseContentDeploymentList, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials, GradingStatus } from './common';
 
 import type { OrganizationGet } from './organizations';
+
+import type { TaskStatus } from './tasks';
 
 import type { UserList } from './users';
 
@@ -202,6 +204,12 @@ export interface CourseRoleGet {
   description?: string | null;
 }
 
+export interface CourseRoleList {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+}
+
 export interface CourseRoleQuery {
   skip?: number | null;
   limit?: number | null;
@@ -320,7 +328,7 @@ export interface CourseSubmissionGroupGradingCreate {
   graded_by_course_member_id: string;
   result_id?: string | null;
   grading: number;
-  status?: any;
+  status?: GradingStatus;
   feedback?: string | null;
 }
 
@@ -337,7 +345,7 @@ export interface CourseSubmissionGroupGradingGet {
   graded_by_course_member_id: string;
   result_id?: string | null;
   grading: number;
-  status: any;
+  status: GradingStatus;
   feedback?: string | null;
 }
 
@@ -350,7 +358,7 @@ export interface CourseSubmissionGroupGradingList {
   graded_by_course_member_id: string;
   result_id?: string | null;
   grading: number;
-  status: any;
+  status: GradingStatus;
   feedback?: string | null;
   created_at: string;
 }
@@ -360,7 +368,7 @@ export interface CourseSubmissionGroupGradingList {
  */
 export interface CourseSubmissionGroupGradingUpdate {
   grading?: number | null;
-  status?: any | null;
+  status?: GradingStatus | null;
   feedback?: string | null;
   result_id?: string | null;
 }
@@ -375,7 +383,7 @@ export interface CourseSubmissionGroupGradingQuery {
   course_submission_group_id?: string | null;
   graded_by_course_member_id?: string | null;
   result_id?: string | null;
-  status?: any | null;
+  status?: GradingStatus | null;
   min_grade?: number | null;
   max_grade?: number | null;
   has_feedback?: boolean | null;
@@ -436,7 +444,7 @@ export interface ResultStudentList {
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   version_identifier?: string | null;
-  status?: any | null;
+  status?: TaskStatus | null;
   result?: number | null;
   result_json?: any | null;
   submit?: boolean | null;
@@ -643,6 +651,18 @@ export interface CourseTaskRequest {
   course: Record<string, any>;
   course_family_id: string;
   gitlab?: GitLabCredentials | null;
+}
+
+/**
+ * Configuration for course execution backend.
+ */
+export interface CourseExecutionBackendConfig {
+  /** Unique identifier for the execution backend */
+  slug: string;
+  /** Version of the execution backend (e.g., 'r2024b', 'v1.0') */
+  version: string;
+  /** Backend-specific settings */
+  settings?: any | null;
 }
 
 export interface CourseFamilyProperties {

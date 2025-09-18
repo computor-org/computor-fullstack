@@ -85,7 +85,7 @@ export class TutorsClient extends BaseEndpointClient {
   /**
    * Tutor List Course Members
    */
-  async tutorListCourseMembersTutorsCourseMembersGet({ skip, limit, id, userId, courseId, courseGroupId, courseRoleId, givenName, familyName, body }: { skip?: number | null; limit?: number | null; id?: string | null; userId?: string | null; courseId?: string | null; courseGroupId?: string | null; courseRoleId?: string | null; givenName?: string | null; familyName?: string | null; body?: CourseMemberProperties | null }): Promise<TutorCourseMemberList[]> {
+  async tutorListCourseMembersTutorsCourseMembersGet({ skip, limit, id, userId, courseId, courseGroupId, courseRoleId, givenName, familyName }: { skip?: number | null; limit?: number | null; id?: string | null; userId?: string | null; courseId?: string | null; courseGroupId?: string | null; courseRoleId?: string | null; givenName?: string | null; familyName?: string | null }): Promise<TutorCourseMemberList[]> {
     const queryParams: Record<string, unknown> = {
       skip,
       limit,
@@ -97,6 +97,6 @@ export class TutorsClient extends BaseEndpointClient {
       given_name: givenName,
       family_name: familyName,
     };
-    return this.client.get<TutorCourseMemberList[]>(this.buildPath('course-members'), body, { params: queryParams });
+    return this.client.get<TutorCourseMemberList[]>(this.buildPath('course-members'), { params: queryParams });
   }
 }

@@ -53,6 +53,7 @@ def generate_types(output_dir: Path = None, watch: bool = False, clean: bool = F
     scan_dirs = [
         backend_dir / "interface",  # Pydantic DTOs
         backend_dir / "api",        # API models
+        backend_dir / "tasks",      # Task DTOs
     ]
     
     click.echo(click.style("🚀 TypeScript Interface Generator", fg='green', bold=True))

@@ -205,12 +205,15 @@ const CourseDetailPage: React.FC = () => {
     const isChild = pathParts.length > 1;
     const hasChildContent = hasChildren(item);
     const isExpanded = expandedPaths.has(item.path);
+    const deploymentSummary = item.deployment;
     const hasDeployment = Boolean(
-      item.example_id ||
-      item.properties?.deployment_history?.last_successful_example_id
+      item.has_deployment ||
+      deploymentSummary?.example_version_id ||
+      deploymentSummary?.version_identifier
     );
     const deploymentVersionLabel =
-      item.properties?.deployment_history?.last_successful_example_version ||
+      deploymentSummary?.version_tag ||
+      deploymentSummary?.example_version_id ||
       item.example_version_id ||
       null;
 
@@ -633,9 +636,24 @@ const CourseDetailPage: React.FC = () => {
           <Box>
             <Typography variant="h5">Course Content</Typography>
             {/* Show summary of assigned examples */}
-            {courseContent.filter(c => c.example_id || c.properties?.deployment_history?.last_successful_example_id).length > 0 && (
+            {courseContent.filter(c =>
+              c.has_deployment ||
+              c.deployment?.example_version_id ||
+              c.deployment?.version_identifier ||
+              c.example_version_id
+            ).length > 0 && (
               <Typography variant="caption" color="text.secondary">
-                {courseContent.filter(c => c.example_id || c.properties?.deployment_history?.last_successful_example_id).length} example{courseContent.filter(c => c.example_id || c.properties?.deployment_history?.last_successful_example_id).length !== 1 ? 's' : ''} assigned
+                {courseContent.filter(c =>
+                  c.has_deployment ||
+                  c.deployment?.example_version_id ||
+                  c.deployment?.version_identifier ||
+                  c.example_version_id
+                ).length} example{courseContent.filter(c =>
+                  c.has_deployment ||
+                  c.deployment?.example_version_id ||
+                  c.deployment?.version_identifier ||
+                  c.example_version_id
+                ).length !== 1 ? 's' : ''} assigned
                 {courseContent.filter(c => c.deployment_status === 'pending_release').length > 0 && (
                   <> • {courseContent.filter(c => c.deployment_status === 'pending_release').length} pending release</>
                 )}

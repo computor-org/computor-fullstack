@@ -1,46 +1,128 @@
-import os
-import json
-from gitlab import Gitlab
-from gitlab.v4.objects import ProjectMergeRequest
-from ctutor_backend.api.exceptions import BadRequestException, InternalServerException, NotFoundException
-from aiocache import Cache
-from ctutor_backend.interface.auth import GLPAuthConfig
-from ctutor_backend.redis_cache import get_redis_client
+from typing import Annotated, Optional
+from uuid import UUID
 
-def list_submission_mergerequests(gitlab: Gitlab, project_path: str):
+from fastapi import APIRouter, Depends, Response, status
+from sqlalchemy.orm import Session
 
-  if project_path == None:
-    raise NotFoundException()
-  
-  projects = gitlab.projects.list(search=project_path,search_namespaces=True)
+from ctutor_backend.api.crud import get_id_db, list_db, update_db, delete_db, create_db
+from ctutor_backend.api.exceptions import BadRequestException
+from ctutor_backend.database import get_db
+from ctutor_backend.interface.messages import MessageInterface, MessageCreate, MessageGet, MessageList, MessageQuery, MessageUpdate
+from ctutor_backend.permissions.auth import get_current_permissions
+from ctutor_backend.permissions.principal import Principal
+from ctutor_backend.model.message import Message
+from ctutor_backend.model.message import MessageRead
 
-  if len(projects) == 0:
-    raise BadRequestException(detail="[list_submission_mergerequests] No submission project available.")
-  elif len(projects) > 1:
-    raise InternalServerException(detail="[list_submission_mergerequests] More than one submission project available.")
 
-  project = projects[0]
+messages_router = APIRouter()
 
-  return project.mergerequests.list(get_all=True)
 
-async def get_submission_mergerequest(glp_auth: GLPAuthConfig, user_id: str, project_path: str, assignment_id: str, assignment_path: str) -> ProjectMergeRequest:
+@messages_router.post("", response_model=MessageGet, status_code=status.HTTP_201_CREATED)
+async def create_message(
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    payload: MessageCreate,
+    db: Session = Depends(get_db),
+):
+    # Enforce author_id from current user
+    if not payload.title or not payload.content:
+        raise BadRequestException(detail="Title and content are required")
 
-  gitlab = Gitlab(url=glp_auth.url, private_token=glp_auth.token)
+    model_dump = payload.model_dump(exclude_unset=True)
+    model_dump['author_id'] = permissions.user_id
 
-  cache = await get_redis_client()
+    # At least one target is recommended (user_id, course_member_id, course_submission_group_id, course_group_id)
+    if not any(model_dump.get(k) for k in ['user_id', 'course_member_id', 'course_submission_group_id', 'course_group_id', 'course_content_id', 'course_id']):
+        # Allow user-only message by setting user_id to current user if nothing else provided
+        model_dump['user_id'] = permissions.user_id
 
-  cache_key = f"{user_id}:merge_request:{assignment_id}"
-  cached_merge_request = await cache.get(cache_key)
+    # Default level
+    if 'level' not in model_dump or model_dump['level'] is None:
+        model_dump['level'] = 0
 
-  if cached_merge_request:
-    merge_request = ProjectMergeRequest(gitlab.projects,json.loads(cached_merge_request))
+    # Use create_db so permission handler validates
+    class _Create(MessageCreate):
+        author_id: str
+    entity = _Create(**model_dump)
+    return await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
 
-  else:
-    mergerequests = list_submission_mergerequests(gitlab,project_path)
-    source_branch=f"submission/{assignment_path}"
-    merge_request = next((x for x in mergerequests if x.source_branch == source_branch and x.title.lower() == f"submission: {assignment_path.lower()}"), None)
 
-    if merge_request != None:
-      await cache.set(cache_key, json.dumps(merge_request.asdict()), ttl=1800)
+@messages_router.get("/{id}", response_model=MessageGet)
+async def get_message(
+    id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    return await get_id_db(permissions, db, id, MessageInterface)
 
-  return merge_request
+
+@messages_router.get("", response_model=list[MessageList])
+async def list_messages(
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    response: Response,
+    params: MessageQuery = Depends(),
+    db: Session = Depends(get_db),
+):
+    items, total = await list_db(permissions, db, params, MessageInterface)
+    response.headers["X-Total-Count"] = str(total)
+    return items
+
+
+@messages_router.patch("/{id}", response_model=MessageGet)
+async def update_message(
+    id: UUID | str,
+    payload: MessageUpdate,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    return update_db(permissions, db, id, payload, MessageInterface.model, MessageInterface.get)
+
+
+@messages_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(
+    id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    delete_db(permissions, db, id, MessageInterface.model)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@messages_router.post("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_message_read(
+    id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    # Ensure user has visibility on the message
+    await get_id_db(permissions, db, id, MessageInterface)
+
+    # Upsert read record for current user
+    exists = (
+        db.query(MessageRead)
+        .filter(MessageRead.message_id == id, MessageRead.reader_user_id == permissions.user_id)
+        .first()
+    )
+    if not exists:
+        db.add(MessageRead(message_id=id, reader_user_id=permissions.user_id))
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_message_unread(
+    id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db),
+):
+    # Ensure user has visibility on the message
+    await get_id_db(permissions, db, id, MessageInterface)
+
+    read = (
+        db.query(MessageRead)
+        .filter(MessageRead.message_id == id, MessageRead.reader_user_id == permissions.user_id)
+        .first()
+    )
+    if read:
+        db.delete(read)
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

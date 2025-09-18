@@ -19,7 +19,8 @@ from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
 from ctutor_backend.interface.tests import TestJob
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate, ResultStatus
+from ctutor_backend.interface.results import ResultGet, ResultInterface, ResultQuery, ResultUpdate
+from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 from ctutor_backend.client.crud_client import CrudClient
 from ctutor_backend.utils.docker_utils import transform_localhost_url
 
@@ -264,7 +265,7 @@ async def commit_test_results_activity(
         
         # Create result update
         result_update = ResultUpdate(
-            status=ResultStatus.COMPLETED,
+            status=TaskStatus.FINISHED,
             result=test_results["result_value"],
             result_json=test_results
         )

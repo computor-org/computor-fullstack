@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-03T14:23:27.604951
+ * Generated on: 2025-09-18T14:42:27.802639
 
  * Category: Roles
 
@@ -30,6 +30,19 @@ export interface RoleList {
   builtin: boolean;
 }
 
+export interface RoleQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by role ID */
+  id?: string | null;
+  /** Filter by role title */
+  title?: string | null;
+  /** Filter by description */
+  description?: string | null;
+  /** Filter by builtin status */
+  builtin?: boolean | null;
+}
+
 export interface RoleClaimGet {
   role_id: string;
   claim_type: string;
@@ -41,4 +54,12 @@ export interface RoleClaimList {
   role_id: string;
   claim_type: string;
   claim_value: string;
+}
+
+export interface RoleClaimQuery {
+  skip?: number | null;
+  limit?: number | null;
+  role_id?: string | null;
+  claim_type?: string | null;
+  claim_value?: string | null;
 }

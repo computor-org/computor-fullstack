@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.interface.course_content_kind import CourseContentKindGet
+from ctutor_backend.interface.course_content_kind import CourseContentKindGet, CourseContentKindList
 from ctutor_backend.model.course import CourseContentType
 from ctutor_backend.utils.color_validation import is_valid_color, validate_color
 
@@ -50,6 +50,8 @@ class CourseContentTypeList(BaseModel):
     color: str
     course_id: str
     course_content_kind_id: str
+
+    course_content_kind: Optional[CourseContentKindList] = None
 
     model_config = ConfigDict(from_attributes=True)
 

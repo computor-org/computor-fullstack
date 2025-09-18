@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-03T14:23:27.604765
+ * Generated on: 2025-09-18T14:42:27.802495
 
  * Category: Organizations
 
@@ -13,6 +13,15 @@
 import type { GitLabConfig, GitLabConfigGet, GitLabCredentials } from './common';
 
 
+
+/**
+ * Request to create an organization via Temporal workflow.
+ */
+export interface OrganizationTaskRequest {
+  organization: Record<string, any>;
+  gitlab: GitLabCredentials;
+  parent_group_id: number;
+}
 
 export interface OrganizationProperties {
   gitlab?: GitLabConfig | null;
@@ -138,11 +147,24 @@ export interface OrganizationUpdate {
   country?: string | null;
 }
 
-/**
- * Request to create an organization via Temporal workflow.
- */
-export interface OrganizationTaskRequest {
-  organization: Record<string, any>;
-  gitlab: GitLabCredentials;
-  parent_group_id: number;
+export interface OrganizationQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  title?: string | null;
+  description?: string | null;
+  path?: string | null;
+  organization_type?: any | null;
+  user_id?: string | null;
+  properties?: OrganizationProperties | null;
+  number?: string | null;
+  email?: string | null;
+  telephone?: string | null;
+  fax_number?: string | null;
+  url?: string | null;
+  postal_code?: string | null;
+  street_address?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  country?: string | null;
 }

@@ -1,4 +1,5 @@
 from typing import List, TYPE_CHECKING
+from enum import IntEnum
 from sqlalchemy import (
     BigInteger, Boolean, CheckConstraint, Column, DateTime, 
     Float, ForeignKey, ForeignKeyConstraint, Index, 
@@ -6,6 +7,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, column_property, Mapped
+from sqlalchemy.ext.hybrid import hybrid_property
 try:
     from ..custom_types import LtreeType
 except ImportError:
@@ -17,6 +19,14 @@ from .base import Base
 if TYPE_CHECKING:
     from .result import Result
     from .example import ExampleVersion
+
+
+class GradingStatus(IntEnum):
+    """Enumeration for grading status values."""
+    NOT_REVIEWED = 0
+    CORRECTED = 1
+    CORRECTION_NECESSARY = 2
+    IMPROVEMENT_POSSIBLE = 3
 
 
 class CourseContentKind(Base):
@@ -104,7 +114,6 @@ class Course(Base):
     course_execution_backends = relationship("CourseExecutionBackend", back_populates="course", uselist=True)
     course_contents = relationship("CourseContent", foreign_keys="CourseContent.course_id", back_populates="course", uselist=True)
     course_submission_groups = relationship("CourseSubmissionGroup", back_populates="course", uselist=True)
-    messages = relationship("Message", back_populates="course", uselist=True)
 
 
 class CourseContentType(Base):
@@ -211,13 +220,8 @@ class CourseContent(Base):
     max_submissions = Column(Integer)
     execution_backend_id = Column(ForeignKey('execution_backend.id', ondelete='CASCADE', onupdate='RESTRICT'))
     
-    # Example integration columns
-    example_id = Column(UUID, ForeignKey('example.id', ondelete='SET NULL'), nullable=True)
+    # Example version tracking (DEPRECATED - will be removed, use CourseContentDeployment.example_version_id)
     example_version_id = Column(UUID, ForeignKey('example_version.id', ondelete='SET NULL'), nullable=True)
-    
-    # Deployment tracking (basic status only)
-    deployed_at = Column(DateTime(True), nullable=True)
-    deployment_status = Column(String(32), server_default=text("'pending'"))  # pending, deploying, deployed, failed
     
 
     # Relationships
@@ -230,11 +234,11 @@ class CourseContent(Base):
     course_submission_groups = relationship('CourseSubmissionGroup', back_populates='course_content')
     # Removed: course_submission_group_members - relationship removed as course_content_id was removed from CourseSubmissionGroupMember
     
-    # Example relationships
-    example = relationship('Example', foreign_keys=[example_id], back_populates='course_contents')
+    # Example relationships (via example_version_id - DEPRECATED)
     example_version = relationship('ExampleVersion', foreign_keys=[example_version_id])
     
-    # Deployment tracking
+    # Deployment tracking - One-to-one relationship with CourseContentDeployment
+    deployment = relationship('CourseContentDeployment', back_populates='course_content', uselist=False)
 
     # Column property for course_content_kind_id
     course_content_kind_id = column_property(
@@ -243,6 +247,36 @@ class CourseContent(Base):
                CourseContentType.id == course_content_type_id)
         .scalar_subquery()
     )
+    
+    # Column property for is_submittable - derived from CourseContentKind.submittable
+    is_submittable = column_property(
+        select(CourseContentKind.submittable)
+        .where(
+            CourseContentKind.id == CourseContentType.course_content_kind_id,
+            CourseContentType.id == course_content_type_id
+        )
+        .scalar_subquery()
+    )
+    
+    # Column property for has_deployment - check if deployment exists
+    @property 
+    def has_deployment(self):
+        """Check if this course content has a deployment."""
+        # Only submittable content can have deployments
+        if not self.is_submittable:
+            return False
+        return self.deployment is not None
+    
+    # Column property for deployment_status - get status from deployment if exists
+    @property
+    def deployment_status(self):
+        """Get deployment status if deployment exists."""
+        # Only submittable content can have deployments
+        if not self.is_submittable:
+            return None
+        if self.deployment:
+            return self.deployment.deployment_status
+        return None
 
 
 class CourseMember(Base):
@@ -284,8 +318,7 @@ class CourseMember(Base):
                                    back_populates="course_member", uselist=True, lazy="select")
     submission_group_members = relationship('CourseSubmissionGroupMember', back_populates='course_member')
     results = relationship('Result', back_populates='course_member')
-    messages_sent = relationship('Message', back_populates='transmitter')
-    message_reads = relationship('MessageRead', back_populates='course_member')
+    # Messaging relationships moved to user-level author/reader in Message/MessageRead
     gradings_given = relationship('CourseSubmissionGroupGrading', back_populates='graded_by',
                                  foreign_keys='CourseSubmissionGroupGrading.graded_by_course_member_id')
 
@@ -316,6 +349,33 @@ class CourseSubmissionGroup(Base):
     results = relationship('Result', back_populates='course_submission_group')
     gradings = relationship('CourseSubmissionGroupGrading', back_populates='course_submission_group',
                            cascade='all, delete-orphan')
+    
+    # Hybrid property for the last submitted result
+    @hybrid_property
+    def last_submitted_result(self):
+        """Get the most recent submitted result for this submission group."""
+        # Python side: when results are loaded
+        submitted = [r for r in self.results if r.submit]
+        if not submitted:
+            return None
+        return max(submitted, key=lambda r: r.created_at)
+    
+    @last_submitted_result.expression
+    def last_submitted_result(cls):
+        """SQL expression for the last submitted result."""
+        from .result import Result
+        # Subquery to get the ID of the most recent submitted result
+        subq = (
+            select(Result.id)
+            .where(
+                Result.course_submission_group_id == cls.id,
+                Result.submit == True
+            )
+            .order_by(Result.created_at.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
+        return subq
 
 
 class CourseSubmissionGroupMember(Base):
@@ -353,9 +413,11 @@ class CourseSubmissionGroupGrading(Base):
     
     This table records:
     - The actual grade (0.0 to 1.0)
-    - The grading status
+    - The grading status (using GradingStatus enum: 0=not_reviewed, 1=corrected, 2=correction_necessary, 3=improvement_possible)
     - Who performed the grading (staff member/tutor/lecturer)
     - When the grading occurred
+    - Feedback/comments on the grading
+    - Reference to the specific result that was graded
     """
     __tablename__ = 'course_submission_group_grading'
     __table_args__ = (
@@ -363,6 +425,8 @@ class CourseSubmissionGroupGrading(Base):
         Index('idx_grading_submission_group', 'course_submission_group_id'),
         # Ensure we can find all gradings by a specific grader
         Index('idx_grading_graded_by', 'graded_by_course_member_id'),
+        # Index for finding gradings by result
+        Index('idx_grading_result', 'result_id'),
     )
 
     # Primary key and versioning
@@ -382,10 +446,15 @@ class CourseSubmissionGroupGrading(Base):
         ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'),
         nullable=False
     )
+    result_id = Column(
+        ForeignKey('result.id', ondelete='SET NULL', onupdate='RESTRICT'),
+        nullable=True  # Nullable because grading might be done without a specific result
+    )
     
     # Grading data
     grading = Column(Float(53), nullable=False)  # Value between 0.0 and 1.0
-    status = Column(String(50))  # 'corrected', 'correction_necessary', 'correction_possible', null, etc.
+    status = Column(Integer, nullable=False, server_default=text("0"))  # GradingStatus enum values
+    feedback = Column(String(4096), nullable=True)  # Feedback/comments from the grader
     
     # Relationships
     course_submission_group = relationship(
@@ -397,9 +466,14 @@ class CourseSubmissionGroupGrading(Base):
         back_populates='gradings_given',
         foreign_keys=[graded_by_course_member_id]
     )
+    result = relationship(
+        'Result',
+        back_populates='gradings',
+        foreign_keys=[result_id]
+    )
     
     def __repr__(self):
-        return f"<CourseSubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status})>"
+        return f"<CourseSubmissionGroupGrading(id={self.id}, grade={self.grading}, status={self.status}, has_feedback={bool(self.feedback)})>"
 
 
 class CourseMemberComment(Base):

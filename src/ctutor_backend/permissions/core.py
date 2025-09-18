@@ -19,7 +19,9 @@ from ctutor_backend.permissions.handlers_impl import (
     CourseContentTypePermissionHandler,
     CourseContentPermissionHandler,
     CourseMemberPermissionHandler,
-    ReadOnlyPermissionHandler
+    ReadOnlyPermissionHandler,
+    ResultPermissionHandler,
+    MessagePermissionHandler
 )
 
 # Import refactored Principal and related classes
@@ -40,6 +42,7 @@ from ctutor_backend.model.course import (
 )
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
+from ctutor_backend.model.message import Message
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.role import Role, RoleClaim, UserRole
 from ctutor_backend.model.group import Group, GroupClaim, UserGroup
@@ -89,7 +92,8 @@ def initialize_permission_handlers():
     permission_registry.register(GroupClaim, UserPermissionHandler(GroupClaim))
     permission_registry.register(UserGroup, UserPermissionHandler(UserGroup))
     permission_registry.register(ExecutionBackend, ReadOnlyPermissionHandler(ExecutionBackend))
-    permission_registry.register(Result, CourseMemberPermissionHandler(Result))
+    permission_registry.register(Result, ResultPermissionHandler(Result))
+    permission_registry.register(Message, MessagePermissionHandler(Message))
 
 
 def check_admin(permissions: Principal) -> bool:
@@ -269,8 +273,10 @@ def db_get_course_claims(user_id: str, db: Session) -> List[tuple]: #TODO: PERMI
     # Add general permissions for lecturers
     if is_lecturer:
         course_claims.extend([
-            ("permissions", f"{CourseContent.__tablename__}:create"),
-            ("permissions", f"{CourseContent.__tablename__}:update"),
+            ("permissions", f"{Example.__tablename__}:get"),
+            ("permissions", f"{Example.__tablename__}:list"),
+            ("permissions", f"{Example.__tablename__}:create"),
+            ("permissions", f"{Example.__tablename__}:update"),
             ("permissions", f"{Example.__tablename__}:upload"),
             ("permissions", f"{Example.__tablename__}:download"),
         ])

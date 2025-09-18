@@ -10,7 +10,7 @@ from ctutor_backend.model.auth import User
 from ctutor_backend.model.execution import ExecutionBackend
 from ctutor_backend.model.role import UserRole
 from ctutor_backend.redis_cache import get_redis_client
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from ctutor_backend.api.api_builder import CrudRouter, LookUpRouter
 from ctutor_backend.api.tests import tests_router
@@ -54,6 +54,8 @@ from ctutor_backend.api.info import info_router
 from ctutor_backend.api.tasks import tasks_router
 from ctutor_backend.api.storage import storage_router
 from ctutor_backend.api.examples import examples_router
+from ctutor_backend.api.course_member_comments import router as course_member_comments_router
+from ctutor_backend.api.messages import messages_router
 from ctutor_backend.interface.example import ExampleRepositoryInterface, ExampleInterface
 import json
 import tempfile
@@ -313,7 +315,27 @@ app.include_router(
     dependencies=[Depends(get_current_permissions), Depends(get_redis_client)]
 )
 
+app.include_router(
+    course_member_comments_router,
+    prefix="/course-member-comments",
+    tags=["course member comments"],
+    dependencies=[Depends(get_current_permissions)]
+)
+
+app.include_router(
+    messages_router,
+    prefix="/messages",
+    tags=["messages"],
+    dependencies=[Depends(get_current_permissions)]
+)
+
 
 @app.head("/", status_code=204)
 def get_status_head():
     return
+
+
+@app.get("/health", status_code=204, include_in_schema=False)
+async def health_check() -> Response:
+    """Simple health probe endpoint."""
+    return Response(status_code=204)

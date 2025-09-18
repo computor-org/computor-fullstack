@@ -6,7 +6,7 @@ that handles operations exceeding FastAPI's request-response cycle.
 """
 
 from .temporal_executor import TemporalTaskExecutor as TaskExecutor, get_task_executor
-from .base import BaseTask, TaskStatus, TaskResult, TaskSubmission, TaskInfo
+from .base import BaseTask, TaskResult, TaskSubmission, TaskInfo
 from .registry import task_registry, register_task
 from .temporal_client import (
     get_temporal_client, 
@@ -33,6 +33,9 @@ from . import temporal_student_template_v2
 
 # Import Temporal student repository tasks to auto-register
 from . import temporal_student_repository
+
+# Import Assignments repository tasks to auto-register
+from . import temporal_assignments_repository
 
 __all__ = [
     'TaskExecutor',

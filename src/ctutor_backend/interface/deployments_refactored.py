@@ -249,6 +249,45 @@ class CourseFamilyConfig(BaseDeployment):
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course family-specific settings")
 
 
+class CourseContentConfig(BaseDeployment):
+    """Configuration for course content (assignments, units, etc.)."""
+    title: Optional[str] = Field(default=None, description="Title of the course content (defaults from example if submittable)")
+    path: Optional[str] = Field(default=None, description="Hierarchical path using dots (optional; generated when omitted)")
+    description: Optional[str] = Field(None, description="Description of the content")
+    content_type: str = Field(description="Slug of the course content type (must match a defined content_type)")
+    position: Optional[float] = Field(None, description="Position for ordering (defaults to auto-increment)")
+    max_group_size: Optional[int] = Field(None, description="Maximum group size for submissions")
+    max_test_runs: Optional[int] = Field(None, description="Maximum test runs allowed")
+    max_submissions: Optional[int] = Field(None, description="Maximum submissions allowed")
+    
+    # For submittable content (assignments), specify the example to deploy
+    example_identifier: Optional[str] = Field(
+        None, 
+        description="Example identifier (e.g., 'week1.fibonacci') - required for submittable content"
+    )
+    example_version_tag: Optional[str] = Field(
+        None,
+        description="Version tag of the example (e.g., 'v1.0', 'latest') - defaults to latest"
+    )
+    
+    # Optional execution backend override (inherits from course if not specified)
+    execution_backend: Optional[str] = Field(
+        None,
+        description="Override execution backend slug for this content"
+    )
+    
+    # Nested content (for hierarchical structures like units containing assignments)
+    contents: Optional[List['CourseContentConfig']] = Field(
+        default_factory=list,
+        description="Nested course contents (for units containing assignments)"
+    )
+    
+    properties: Optional[Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Additional properties for the content"
+    )
+
+
 class CourseConfig(BaseDeployment):
     """Course configuration."""
     name: str = Field(description="Course display name")
@@ -263,6 +302,10 @@ class CourseConfig(BaseDeployment):
         default_factory=list,
         description="Course content types to be created (assignments, units, etc.)"
     )
+    contents: Optional[List[CourseContentConfig]] = Field(
+        default_factory=list,
+        description="Course contents hierarchy (assignments, units, etc.)"
+    )
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course-specific settings")
 
 
@@ -270,7 +313,8 @@ class CourseConfig(BaseDeployment):
 
 class HierarchicalCourseConfig(CourseConfig):
     """Course configuration for hierarchical deployment."""
-    pass  # Inherits all fields from CourseConfig
+    # Inherits all fields from CourseConfig including contents
+    pass
 
 
 class HierarchicalCourseFamilyConfig(CourseFamilyConfig):
@@ -316,6 +360,17 @@ class ComputorDeploymentConfig(BaseDeployment):
     settings: Optional[Dict[str, Any]] = Field(
         default_factory=dict, 
         description="Global deployment settings"
+    )
+    
+    # Optional: Upload examples from a local directory before deploying hierarchy
+    # Each immediate subdirectory is treated as an example to upload
+    class ExamplesUploadConfig(BaseModel):
+        repository: str = Field(description="Name of the Example Repository to use/create")
+        path: str = Field(description="Relative path to directory containing example subdirectories")
+
+    examples_upload: Optional["ComputorDeploymentConfig.ExamplesUploadConfig"] = Field(
+        default=None,
+        description="If provided, uploads examples before hierarchy deployment"
     )
     
     def validate_structure(self) -> bool:
@@ -599,3 +654,6 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
     gitlab_create_users=True,
     gitlab_admin_token="<leave_empty_for_now>"
 )
+
+# Update forward references for nested CourseContentConfig
+CourseContentConfig.model_rebuild()

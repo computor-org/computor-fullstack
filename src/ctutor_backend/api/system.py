@@ -29,7 +29,8 @@ from ctutor_backend.interface.system import (
     ReleaseCourseContentCreate, StatusQuery, CourseReleaseUpdate, GitLabCredentials,
     OrganizationTaskRequest, CourseFamilyTaskRequest, CourseTaskRequest, TaskResponse,
     PendingChange, PendingChangesResponse, GenerateTemplateRequest, GenerateTemplateResponse,
-    BulkAssignExamplesRequest
+    BulkAssignExamplesRequest,
+    GenerateAssignmentsRequest, GenerateAssignmentsResponse,
 )
 from ctutor_backend.model.course import Course, CourseContent, CourseContentType, CourseFamily, CourseGroup, CourseMember
 from ctutor_backend.model.organization import Organization  
@@ -855,11 +856,15 @@ async def generate_student_template(
             detail="Unable to determine student-template repository URL. Course needs GitLab configuration with either 'student_template_url' or 'full_path'."
         )
     
-    # Count contents to process
+    # Count contents to process - check for deployments instead of example_id
+    from ctutor_backend.model.deployment import CourseContentDeployment
     contents_with_examples = db.query(func.count(CourseContent.id)).filter(
         and_(
             CourseContent.course_id == course_id,
-            CourseContent.example_id.isnot(None)
+            CourseContent.id.in_(
+                db.query(CourseContentDeployment.course_content_id)
+                .filter(CourseContentDeployment.deployment_status == 'deployed')
+            )
         )
     ).scalar()
     
@@ -872,27 +877,103 @@ async def generate_student_template(
             "course_id": course_id,
             "student_template_url": student_template_url,
             "assignments_url": assignments_url,
-            "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
+            "commit_message": request.commit_message or f"Update student template - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}",
+            "force_redeploy": request.force_redeploy,
+            # Pass through optional release selection for strict commit/path control
+            "release": (request.release.model_dump() if request.release else None),
         },
         queue="computor-tasks"
     )
     
     workflow_id = await task_executor.submit_task(task_submission)
     
-    # Update all pending_release contents to deploying
-    db.query(CourseContent).filter(
+    # Don't update status here - let the workflow handle all status transitions
+    # Just count how many deployments are ready to process
+    statuses_to_count = ["pending", "failed"]
+    if request.force_redeploy:
+        statuses_to_count.append("deployed")
+    
+    deployment_ids = db.query(CourseContentDeployment.id).join(
+        CourseContent,
+        CourseContentDeployment.course_content_id == CourseContent.id
+    ).filter(
         and_(
             CourseContent.course_id == course_id,
-            CourseContent.deployment_status == "pending_release"
+            CourseContentDeployment.deployment_status.in_(statuses_to_count)
         )
-    ).update({"deployment_status": "deploying"})
-    
-    db.commit()
+    ).all()
     
     return GenerateTemplateResponse(
         workflow_id=workflow_id,
         status="started",
-        contents_to_process=contents_with_examples or 0
+        contents_to_process=len(deployment_ids) if deployment_ids else 0
+    )
+
+@system_router.post(
+    "/courses/{course_id}/generate-assignments",
+    response_model=GenerateAssignmentsResponse
+)
+async def generate_assignments(
+    course_id: str,
+    request: GenerateAssignmentsRequest,
+    permissions: Annotated[Principal, Depends(get_current_permissions)],
+    db: Session = Depends(get_db)
+):
+    # Permissions
+    if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Course {course_id} not found")
+
+    # Determine assignments URL if not provided
+    assignments_url = request.assignments_url
+    if not assignments_url and course.properties and 'gitlab' in course.properties:
+        course_gitlab = course.properties['gitlab']
+        if 'assignments_url' in course_gitlab:
+            assignments_url = course_gitlab['assignments_url']
+        elif 'full_path' in course_gitlab:
+            family = db.query(CourseFamily).filter(CourseFamily.id == course.course_family_id).first()
+            if not family:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Course family not found")
+            org = db.query(Organization).filter(Organization.id == family.organization_id).first()
+            gitlab_url = (org.properties or {}).get('gitlab', {}).get('url') if org and org.properties else None
+            if gitlab_url:
+                assignments_url = f"{gitlab_url}/{course_gitlab['full_path']}/assignments"
+
+    # Count selected contents (best-effort)
+    contents_q = db.query(func.count(CourseContent.id)).filter(CourseContent.course_id == course_id)
+    if request.course_content_ids:
+        contents_q = contents_q.filter(CourseContent.id.in_(request.course_content_ids))
+    count_estimate = contents_q.scalar()
+
+    # Submit Temporal workflow
+    task_executor = get_task_executor()
+    selection = {
+        'course_content_ids': request.course_content_ids,
+        'parent_id': request.parent_id,
+        'include_descendants': request.include_descendants,
+        'all': request.all,
+    }
+    task_submission = TaskSubmission(
+        task_name="generate_assignments_repository",
+        parameters={
+            'course_id': course_id,
+            'assignments_url': assignments_url,
+            'selection': selection,
+            'overwrite_strategy': request.overwrite_strategy,
+            'commit_message': request.commit_message,
+        },
+        queue="computor-tasks"
+    )
+    workflow_id = await task_executor.submit_task(task_submission)
+
+    return GenerateAssignmentsResponse(
+        workflow_id=workflow_id,
+        status="started",
+        contents_to_process=count_estimate or 0
     )
 
 # @system_router.post(

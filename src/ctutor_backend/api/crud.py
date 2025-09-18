@@ -1,6 +1,7 @@
 from uuid import UUID
 from typing import Any, Optional
 from datetime import datetime
+from enum import Enum
 from fastapi import HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -16,6 +17,7 @@ from ctutor_backend.interface.base import EntityInterface, ListQuery
 from sqlalchemy.inspection import inspect
 from ..custom_types import Ltree, LtreeType
 from sqlalchemy.exc import StatementError
+from ctutor_backend.interface.tasks import TaskStatus, map_task_status_to_int
 
 async def create_db(permissions: Principal, db: Session, entity: BaseModel, db_type: Any, response_type: BaseModel, post_create: Any = None):
 
@@ -164,6 +166,10 @@ def update_db(permissions: Principal, db: Session, id: UUID | str | None, entity
     try:
         for key in entity.keys():
             attr = entity.get(key)
+            if isinstance(attr, TaskStatus):
+                attr = map_task_status_to_int(attr)
+            elif isinstance(attr, Enum):
+                attr = attr.value
             setattr(db_item, key, attr)
 
         db.commit()

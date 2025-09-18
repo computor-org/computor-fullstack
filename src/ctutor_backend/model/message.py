@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    BigInteger, Column, DateTime, ForeignKey, 
+    BigInteger, Column, DateTime, ForeignKey,
     Index, String, text, Integer
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -9,11 +9,16 @@ from .base import Base
 
 
 class Message(Base):
-    __tablename__ = 'codeability_message'
+    __tablename__ = 'message'
     __table_args__ = (
-        Index('msg_course_archived_idx', 'course_id', 'archived_at'),
         Index('msg_parent_archived_idx', 'parent_id', 'archived_at'),
-        Index('msg_transmitter_archived_idx', 'transmitter_course_member_id', 'archived_at'),
+        Index('msg_author_archived_idx', 'author_id', 'archived_at'),
+        Index('msg_user_archived_idx', 'user_id', 'archived_at'),
+        Index('msg_course_member_archived_idx', 'course_member_id', 'archived_at'),
+        Index('msg_submission_group_archived_idx', 'course_submission_group_id', 'archived_at'),
+        Index('msg_course_group_archived_idx', 'course_group_id', 'archived_at'),
+        Index('msg_course_content_archived_idx', 'course_content_id', 'archived_at'),
+        Index('msg_course_archived_idx', 'course_id', 'archived_at'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -24,26 +29,46 @@ class Message(Base):
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
     archived_at = Column(DateTime(True))
-    course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    transmitter_course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    parent_id = Column(ForeignKey('codeability_message.id', ondelete='CASCADE', onupdate='RESTRICT'))
+
+    # Author of the message
+    author_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+
+    # Threading
+    parent_id = Column(ForeignKey('message.id', ondelete='CASCADE', onupdate='RESTRICT'))
     level = Column(Integer, nullable=False)
+
+    # Content
     title = Column(String(255), nullable=False)
     content = Column(String(16384), nullable=False)
 
+    # Targets (all nullable; at least one may be set; if all course-related are NULL and user_id set, it's a direct user message)
+    user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_submission_group_id = Column(ForeignKey('course_submission_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_group_id = Column(ForeignKey('course_group.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_content_id = Column(ForeignKey('course_content.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+
     # Relationships
-    course = relationship('Course')
-    transmitter = relationship('CourseMember', foreign_keys=[transmitter_course_member_id])
+    author = relationship('User', foreign_keys=[author_id])
     parent = relationship('Message', remote_side=[id], backref='replies')
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
+
+    user = relationship('User', foreign_keys=[user_id])
+    course_member = relationship('CourseMember', foreign_keys=[course_member_id])
+    course_submission_group = relationship('CourseSubmissionGroup', foreign_keys=[course_submission_group_id])
+    course_group = relationship('CourseGroup', foreign_keys=[course_group_id])
+    course_content = relationship('CourseContent', foreign_keys=[course_content_id])
+    course = relationship('Course', foreign_keys=[course_id])
+
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
 
 
 class MessageRead(Base):
-    __tablename__ = 'codeability_message_read'
+    __tablename__ = 'message_read'
     __table_args__ = (
-        Index('msg_read_unique_idx', 'codeability_message_id', 'course_member_id', unique=True),
+        Index('msg_read_unique_idx', 'message_id', 'reader_user_id', unique=True),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
@@ -53,11 +78,12 @@ class MessageRead(Base):
     created_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     updated_by = Column(ForeignKey('user.id', ondelete='SET NULL'))
     properties = Column(JSONB)
-    codeability_message_id = Column(ForeignKey('codeability_message.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
-    course_member_id = Column(ForeignKey('course_member.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+
+    message_id = Column(ForeignKey('message.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    reader_user_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 
     # Relationships
     message = relationship('Message', back_populates='message_reads')
-    course_member = relationship('CourseMember')
+    reader_user = relationship('User', foreign_keys=[reader_user_id])
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])

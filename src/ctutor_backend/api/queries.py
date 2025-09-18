@@ -60,43 +60,23 @@ def results_count_subquery(user_id: UUID | str | None, course_member_id: UUID | 
     
     return query.group_by(Result.course_content_id).subquery()
 
-# def submitted_result(user_id: UUID | str | None, course_member_id: UUID | str | None, course_content_id: UUID | str | None, db: Session,):
-
-#     query = db.query(
-#         Result.course_content_id,
-#         func.count(Result.id).label("submitted_count")
-#     )
-
-#     if user_id != None:
-#         query = query.join(CourseMember, CourseMember.user_id == user_id) \
-#             .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id)
-#     elif course_member_id != None:
-#         query = query.join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == course_member_id)
-
-#     if course_content_id == None:
-#         query = query.filter(Result.course_submission_group_id == CourseSubmissionGroupMember.course_submission_group_id, \
-#                     Result.status == 0,
-#                     Result.submit == True)
-#     else:
-#         query = query.filter(Result.course_submission_group_id == CourseSubmissionGroupMember.course_submission_group_id, \
-#                     CourseSubmissionGroupMember.course_content_id == course_content_id, \
-#                     Result.status == 0,
-#                     Result.submit == True)
-
-    return query.group_by(Result.course_content_id).subquery()
-
 def latest_grading_subquery(db: Session):
     """
-    Get the latest grading for each course submission group.
-    Returns a subquery with course_submission_group_id, status, and grading.
+    Latest grading per submission group using window function with deterministic ordering.
+    Returns columns: course_submission_group_id, status, grading, rn (rn=1 is latest).
     """
     return db.query(
         CourseSubmissionGroupGrading.course_submission_group_id,
         CourseSubmissionGroupGrading.status,
         CourseSubmissionGroupGrading.grading,
+        CourseSubmissionGroupGrading.created_at,
+        CourseSubmissionGroupGrading.id,
         func.row_number().over(
             partition_by=CourseSubmissionGroupGrading.course_submission_group_id,
-            order_by=CourseSubmissionGroupGrading.created_at.desc()
+            order_by=[
+                CourseSubmissionGroupGrading.created_at.desc(),
+                CourseSubmissionGroupGrading.id.desc(),
+            ],
         ).label('rn')
     ).subquery()
 
@@ -155,8 +135,8 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
             CourseContent.id == results_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
-            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
-            (latest_grading_sub.c.rn == 1)
+            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
+            & (latest_grading_sub.c.rn == 1)
         ).distinct().first()
         
     if course_contents_result == None:
@@ -219,8 +199,8 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             CourseContent.id == results_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
-            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
-            (latest_grading_sub.c.rn == 1)
+            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
+            & (latest_grading_sub.c.rn == 1)
         ).distinct()
 
     return query
@@ -259,8 +239,8 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
             CourseContent.id == results_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
-            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
-            (latest_grading_sub.c.rn == 1)
+            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
+            & (latest_grading_sub.c.rn == 1)
         ).first()
         
     if course_contents_result == None:
@@ -274,6 +254,17 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
     results_count_sub = results_count_subquery(None,course_member_id,None,db)
     latest_grading_sub = latest_grading_subquery(db)
 
+    # Subquery to get the member's submission groups
+    member_submission_groups = select(CourseSubmissionGroup).select_from(
+        CourseSubmissionGroup
+    ).join(
+        CourseSubmissionGroupMember,
+        CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id
+    ).where(
+        CourseSubmissionGroupMember.course_member_id == course_member_id
+    ).subquery()
+
+    # Query ALL course contents for the course where the user is a member
     query = db.query(
             CourseContent,
             results_count_sub.c.total_results_count,
@@ -285,10 +276,12 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
         ) \
         .select_from(CourseMember) \
         .filter(CourseMember.id == course_member_id) \
-        .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
-        .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .join(CourseContent, CourseContent.id == CourseSubmissionGroup.course_content_id) \
+        .join(Course, Course.id == CourseMember.course_id) \
+        .join(CourseContent, CourseContent.course_id == Course.id) \
         .join(CourseContentKind, CourseContentKind.id == CourseContent.course_content_kind_id) \
+        .outerjoin(CourseSubmissionGroup,
+                   (CourseSubmissionGroup.course_content_id == CourseContent.id) &
+                   (CourseSubmissionGroup.id.in_(select(member_submission_groups.c.id)))) \
         .outerjoin(
             latest_result_sub,
             CourseContent.id == latest_result_sub.c.course_content_id
@@ -302,8 +295,8 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             CourseContent.id == results_count_sub.c.course_content_id
         ).outerjoin(
             latest_grading_sub,
-            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id) &
-            (latest_grading_sub.c.rn == 1)
+            (latest_grading_sub.c.course_submission_group_id == CourseSubmissionGroup.id)
+            & (latest_grading_sub.c.rn == 1)
         )
 
     return query

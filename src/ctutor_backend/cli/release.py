@@ -8,73 +8,73 @@ from ctutor_backend.interface.deployments import DeploymentFactory
 from ctutor_backend.interface.deployments import ComputorDeploymentConfig
 from alive_progress import alive_bar
 
-# def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str = "Flow run"):
+def handle_flow_runs(flow_run_id: str, custom_client: CustomClient, title: str = "Flow run"):
 
-#     # click.echo(f"Flow run with id [{click.style(flow_run_id,fg='green')}] started")
+    # click.echo(f"Flow run with id [{click.style(flow_run_id,fg='green')}] started")
 
-#     with alive_bar(title=title,monitor=None, stats=None,spinner='twirls') as bar:
+    with alive_bar(title=title,monitor=None, stats=None,spinner='twirls') as bar:
 
-#       bar.text(f"[scheduled]")
+      bar.text(f"[scheduled]")
 
-#       start_time = time.time()
+      start_time = time.time()
 
-#       status = "SCHEDULED"
-#       for i in range(30000):
-#         time.sleep(0.1)
+      status = "SCHEDULED"
+      for i in range(30000):
+        time.sleep(0.1)
         
-#         elapsed_time = time.time() - start_time
+        elapsed_time = time.time() - start_time
 
-#         if elapsed_time > 4:
+        if elapsed_time > 4:
 
-#           start_time = time.time()
-#           elapsed_time = 0
+          start_time = time.time()
+          elapsed_time = 0
 
-#           try:
-#             response = custom_client.get(f"system/status/{flow_run_id}")
-#           except Exception as e:
-#               click.echo(e)
-#               return
+          try:
+            response = custom_client.get(f"system/status/{flow_run_id}")
+          except Exception as e:
+              click.echo(e)
+              return
           
-#           status = response["status"]
+          status = response["status"]
 
-#           bar.text(f"[{status}]")
+          bar.text(f"[{status}]")
 
-#           if status == "FAILED" or status == "COMPLETED" or status == "CRASHED" or status == "CANCELLED":
-#              break
+          if status == "FAILED" or status == "COMPLETED" or status == "CRASHED" or status == "CANCELLED":
+             break
         
-#         bar()
+        bar()
       
-#       if status == "COMPLETED":
-#         click.echo(f"[{click.style('COMPLETED',fg='green')}]")
+      if status == "COMPLETED":
+        click.echo(f"[{click.style('COMPLETED',fg='green')}]")
 
-#       elif status == "FAILED" or status == "CRASHED":
-#         click.echo(f"[{click.style('FAILED',fg='red')}]")
+      elif status == "FAILED" or status == "CRASHED":
+        click.echo(f"[{click.style('FAILED',fg='red')}]")
 
-#       click.echo(response.get("message"))
-#       return True
+      click.echo(response.get("message"))
+      return True
 
-          # if response["status"] == "SCHEDULED":
-          #   bar.text("[SCHEDULED]")
-          #   #click.echo(f"[{click.style('scheduled',fg='yellow')}]",nl=False)
-          #   # time.sleep(4)
-          # elif response["status"] == "PENDING":
-          #   bar.text("[PENDING]")
-          #   #click.echo(f"[{click.style('pending',fg='white')}]",nl=False)
-          #   # time.sleep(4)
-          # elif response["status"] == "RUNNING":
-          #   bar.text("[RUNNING]")
-          #   #click.echo(f"[{click.style('running',fg='blue')}]",nl=False)
-          #   # time.sleep(2)
-          # elif response["status"] == "FAILED":
-          #   bar.text("[FAILED]")
-          #   click.echo(f"[{click.style('FAILED',fg='red')}]",nl=False)
-          #   click.echo(response.get("message"))
-          #   return False
-          # elif response["status"] == "COMPLETED":
-          #   bar.text("[COMPLETED]")
-          #   click.echo(f"[{click.style('COMPLETED',fg='green')}]",nl=False)
-          #   click.echo(response.get("message"))
-          #   return True
+        # if response["status"] == "SCHEDULED":
+        #   bar.text("[SCHEDULED]")
+        #   #click.echo(f"[{click.style('scheduled',fg='yellow')}]",nl=False)
+        #   # time.sleep(4)
+        # elif response["status"] == "PENDING":
+        #   bar.text("[PENDING]")
+        #   #click.echo(f"[{click.style('pending',fg='white')}]",nl=False)
+        #   # time.sleep(4)
+        # elif response["status"] == "RUNNING":
+        #   bar.text("[RUNNING]")
+        #   #click.echo(f"[{click.style('running',fg='blue')}]",nl=False)
+        #   # time.sleep(2)
+        # elif response["status"] == "FAILED":
+        #   bar.text("[FAILED]")
+        #   click.echo(f"[{click.style('FAILED',fg='red')}]",nl=False)
+        #   click.echo(response.get("message"))
+        #   return False
+        # elif response["status"] == "COMPLETED":
+        #   bar.text("[COMPLETED]")
+        #   click.echo(f"[{click.style('COMPLETED',fg='green')}]",nl=False)
+        #   click.echo(response.get("message"))
+        #   return True
 
 
 # @click.command()
@@ -180,9 +180,9 @@ from alive_progress import alive_bar
 
 #     handle_flow_runs(flow_run_id, custom_client, f"Applied deployment, flow run started [{flow_run_id}]")
 
-@click.group()
-def release():
-    pass
+# @click.group()
+# def release():
+#     pass
 
 # release.add_command(release_course,"course")
 # release.add_command(release_course_content,"content")

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from ctutor_backend.interface.deployments import GitLabConfigGet
 from ctutor_backend.interface.base import BaseEntityGet, EntityInterface, ListQuery
-from ctutor_backend.interface.results import ResultStatus
+from ctutor_backend.interface.tasks import TaskStatus
 from ctutor_backend.model.course import CourseContent
 from ctutor_backend.model.course import CourseMember
 from ..custom_types import Ltree
@@ -51,7 +51,6 @@ class SubmissionGroupStudentList(BaseModel):
     current_group_size: int = 1
     members: List[SubmissionGroupMemberBasic] = []
     repository: Optional[SubmissionGroupRepository] = None
-    latest_grading: Optional[SubmissionGroupGradingStudent] = None
     status: Optional[str] = None  # Backward compatibility
     grading: Optional[float] = None  # Backward compatibility
     count: int = 0  # Backward compatibility - submission count
@@ -63,7 +62,7 @@ class ResultStudentList(BaseModel):
     execution_backend_id: Optional[str] = None
     test_system_id: Optional[str] = None
     version_identifier: Optional[str] = None
-    status: Optional[ResultStatus] = None
+    status: Optional[TaskStatus] = None
     result: Optional[float] = None
     result_json: Optional[dict] = None
     submit: Optional[bool] = None
@@ -127,8 +126,9 @@ class CourseContentStudentList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
 class CourseContentStudentUpdate(BaseModel):
-    status: Optional[Literal["corrected", "correction_necessary", "improvement_possible"]] = None
+    status: Optional[Literal["corrected", "correction_necessary", "improvement_possible", "not_reviewed"]] = None
     grading: Optional[float] = None
+    feedback: Optional[str] = None  # Optional feedback/comments from the grader
 
 class CourseContentStudentQuery(ListQuery):
     id: Optional[str] = None

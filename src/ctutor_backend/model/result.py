@@ -13,9 +13,10 @@ class Result(Base):
     __table_args__ = (
         Index('result_commit_test_system_key', 'test_system_id', 'execution_backend_id', unique=True),
         # Partial unique indexes - allow multiple results with same version_identifier when status is FAILED(1), CANCELLED(2), or CRASHED(6)
-        Index('result_version_identifier_member_partial_key', 'course_member_id', 'version_identifier', 
+        # Include course_content_id to allow same version for different assignments
+        Index('result_version_identifier_member_content_partial_key', 'course_member_id', 'version_identifier', 'course_content_id',
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
-        Index('result_version_identifier_group_partial_key', 'course_submission_group_id', 'version_identifier', 
+        Index('result_version_identifier_group_content_partial_key', 'course_submission_group_id', 'version_identifier', 'course_content_id',
               unique=True, postgresql_where=text('status NOT IN (1, 2, 6)'))
     )
 
@@ -36,6 +37,8 @@ class Result(Base):
     result = Column(Float(53), nullable=False)
     result_json = Column(JSONB)
     version_identifier = Column(String(2048), nullable=False)
+    # Reference commit used for the assignment (from assignments repo)
+    reference_version_identifier = Column(String(64), nullable=True)
     status = Column(Integer, nullable=False)
 
     # Relationships
@@ -46,3 +49,4 @@ class Result(Base):
     created_by_user = relationship('User', foreign_keys=[created_by])
     updated_by_user = relationship('User', foreign_keys=[updated_by])
     execution_backend = relationship('ExecutionBackend', back_populates='results')
+    gradings = relationship('CourseSubmissionGroupGrading', back_populates='result', foreign_keys='CourseSubmissionGroupGrading.result_id')

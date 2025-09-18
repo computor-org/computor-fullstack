@@ -1,19 +1,24 @@
 #!/bin/bash
-# Generate TypeScript interfaces from Pydantic models
+# Generate TypeScript interfaces from Pydantic models via the CLI helper.
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# shellcheck disable=SC1090
+source "${ROOT_DIR}/scripts/utilities/ensure_venv.sh"
 
 echo "🚀 Generating TypeScript interfaces from Pydantic models..."
 
-# Check if in virtual environment
-if [[ -z "${VIRTUAL_ENV}" ]]; then
-    echo "⚠️  No virtual environment detected. Activating .venv..."
-    source .venv/bin/activate 2>/dev/null || source venv/bin/activate 2>/dev/null || {
-        echo "❌ Could not activate virtual environment. Please activate it manually."
-        exit 1
-    }
+ensure_venv
+
+PYTHON_BIN="${PYTHON_BIN:-python}"
+if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
 fi
 
-# Run the generator
-cd src && python -m ctutor_backend.cli.cli generate-types "$@"
+PYTHONPATH="${ROOT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}" \
+    "${PYTHON_BIN}" -m ctutor_backend.cli.cli generate-types "$@"
 
 echo "✅ TypeScript interfaces generated successfully!"
 echo "📁 Check frontend/src/types/generated/ for the generated files"

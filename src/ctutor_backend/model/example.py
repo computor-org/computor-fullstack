@@ -137,8 +137,8 @@ class Example(Base):
     created_by_user = relationship("User", foreign_keys=[created_by])
     updated_by_user = relationship("User", foreign_keys=[updated_by])
     
-    # Course content relationships (reverse)
-    course_contents = relationship("CourseContent", foreign_keys="CourseContent.example_id", back_populates="example")
+    # Course content relationships removed - CourseContent no longer has example_id
+    # Access examples via CourseContentDeployment.example_version.example instead
     
     # Version relationships
     versions = relationship("ExampleVersion", back_populates="example", cascade="all, delete-orphan")
@@ -171,48 +171,6 @@ class Example(Base):
         """Get the full path within the repository."""
         return self.directory
     
-    def get_execution_backend_slug(self, version_tag: str = None) -> str:
-        """
-        Extract the execution backend slug from the meta_yaml of a specific version.
-        
-        Args:
-            version_tag: Specific version to get backend from. If None, uses latest version.
-            
-        Returns:
-            Execution backend slug if found, None otherwise
-        """
-        import yaml
-        
-        # Find the appropriate version
-        version = None
-        if version_tag:
-            # Find specific version
-            for v in self.versions:
-                if v.version_tag == version_tag:
-                    version = v
-                    break
-        else:
-            # Get latest version (highest version number)
-            if self.versions:
-                version = max(self.versions, key=lambda v: v.version_number)
-        
-        if not version or not version.meta_yaml:
-            return None
-        
-        try:
-            # Parse the meta.yaml content
-            meta_data = yaml.safe_load(version.meta_yaml)
-            
-            # Navigate to properties.executionBackend.slug
-            properties = meta_data.get('properties', {})
-            if properties:
-                execution_backend = properties.get('executionBackend', {})
-                if execution_backend and isinstance(execution_backend, dict):
-                    return execution_backend.get('slug')
-            
-            return None
-        except (yaml.YAMLError, AttributeError, TypeError):
-            return None
 
 
 class ExampleVersion(Base):
@@ -284,6 +242,33 @@ class ExampleVersion(Base):
     
     def __repr__(self):
         return f"<ExampleVersion(id={self.id}, version_tag='{self.version_tag}')>"
+    
+    def get_execution_backend_slug(self) -> str:
+        """
+        Extract the execution backend slug from the meta_yaml.
+        
+        Returns:
+            Execution backend slug if found, None otherwise
+        """
+        import yaml
+        
+        if not self.meta_yaml:
+            return None
+        
+        try:
+            # Parse the meta.yaml content
+            meta_data = yaml.safe_load(self.meta_yaml)
+            
+            # Navigate to properties.executionBackend.slug
+            properties = meta_data.get('properties', {})
+            if properties:
+                execution_backend = properties.get('executionBackend', {})
+                if execution_backend and isinstance(execution_backend, dict):
+                    return execution_backend.get('slug')
+            
+            return None
+        except (yaml.YAMLError, AttributeError, TypeError):
+            return None
 
 
 class ExampleDependency(Base):

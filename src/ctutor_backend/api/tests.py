@@ -16,7 +16,8 @@ from ctutor_backend.interface.course_contents import CourseContentGet
 from ctutor_backend.interface.courses import CourseProperties
 from ctutor_backend.interface.organizations import OrganizationProperties
 from ctutor_backend.interface.repositories import Repository
-from ctutor_backend.interface.results import ResultCreate, ResultStatus
+from ctutor_backend.interface.results import ResultCreate
+from ctutor_backend.interface.tasks import TaskStatus, map_int_to_task_status, map_task_status_to_int
 from ctutor_backend.interface.tests import TestCreate, TestJob
 from ctutor_backend.interface.tokens import decrypt_api_key
 from ctutor_backend.model.auth import User
@@ -24,11 +25,30 @@ from ctutor_backend.model.course import Course, CourseContent, CourseContentType
 from ctutor_backend.model.organization import Organization
 from ctutor_backend.model.result import Result
 from ctutor_backend.model.execution import ExecutionBackend
-from ctutor_backend.model.example import Example
+from ctutor_backend.model.example import Example, ExampleVersion
+from ctutor_backend.model.deployment import CourseContentDeployment
 from ..custom_types import Ltree
 from ctutor_backend.tasks import get_task_executor, TaskSubmission
 class TestRunResponse(ResultCreate):
     id: str
+
+def build_test_run_response(result: Result) -> TestRunResponse:
+    """Convert a Result ORM instance into the API response model."""
+    return TestRunResponse(
+        id=str(result.id),
+        submit=result.submit,
+        course_member_id=str(result.course_member_id),
+        course_content_id=str(result.course_content_id),
+        course_submission_group_id=str(result.course_submission_group_id) if result.course_submission_group_id else None,
+        execution_backend_id=str(result.execution_backend_id),
+        test_system_id=result.test_system_id,
+        result=result.result,
+        result_json=result.result_json,
+        properties=result.properties,
+        status=map_int_to_task_status(result.status),
+        version_identifier=result.version_identifier,
+        reference_version_identifier=result.reference_version_identifier,
+    )
 
 tests_router = APIRouter()
 
@@ -92,7 +112,9 @@ async def create_test(
         .join(CourseExecutionBackend, CourseExecutionBackend.course_id == CourseContent.course_id) \
         .join(CourseSubmissionGroupMember, CourseSubmissionGroupMember.course_member_id == CourseMember.id) \
         .join(CourseSubmissionGroup, CourseSubmissionGroup.id == CourseSubmissionGroupMember.course_submission_group_id) \
-        .outerjoin(Example, Example.id == CourseContent.example_id) \
+        .outerjoin(CourseContentDeployment, CourseContentDeployment.course_content_id == CourseContent.id) \
+        .outerjoin(ExampleVersion, ExampleVersion.id == CourseContentDeployment.example_version_id) \
+        .outerjoin(Example, Example.id == ExampleVersion.example_id) \
         .outerjoin(
             results_count_subquery,
             (CourseContent.id == results_count_subquery.c.course_content_id)
@@ -179,69 +201,63 @@ async def create_test(
         latest_result = sorted(existing_results, key=lambda r: r.created_at, reverse=True)[0]
         
         # Check if the latest result is still running according to DB
-        if ResultStatus(latest_result.status) in [ResultStatus.PENDING, ResultStatus.SCHEDULED, ResultStatus.RUNNING, ResultStatus.PAUSED]:
+        # Status values: 0=COMPLETED, 1=FAILED, 2=CANCELLED, 3=SCHEDULED, 4=PENDING, 5=RUNNING, 7=PAUSED
+        if latest_result.status in [4, 3, 5, 7]:  # PENDING, SCHEDULED, RUNNING, PAUSED
             # Check actual Temporal workflow status
             try:
                 task_executor = get_task_executor()
                 actual_status = await task_executor.get_task_status(latest_result.test_system_id)
                 
-                # Map Temporal status to ResultStatus
-                from ctutor_backend.tasks.base import TaskStatus
+                # Check Temporal status
                 if actual_status.status in [TaskStatus.QUEUED, TaskStatus.STARTED]:
                     # Still running, return the existing one
-                    return TestRunResponse(**latest_result.__dict__)
+                    return build_test_run_response(latest_result)
                 elif actual_status.status == TaskStatus.FINISHED:
-                    # Workflow finished, but we need to check if it succeeded or failed
+                    # Workflow finished, check actual task result for errors
                     actual_result = await task_executor.get_task_result(latest_result.test_system_id)
-                    
-                    # Check the workflow result status
-                    if actual_result.result and isinstance(actual_result.result, dict):
-                        workflow_status = actual_result.result.get("status", "").lower()
-                        
-                        if workflow_status == "completed":
-                            # Successfully completed
-                            latest_result.status = ResultStatus.COMPLETED
-                            db.commit()
-                            db.refresh(latest_result)
-                            
-                            if test_create.submit and not latest_result.submit:
-                                latest_result.submit = True
-                                db.commit()
-                                db.refresh(latest_result)
-                            return TestRunResponse(**latest_result.__dict__)
-                        else:
-                            # Failed or other non-success status
-                            latest_result.status = ResultStatus.FAILED
-                            db.commit()
-                            db.refresh(latest_result)
-                            # Will create a new run below
-                    else:
-                        # No result or unexpected format, treat as failed
-                        latest_result.status = ResultStatus.FAILED
+
+                    try:
+                        actual_result_status = TaskStatus(actual_result.status)
+                    except ValueError:
+                        actual_result_status = TaskStatus.FAILED
+
+                    if actual_result_status == TaskStatus.FINISHED and not actual_result.error:
+                        latest_result.status = map_task_status_to_int(TaskStatus.FINISHED)
                         db.commit()
                         db.refresh(latest_result)
-                        # Will create a new run below
+
+                        if test_create.submit and not latest_result.submit:
+                            latest_result.submit = True
+                            db.commit()
+                            db.refresh(latest_result)
+                        return build_test_run_response(latest_result)
+
+                    # Workflow reported an error or finished unsuccessfully
+                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
+                    db.commit()
+                    db.refresh(latest_result)
+                    # Will create a new run below
                 else:  # FAILED, CANCELLED, etc.
                     # Update DB status to failed
-                    latest_result.status = ResultStatus.FAILED
+                    latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
                     db.commit()
                     db.refresh(latest_result)
                     # Will create a new run below
             except Exception as e:
                 # If we can't check Temporal (workflow doesn't exist, etc.), assume it crashed
                 logger.warning(f"Could not check Temporal workflow status for {latest_result.test_system_id}: {e}")
-                latest_result.status = ResultStatus.FAILED
+                latest_result.status = map_task_status_to_int(TaskStatus.FAILED)
                 db.commit()
                 db.refresh(latest_result)
                 # Will create a new run below
         
         # If completed successfully and only updating submit flag
-        elif ResultStatus(latest_result.status) == ResultStatus.COMPLETED:
+        elif latest_result.status == 0:  # COMPLETED
             if test_create.submit and not latest_result.submit:
                 latest_result.submit = True
                 db.commit()
                 db.refresh(latest_result)
-            return TestRunResponse(**latest_result.__dict__)
+            return build_test_run_response(latest_result)
         
         # If failed/crashed/cancelled, we'll create a new run below
 
@@ -272,8 +288,14 @@ async def create_test(
         provider = organization_properties.gitlab.url
         full_path_course = course_properties.gitlab.full_path
         
-        # Use directory from example
-        assignment_directory = course_content.example.directory
+        # Resolve deployment info (directory and reference commit)
+        deployment = db.query(CourseContentDeployment).filter(
+            CourseContentDeployment.course_content_id == assignment.id
+        ).first()
+        if not deployment or not deployment.deployment_path or not deployment.version_identifier:
+            raise BadRequestException(detail="Assignment not released: missing deployment path or version identifier")
+        assignment_directory = deployment.deployment_path
+        reference_commit = deployment.version_identifier
         
         token = decrypt_api_key(organization_properties.gitlab.token)
         
@@ -299,8 +321,8 @@ async def create_test(
             url=gitlab_path_reference,
             path=assignment_directory,
             token=token,
-            commit="main"
-        ) # TODO
+            commit=reference_commit
+        )
 
         job = TestJob(
             user_id=user_id,
@@ -330,8 +352,9 @@ async def create_test(
         result=0,
         result_json=None,
         properties=None,
-        status=ResultStatus.PENDING,  # Start as PENDING
-        version_identifier=commit
+        status=map_task_status_to_int(TaskStatus.QUEUED),  # Start as QUEUED
+        version_identifier=commit,
+        reference_version_identifier=reference_commit
     )
 
     db.add(result_create)
@@ -361,31 +384,18 @@ async def create_test(
             if submitted_id != workflow_id:
                 logger.warning(f"Submitted workflow ID {submitted_id} doesn't match pre-generated ID {workflow_id}")
             
-            # Update status to SCHEDULED now that task is submitted
-            result_create.status = ResultStatus.SCHEDULED
+            # Update status to QUEUED now that task is submitted
+            result_create.status = map_task_status_to_int(TaskStatus.QUEUED)
             db.commit()
             db.refresh(result_create)
         else:
             raise BadRequestException(f"Execution backend type '{execution_backend.type}' not supported. Use 'temporal'.")
     except Exception as e:
         # If task submission fails, update result status to FAILED
-        result_create.status = ResultStatus.FAILED
+        result_create.status = map_task_status_to_int(TaskStatus.FAILED)
         result_create.properties = {"error": str(e)}
         db.commit()
         db.refresh(result_create)
         raise
 
-    return TestRunResponse(
-        id=str(result_create.id),
-        submit=result_create.submit,
-        course_member_id=result_create.course_member_id,
-        course_submission_group_id=result_create.course_submission_group_id,
-        course_content_id=result_create.course_content_id,
-        execution_backend_id=result_create.execution_backend_id,
-        test_system_id=result_create.test_system_id,
-        result=result_create.result,
-        result_json=result_create.result_json,
-        properties=result_create.properties,
-        status=result_create.status,
-        version_identifier=result_create.version_identifier
-    )
+    return build_test_run_response(result_create)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -38,8 +38,14 @@ import {
   CloudUpload as CloudUploadIcon,
   Publish as PublishIcon,
 } from '@mui/icons-material';
-import { CourseGet, CourseContentGet, CourseContentTypeGet, CourseContentKindGet } from '../types/generated/courses';
+import { CourseContentGet, CourseContentTypeGet, CourseContentKindGet } from '../types/generated/courses';
 import { apiClient } from '../services/apiClient';
+import {
+  useCourseContentKindsQuery,
+  useCourseContentTypesQuery,
+  useCourseContentsQuery,
+  useCourseQuery,
+} from '../app/queries/courseQueries';
 import AddCourseContentDialog from '../components/AddCourseContentDialog';
 import ManageCourseContentTypesDialog from '../components/ManageCourseContentTypesDialog';
 import EditCourseContentDialog from '../components/EditCourseContentDialog';
@@ -50,12 +56,62 @@ import DeploymentStatusChip from '../components/DeploymentStatusChip';
 
 const CourseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const courseId = id ?? '';
   const navigate = useNavigate();
-  const [course, setCourse] = useState<CourseGet | null>(null);
-  const [courseContent, setCourseContent] = useState<CourseContentGet[]>([]);
-  const [contentTypes, setContentTypes] = useState<CourseContentTypeGet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  const {
+    data: course,
+    isLoading: courseLoading,
+    error: courseError,
+    refetch: refetchCourse,
+  } = useCourseQuery(courseId, { enabled: Boolean(courseId) });
+
+  const {
+    data: rawCourseContents = [],
+    isLoading: contentsLoading,
+    error: contentsError,
+    refetch: refetchCourseContents,
+  } = useCourseContentsQuery(courseId, { enabled: Boolean(courseId) });
+
+  const {
+    data: contentTypes = [],
+    isLoading: contentTypesLoading,
+    error: contentTypesError,
+    refetch: refetchContentTypes,
+  } = useCourseContentTypesQuery(courseId, { enabled: Boolean(courseId) });
+
+  const {
+    data: contentKinds = [],
+    isLoading: contentKindsLoading,
+    error: contentKindsError,
+    refetch: refetchContentKinds,
+  } = useCourseContentKindsQuery();
+
+  const isLoading = courseLoading || contentsLoading || contentTypesLoading || contentKindsLoading;
+  const queryError = courseError || contentsError || contentTypesError || contentKindsError;
+  const errorMessage = queryError instanceof Error ? queryError.message : queryError ? 'Failed to load course data' : null;
+
+  const courseContent = useMemo(() => {
+    return [...rawCourseContents].sort((a, b) => {
+      const depthA = a.path.split('.').length;
+      const depthB = b.path.split('.').length;
+      if (depthA !== depthB) return depthA - depthB;
+      if (a.path !== b.path) {
+        return a.path.localeCompare(b.path);
+      }
+      return a.position - b.position;
+    });
+  }, [rawCourseContents]);
+
+  const handleRetry = async () => {
+    await Promise.all([
+      refetchCourse(),
+      refetchCourseContents(),
+      refetchContentTypes(),
+      refetchContentKinds(),
+    ]);
+  };
+
   const [addContentOpen, setAddContentOpen] = useState(false);
   const [manageTypesOpen, setManageTypesOpen] = useState(false);
   const [editContentOpen, setEditContentOpen] = useState(false);
@@ -64,99 +120,6 @@ const CourseDetailPage: React.FC = () => {
   const [deployExampleOpen, setDeployExampleOpen] = useState(false);
   const [selectedContent, setSelectedContent] = useState<CourseContentGet | null>(null);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [contentKinds, setContentKinds] = useState<CourseContentKindGet[]>([]);
-
-  // Load course details
-  const loadCourseContent = async () => {
-    if (!id) return;
-    
-    try {
-      // Load course content
-      const contentResponse = await apiClient.get<CourseContentGet[]>('/course-contents', {
-        params: {
-          course_id: id,
-          limit: 100,
-        },
-      });
-      const contentData = Array.isArray(contentResponse) ? contentResponse : (contentResponse as any).data || [];
-      
-      // Sort by path to ensure hierarchical order
-      const sortedContent = contentData.sort((a: CourseContentGet, b: CourseContentGet) => {
-        // First sort by path depth (parents before children)
-        const depthA = a.path.split('.').length;
-        const depthB = b.path.split('.').length;
-        if (depthA !== depthB) return depthA - depthB;
-        
-        // Then sort by position within same level
-        return a.position - b.position;
-      });
-      
-      setCourseContent(sortedContent);
-    } catch (err: any) {
-      console.error('Error loading course content:', err);
-    }
-  };
-
-  const loadCourse = async () => {
-    if (!id) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Load course details
-      const courseData = await apiClient.get<CourseGet>(`/courses/${id}`);
-      setCourse(courseData);
-      
-      // Load course content
-      await loadCourseContent();
-      
-      // Load content types and kinds
-      await loadContentTypes();
-      await loadContentKinds();
-      
-    } catch (err: any) {
-      console.error('Error loading course:', err);
-      setError(err.message || 'Failed to load course');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadContentTypes = async () => {
-    if (!id) return;
-    
-    try {
-      const response = await apiClient.get<CourseContentTypeGet[]>('/course-content-types', {
-        params: {
-          course_id: id,
-          limit: 100,
-        },
-      });
-      const data = Array.isArray(response) ? response : (response as any).data || [];
-      setContentTypes(data);
-    } catch (err) {
-      console.error('Error loading content types:', err);
-    }
-  };
-
-  const loadContentKinds = async () => {
-    try {
-      const response = await apiClient.get<CourseContentKindGet[]>('/course-content-kinds', {
-        params: {
-          limit: 100,
-        },
-      });
-      const data = Array.isArray(response) ? response : (response as any).data || [];
-      setContentKinds(data);
-    } catch (err) {
-      console.error('Error loading content kinds:', err);
-    }
-  };
-
-  useEffect(() => {
-    loadCourse();
-  }, [id]);
 
   const getContentIcon = (kind: string) => {
     switch (kind) {
@@ -195,7 +158,7 @@ const CourseDetailPage: React.FC = () => {
       alert('Student template generation started! Check the workflow status for progress.');
       
       // Reload course content to update deployment status
-      await loadCourseContent();
+      await Promise.all([refetchCourseContents(), refetchCourse()]);
     } catch (err: any) {
       console.error('Error generating student template:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to generate student template';
@@ -242,7 +205,15 @@ const CourseDetailPage: React.FC = () => {
     const isChild = pathParts.length > 1;
     const hasChildContent = hasChildren(item);
     const isExpanded = expandedPaths.has(item.path);
-    
+    const hasDeployment = Boolean(
+      item.example_id ||
+      item.properties?.deployment_history?.last_successful_example_id
+    );
+    const deploymentVersionLabel =
+      item.properties?.deployment_history?.last_successful_example_version ||
+      item.example_version_id ||
+      null;
+
     return (
       <Box
         key={item.id}
@@ -282,7 +253,7 @@ const CourseDetailPage: React.FC = () => {
         >
           {getContentIcon(item.course_content_kind_id)}
           {/* Show a small badge if example is assigned */}
-          {item.example_id && (
+          {hasDeployment && (
             <Box
               sx={{
                 position: 'absolute',
@@ -304,7 +275,7 @@ const CourseDetailPage: React.FC = () => {
               {item.title || pathParts[pathParts.length - 1]}
             </Typography>
             {/* Show example name if assigned */}
-            {item.example_id && (
+            {hasDeployment && (
               <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                 (has example)
               </Typography>
@@ -328,11 +299,11 @@ const CourseDetailPage: React.FC = () => {
           />
         )}
         {/* Show deployment status if example is deployed */}
-        {item.example_id && course && (
+        {hasDeployment && course && (
           <DeploymentStatusChip
             courseId={course.id}
             deploymentStatus={item.deployment_status}
-            exampleVersion={item.example_version}
+            exampleVersion={deploymentVersionLabel}
           />
         )}
         {/* Only show deploy button for assignment type content */}
@@ -431,7 +402,7 @@ const CourseDetailPage: React.FC = () => {
     return hierarchy;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -439,11 +410,18 @@ const CourseDetailPage: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error" onClose={() => setError(null)}>
-          {error}
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={handleRetry}>
+              Retry
+            </Button>
+          }
+        >
+          {errorMessage}
         </Alert>
       </Box>
     );
@@ -655,9 +633,9 @@ const CourseDetailPage: React.FC = () => {
           <Box>
             <Typography variant="h5">Course Content</Typography>
             {/* Show summary of assigned examples */}
-            {courseContent.filter(c => c.example_id).length > 0 && (
+            {courseContent.filter(c => c.example_id || c.properties?.deployment_history?.last_successful_example_id).length > 0 && (
               <Typography variant="caption" color="text.secondary">
-                {courseContent.filter(c => c.example_id).length} example{courseContent.filter(c => c.example_id).length !== 1 ? 's' : ''} assigned
+                {courseContent.filter(c => c.example_id || c.properties?.deployment_history?.last_successful_example_id).length} example{courseContent.filter(c => c.example_id || c.properties?.deployment_history?.last_successful_example_id).length !== 1 ? 's' : ''} assigned
                 {courseContent.filter(c => c.deployment_status === 'pending_release').length > 0 && (
                   <> • {courseContent.filter(c => c.deployment_status === 'pending_release').length} pending release</>
                 )}
@@ -737,9 +715,11 @@ const CourseDetailPage: React.FC = () => {
           onClose={() => setAddContentOpen(false)}
           courseId={course.id}
           existingContent={courseContent}
-          onContentAdded={() => {
+          contentTypes={contentTypes}
+          contentKinds={contentKinds}
+          onContentAdded={async () => {
             setAddContentOpen(false);
-            loadCourse();
+            await Promise.all([refetchCourseContents(), refetchCourse()]);
           }}
         />
       )}
@@ -750,9 +730,8 @@ const CourseDetailPage: React.FC = () => {
           open={manageTypesOpen}
           onClose={() => setManageTypesOpen(false)}
           courseId={course.id}
-          onTypesChanged={() => {
-            // This will trigger refresh in AddCourseContentDialog
-            loadContentTypes();
+          onTypesChanged={async () => {
+            await refetchContentTypes();
           }}
         />
       )}
@@ -767,10 +746,11 @@ const CourseDetailPage: React.FC = () => {
           }}
           content={selectedContent}
           contentTypes={contentTypes}
-          onContentUpdated={() => {
+          contentKinds={contentKinds}
+          onContentUpdated={async () => {
             setEditContentOpen(false);
             setSelectedContent(null);
-            loadCourse();
+            await Promise.all([refetchCourseContents(), refetchCourse()]);
           }}
         />
       )}
@@ -785,10 +765,10 @@ const CourseDetailPage: React.FC = () => {
           }}
           content={selectedContent}
           allContent={courseContent}
-          onContentDeleted={() => {
+          onContentDeleted={async () => {
             setDeleteContentOpen(false);
             setSelectedContent(null);
-            loadCourse();
+            await Promise.all([refetchCourseContents(), refetchCourse()]);
           }}
         />
       )}
@@ -805,10 +785,10 @@ const CourseDetailPage: React.FC = () => {
           allContent={courseContent}
           contentTypes={contentTypes}
           contentKinds={contentKinds}
-          onContentMoved={() => {
+          onContentMoved={async () => {
             setMoveContentOpen(false);
             setSelectedContent(null);
-            loadCourse();
+            await Promise.all([refetchCourseContents(), refetchCourse()]);
           }}
         />
       )}
@@ -823,10 +803,10 @@ const CourseDetailPage: React.FC = () => {
           }}
           courseId={course.id}
           content={selectedContent}
-          onDeploymentStarted={() => {
+          onDeploymentStarted={async () => {
             setDeployExampleOpen(false);
             setSelectedContent(null);
-            loadCourse();
+            await Promise.all([refetchCourseContents(), refetchCourse()]);
           }}
         />
       )}

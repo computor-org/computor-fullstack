@@ -1,47 +1,46 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  Alert,
   Box,
   Button,
   Chip,
+  IconButton,
   Stack,
   Typography,
-  Alert,
-  IconButton,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
   School as SchoolIcon,
 } from '@mui/icons-material';
-import { CourseGet, CourseCreate, CourseUpdate } from '../types/generated/courses';
-import { apiClient } from '../services/apiClient';
+import { useQueryClient } from '@tanstack/react-query';
+import { CourseGet, CourseUpdate } from '../types/generated/courses';
 import { DataTable, Column } from '../components/common/DataTable';
 import { FormDialog } from '../components/common/FormDialog';
 import CourseTaskForm from '../components/CourseTaskForm';
 import DeleteDialog from '../components/DeleteDialog';
+import { useCourseListQuery, courseKeys } from '../app/queries/courseQueries';
+import { courseService } from '../services/courseService';
 
 const CoursesPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [courses, setCourses] = useState<CourseGet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [totalCount, setTotalCount] = useState(0);
   const [searchValue, setSearchValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Dialog states
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<CourseGet | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchTerm(searchValue);
@@ -50,47 +49,28 @@ const CoursesPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchValue]);
 
-  // Load courses
-  const loadCourses = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const queryParams = useMemo(
+    () => ({
+      limit: rowsPerPage,
+      offset: page * rowsPerPage,
+      title: searchTerm || undefined,
+    }),
+    [rowsPerPage, page, searchTerm]
+  );
 
-      const response = await apiClient.get<any>('/courses', {
-        params: {
-          limit: rowsPerPage,
-          offset: page * rowsPerPage,
-          ...(searchTerm && { title: searchTerm }),
-        },
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      });
+  const courseListQuery = useCourseListQuery(queryParams);
+  const { data, isLoading, isFetching, error } = courseListQuery;
 
-      const total = response.headers?.['x-total-count'] || response.data?.length || 0;
-      const data = Array.isArray(response) ? response : response.data || [];
+  const courses = data?.items ?? [];
+  const totalCount = data?.total ?? 0;
+  const errorMessage = error instanceof Error ? error.message : null;
 
-      setCourses(data);
-      setTotalCount(parseInt(total, 10));
-    } catch (err: any) {
-      console.error('Error loading courses:', err);
-      setError(err.message || 'Failed to load courses');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, rowsPerPage, searchTerm]);
-
-  useEffect(() => {
-    loadCourses();
-  }, [loadCourses]);
-
-  // Check for refresh parameter and clear it
   useEffect(() => {
     if (searchParams.get('refresh')) {
       setSearchParams({});
-      loadCourses();
+      queryClient.invalidateQueries({ queryKey: courseKeys.all });
     }
-  }, [searchParams, setSearchParams, loadCourses]);
+  }, [searchParams, setSearchParams, queryClient]);
 
   const handleCreate = () => {
     navigate('/admin/courses/create');
@@ -108,13 +88,14 @@ const CoursesPage: React.FC = () => {
   };
 
   const handleFormSubmit = async (data: CourseUpdate) => {
+    if (!selectedCourse) return;
+
     try {
       setFormLoading(true);
-      if (selectedCourse) {
-        await apiClient.patch(`/courses/${selectedCourse.id}`, data);
-      }
+      await courseService.updateCourse(selectedCourse.id, data);
       setFormOpen(false);
-      loadCourses();
+      setSelectedCourse(null);
+      await queryClient.invalidateQueries({ queryKey: courseKeys.all });
     } catch (err: any) {
       console.error('Error saving course:', err);
       alert(err.message || 'Failed to save course');
@@ -127,12 +108,16 @@ const CoursesPage: React.FC = () => {
     if (!selectedCourse) return;
 
     try {
-      await apiClient.delete(`/courses/${selectedCourse.id}`);
+      setDeleteLoading(true);
+      await courseService.deleteCourse(selectedCourse.id);
       setDeleteOpen(false);
-      loadCourses();
+      setSelectedCourse(null);
+      await queryClient.invalidateQueries({ queryKey: courseKeys.all });
     } catch (err: any) {
       console.error('Error deleting course:', err);
       alert(err.message || 'Failed to delete course');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -199,26 +184,23 @@ const CoursesPage: React.FC = () => {
         Courses Management
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
       <DataTable
         title="Courses"
         columns={columns}
         data={courses}
-        loading={loading}
-        error={null}
+        loading={isLoading || isFetching}
+        error={errorMessage}
         totalCount={totalCount}
         page={page}
         rowsPerPage={rowsPerPage}
         searchValue={searchValue}
-        onPageChange={setPage}
-        onRowsPerPageChange={setRowsPerPage}
         onSearchChange={setSearchValue}
-        onRefresh={loadCourses}
+        onPageChange={setPage}
+        onRowsPerPageChange={(value) => {
+          setRowsPerPage(value);
+          setPage(0);
+        }}
+        onRefresh={() => courseListQuery.refetch()}
         onRowClick={(course) => navigate(`/admin/courses/${course.id}`)}
         rowActions={rowActions}
         actions={
@@ -227,32 +209,38 @@ const CoursesPage: React.FC = () => {
             startIcon={<AddIcon />}
             onClick={handleCreate}
           >
-            Add Course
+            Create Course
           </Button>
         }
       />
 
       <FormDialog
         open={formOpen}
-        onClose={() => setFormOpen(false)}
-        title="Edit Course"
+        title={formMode === 'create' ? 'Create Course' : 'Edit Course'}
+        onClose={() => {
+          setFormOpen(false);
+          setSelectedCourse(null);
+        }}
         loading={formLoading}
-        maxWidth="md"
       >
         <CourseTaskForm
           course={selectedCourse}
-          mode="edit"
+          mode={formMode}
           onSubmit={handleFormSubmit}
-          onClose={() => setFormOpen(false)}
+          hideStatusAlerts
         />
       </FormDialog>
 
       <DeleteDialog
         open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={handleDeleteConfirm}
         title="Delete Course"
-        message={`Are you sure you want to delete "${selectedCourse?.title || 'this course'}"?`}
+        message={`Are you sure you want to delete ${selectedCourse?.title || 'this course'}?`}
+        onClose={() => {
+          setDeleteOpen(false);
+          setSelectedCourse(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        loading={deleteLoading}
       />
     </Box>
   );

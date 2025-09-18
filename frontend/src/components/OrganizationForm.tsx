@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   TextField,
   Select,
   MenuItem,
@@ -16,8 +17,10 @@ import { OrganizationGet, OrganizationCreate, OrganizationUpdate } from '../type
 interface OrganizationFormProps {
   organization?: OrganizationGet | null;
   mode: 'create' | 'edit';
-  onSubmit: (data: OrganizationCreate | OrganizationUpdate) => void;
+  onSubmit: (data: OrganizationCreate | OrganizationUpdate) => Promise<void> | void;
   onClose?: () => void;
+  loading?: boolean;
+  error?: string | null;
 }
 
 const OrganizationForm: React.FC<OrganizationFormProps> = ({
@@ -25,6 +28,8 @@ const OrganizationForm: React.FC<OrganizationFormProps> = ({
   mode,
   onSubmit,
   onClose,
+  loading = false,
+  error = null,
 }) => {
   const [formData, setFormData] = useState({
     title: '',
@@ -66,7 +71,7 @@ const OrganizationForm: React.FC<OrganizationFormProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (mode === 'create') {
@@ -74,7 +79,7 @@ const OrganizationForm: React.FC<OrganizationFormProps> = ({
         ...formData,
         properties: {},
       };
-      onSubmit(createData);
+      await onSubmit(createData);
     } else {
       // For update, only send changed fields
       const updateData: OrganizationUpdate = {};
@@ -84,12 +89,21 @@ const OrganizationForm: React.FC<OrganizationFormProps> = ({
           (updateData as any)[key] = value;
         }
       });
-      onSubmit(updateData);
+      if (Object.keys(updateData).length > 0) {
+        await onSubmit(updateData);
+      } else {
+        onClose?.();
+      }
     }
   };
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <TextField
@@ -225,12 +239,12 @@ const OrganizationForm: React.FC<OrganizationFormProps> = ({
       </Grid>
       <DialogActions>
         {onClose && (
-          <Button onClick={onClose} color="inherit">
+          <Button onClick={onClose} color="inherit" disabled={loading}>
             Cancel
           </Button>
         )}
-        <Button type="submit" variant="contained" color="primary">
-          {mode === 'create' ? 'Create' : 'Update'}
+        <Button type="submit" variant="contained" color="primary" disabled={loading}>
+          {loading ? 'Saving...' : mode === 'create' ? 'Create' : 'Update'}
         </Button>
       </DialogActions>
     </Box>

@@ -1,48 +1,49 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Alert,
   Box,
   Button,
   Chip,
+  IconButton,
   Stack,
   Typography,
-  Alert,
-  IconButton,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
-  School as SchoolIcon,
+  Edit as EditIcon,
+  AccountTree as AccountTreeIcon,
+  Business as BusinessIcon,
 } from '@mui/icons-material';
-import { CourseFamilyGet, CourseFamilyCreate, CourseFamilyUpdate } from '../types/generated/courses';
+import { useQueryClient } from '@tanstack/react-query';
+import { CourseFamilyCreate, CourseFamilyGet, CourseFamilyUpdate } from '../types/generated/courses';
 import { OrganizationGet } from '../types/generated/organizations';
-import { apiClient } from '../services/apiClient';
 import { DataTable, Column } from '../components/common/DataTable';
 import { FormDialog } from '../components/common/FormDialog';
 import CourseFamilyForm from '../components/CourseFamilyForm';
 import DeleteDialog from '../components/DeleteDialog';
+import { useCourseFamilyListQuery, courseFamilyKeys } from '../app/queries/courseFamilyQueries';
+import { courseFamilyService } from '../services/courseFamilyService';
+import { useOrganizationListQuery, organizationKeys } from '../app/queries/organizationQueries';
 
 const CourseFamiliesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [courseFamilies, setCourseFamilies] = useState<CourseFamilyGet[]>([]);
-  const [organizations, setOrganizations] = useState<OrganizationGet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [totalCount, setTotalCount] = useState(0);
   const [searchValue, setSearchValue] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Dialog states
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCourseFamily, setSelectedCourseFamily] = useState<CourseFamilyGet | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [formLoading, setFormLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchTerm(searchValue);
@@ -51,57 +52,29 @@ const CourseFamiliesPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchValue]);
 
-  // Load organizations for dropdown
-  const loadOrganizations = async () => {
-    try {
-      const response = await apiClient.get<any>('/organizations', {
-        params: { limit: 100 },
-      });
-      const data = Array.isArray(response) ? response : response.data || [];
-      setOrganizations(data);
-    } catch (err) {
-      console.error('Error loading organizations:', err);
-    }
-  };
+  const queryParams = useMemo(
+    () => ({
+      limit: rowsPerPage,
+      offset: page * rowsPerPage,
+      title: searchTerm || undefined,
+    }),
+    [rowsPerPage, page, searchTerm]
+  );
 
-  // Load course families
-  const loadCourseFamilies = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  const courseFamilyListQuery = useCourseFamilyListQuery(queryParams);
+  const { data, isLoading, isFetching, error } = courseFamilyListQuery;
 
-      const response = await apiClient.get<any>('/course-families', {
-        params: {
-          limit: rowsPerPage,
-          offset: page * rowsPerPage,
-          ...(searchTerm && { title: searchTerm }),
-          include: 'organization',  // Request organization data
-        },
-      });
+  const organizationListQuery = useOrganizationListQuery({ limit: 500 });
+  const organizations = (organizationListQuery.data?.items ?? []) as OrganizationGet[];
 
-      const total = response.headers?.['x-total-count'] || response.data?.length || 0;
-      const data = Array.isArray(response) ? response : response.data || [];
-
-      setCourseFamilies(data);
-      setTotalCount(parseInt(total, 10));
-    } catch (err: any) {
-      console.error('Error loading course families:', err);
-      setError(err.message || 'Failed to load course families');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, rowsPerPage, searchTerm]);
-
-  useEffect(() => {
-    loadOrganizations();
-  }, []);
-
-  useEffect(() => {
-    loadCourseFamilies();
-  }, [loadCourseFamilies]);
+  const courseFamilies = data?.items ?? [];
+  const totalCount = data?.total ?? 0;
+  const errorMessage = error instanceof Error ? error.message : null;
 
   const handleCreate = () => {
-    navigate('/admin/course-families/create');
+    setSelectedCourseFamily(null);
+    setFormMode('create');
+    setFormOpen(true);
   };
 
   const handleEdit = (courseFamily: CourseFamilyGet) => {
@@ -115,19 +88,25 @@ const CourseFamiliesPage: React.FC = () => {
     setDeleteOpen(true);
   };
 
-  const handleFormSubmit = async (data: CourseFamilyCreate | CourseFamilyUpdate) => {
+  const handleFormSubmit = async (payload: CourseFamilyCreate | CourseFamilyUpdate) => {
     try {
       setFormLoading(true);
-      if (formMode === 'create') {
-        await apiClient.post('/course-families', data);
-      } else if (selectedCourseFamily) {
-        await apiClient.patch(`/course-families/${selectedCourseFamily.id}`, data);
+      setFormError(null);
+      if (formMode === 'edit' && selectedCourseFamily) {
+        await courseFamilyService.updateCourseFamily(selectedCourseFamily.id, payload as CourseFamilyUpdate);
+      } else {
+        await courseFamilyService.createCourseFamily(payload as CourseFamilyCreate);
       }
+
       setFormOpen(false);
-      loadCourseFamilies();
+      setSelectedCourseFamily(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: courseFamilyKeys.all }),
+        queryClient.invalidateQueries({ queryKey: organizationKeys.all }),
+      ]);
     } catch (err: any) {
       console.error('Error saving course family:', err);
-      alert(err.message || 'Failed to save course family');
+      setFormError(err?.message || 'Failed to save course family');
     } finally {
       setFormLoading(false);
     }
@@ -137,12 +116,16 @@ const CourseFamiliesPage: React.FC = () => {
     if (!selectedCourseFamily) return;
 
     try {
-      await apiClient.delete(`/course-families/${selectedCourseFamily.id}`);
+      setDeleteLoading(true);
+      await courseFamilyService.deleteCourseFamily(selectedCourseFamily.id);
       setDeleteOpen(false);
-      loadCourseFamilies();
+      setSelectedCourseFamily(null);
+      await queryClient.invalidateQueries({ queryKey: courseFamilyKeys.all });
     } catch (err: any) {
       console.error('Error deleting course family:', err);
       alert(err.message || 'Failed to delete course family');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -151,28 +134,35 @@ const CourseFamiliesPage: React.FC = () => {
       id: 'title',
       label: 'Course Family',
       render: (value, row) => (
-        <Typography variant="subtitle2">
-          {value || 'Untitled Course Family'}
-        </Typography>
-      ),
-    },
-    {
-      id: 'path',
-      label: 'Path',
-      render: (value) => (
-        <Typography variant="body2" color="text.secondary">
-          {value}
-        </Typography>
+        <Box>
+          <Typography variant="subtitle2">
+            {value || 'Untitled Course Family'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {row.path}
+          </Typography>
+        </Box>
       ),
     },
     {
       id: 'organization_id',
-      label: 'Organization ID',
-      render: (value) => (
+      label: 'Organization',
+      render: (value, row) => (
         <Stack direction="row" spacing={1} alignItems="center">
-          <SchoolIcon fontSize="small" color="action" />
-          <Typography variant="body2">{value}</Typography>
+          <BusinessIcon fontSize="small" color="action" />
+          <Typography variant="body2">
+            {row.organization?.title || value}
+          </Typography>
         </Stack>
+      ),
+    },
+    {
+      id: 'description',
+      label: 'Description',
+      render: (value) => (
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {value || '—'}
+        </Typography>
       ),
     },
   ];
@@ -191,12 +181,12 @@ const CourseFamiliesPage: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Course Families Management
+        Course Families
       </Typography>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+      {organizationListQuery.error instanceof Error && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Failed to load organizations list. Some dropdowns may be incomplete.
         </Alert>
       )}
 
@@ -204,24 +194,23 @@ const CourseFamiliesPage: React.FC = () => {
         title="Course Families"
         columns={columns}
         data={courseFamilies}
-        loading={loading}
-        error={null}
+        loading={isLoading || isFetching}
+        error={errorMessage}
         totalCount={totalCount}
         page={page}
         rowsPerPage={rowsPerPage}
         searchValue={searchValue}
-        onPageChange={setPage}
-        onRowsPerPageChange={setRowsPerPage}
         onSearchChange={setSearchValue}
-        onRefresh={loadCourseFamilies}
-        onRowClick={(cf) => navigate(`/admin/course-families/${cf.id}`)}
+        onPageChange={setPage}
+        onRowsPerPageChange={(value) => {
+          setRowsPerPage(value);
+          setPage(0);
+        }}
+        onRefresh={() => courseFamilyListQuery.refetch()}
+        onRowClick={(courseFamily) => navigate(`/admin/course-families/${courseFamily.id}`)}
         rowActions={rowActions}
         actions={
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreate}
-          >
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleCreate}>
             Add Course Family
           </Button>
         }
@@ -229,26 +218,39 @@ const CourseFamiliesPage: React.FC = () => {
 
       <FormDialog
         open={formOpen}
-        onClose={() => setFormOpen(false)}
         title={formMode === 'create' ? 'Create Course Family' : 'Edit Course Family'}
-        loading={formLoading}
-        maxWidth="md"
+        onClose={() => {
+          setFormOpen(false);
+          setSelectedCourseFamily(null);
+          setFormError(null);
+        }}
+        loading={formLoading || organizationListQuery.isLoading}
       >
         <CourseFamilyForm
           courseFamily={selectedCourseFamily}
           organizations={organizations}
           mode={formMode}
           onSubmit={handleFormSubmit}
-          onClose={() => setFormOpen(false)}
+          onClose={() => {
+            setFormOpen(false);
+            setSelectedCourseFamily(null);
+            setFormError(null);
+          }}
+          loading={formLoading || organizationListQuery.isLoading}
+          error={formError}
         />
       </FormDialog>
 
       <DeleteDialog
         open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={handleDeleteConfirm}
         title="Delete Course Family"
-        message={`Are you sure you want to delete "${selectedCourseFamily?.title || 'this course family'}"?`}
+        message={`Are you sure you want to delete ${selectedCourseFamily?.title || 'this course family'}?`}
+        onClose={() => {
+          setDeleteOpen(false);
+          setSelectedCourseFamily(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        loading={deleteLoading}
       />
     </Box>
   );

@@ -12,7 +12,7 @@ import {
 interface DeleteDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
   loading?: boolean;

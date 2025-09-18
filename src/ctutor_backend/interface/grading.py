@@ -2,11 +2,23 @@ from datetime import datetime
 from enum import IntEnum
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 from ctutor_backend.interface.base import EntityInterface, ListQuery, BaseEntityGet
-from ctutor_backend.model.course import CourseSubmissionGroupGrading
+from ctutor_backend.model.course import CourseSubmissionGroupGrading, CourseMember
 
+class GradingAuthor(BaseModel):
+    given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
+    family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's family name")
+
+    model_config = ConfigDict(from_attributes=True)
+
+class GradedByCourseMember(BaseModel):
+    course_role_id: Optional[str] = None
+    user_id: str
+    user: Optional[GradingAuthor] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 class GradingStatus(IntEnum):
     """Enumeration for grading status values."""
@@ -24,7 +36,9 @@ class CourseSubmissionGroupGradingCreate(BaseModel):
     grading: float = Field(ge=0.0, le=1.0)  # Grade between 0.0 and 1.0
     status: GradingStatus = GradingStatus.NOT_REVIEWED
     feedback: Optional[str] = None  # Optional feedback/comments
-    
+
+    graded_by_course_member: Optional[GradedByCourseMember] = None
+
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
 
@@ -39,6 +53,7 @@ class CourseSubmissionGroupGradingGet(BaseEntityGet):
     feedback: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    graded_by_course_member: Optional[GradedByCourseMember] = None
     
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
@@ -53,6 +68,7 @@ class CourseSubmissionGroupGradingList(BaseModel):
     status: GradingStatus
     feedback: Optional[str] = None
     created_at: datetime
+    graded_by_course_member: Optional[GradedByCourseMember] = None
     
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
@@ -83,6 +99,11 @@ class CourseSubmissionGroupGradingQuery(ListQuery):
 
 def grading_search(db: Session, query, params: Optional[CourseSubmissionGroupGradingQuery]):
     """Search function for gradings."""
+    query = query.options(
+        joinedload(CourseSubmissionGroupGrading.graded_by).joinedload(CourseMember.user),
+        joinedload(CourseSubmissionGroupGrading.graded_by).joinedload(CourseMember.course_role),
+    )
+
     if params.id is not None:
         query = query.filter(CourseSubmissionGroupGrading.id == params.id)
     if params.course_submission_group_id is not None:

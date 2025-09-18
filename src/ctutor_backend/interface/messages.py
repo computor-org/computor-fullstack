@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.message import Message
 from ctutor_backend.model.course import CourseMember, CourseSubmissionGroup, CourseGroup, CourseContent
+
 class MessageAuthor(BaseModel):
     given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
     family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's family name")

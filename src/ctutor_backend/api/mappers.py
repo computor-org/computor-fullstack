@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from ctutor_backend.interface.course_content_types import CourseContentTypeList
 from ctutor_backend.interface.student_course_contents import (
     CourseContentStudentList, ResultStudentList, SubmissionGroupStudentList,
-    SubmissionGroupRepository, SubmissionGroupMemberBasic, SubmissionGroupGradingStudent
+    SubmissionGroupRepository
 )
 from ctutor_backend.interface.grading import GradingStatus
 from ctutor_backend.interface.tasks import map_int_to_task_status
@@ -111,7 +111,8 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
                     count=submitted_count if submitted_count != None else 0,
                     max_submissions=course_submission_group.max_submissions if course_submission_group else None,
                     max_group_size=course_submission_group.max_group_size if course_submission_group else None,
-                    repository=repository
+                    repository=repository,
+                    unread_message_count=submission_group_unread_count
                 ) if course_submission_group != None else None,
             unread_message_count=unread_message_count
         )

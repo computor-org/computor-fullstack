@@ -8,6 +8,8 @@
 
 
 
+import type { GradingAuthor } from './auth';
+
 import type { ComputorDeploymentConfig, CourseContentDeploymentGet, CourseContentDeploymentList, CourseMemberGitLabConfig, GitLabConfig, GitLabConfigGet, GitLabCredentials, GradingStatus } from './common';
 
 import type { OrganizationGet } from './organizations';
@@ -320,6 +322,12 @@ export interface CourseGroupQuery {
   properties?: string | null;
 }
 
+export interface GradedByCourseMember {
+  course_role_id?: string | null;
+  user_id: string;
+  user?: GradingAuthor | null;
+}
+
 /**
  * Create a new grading for a submission group.
  */
@@ -330,6 +338,7 @@ export interface CourseSubmissionGroupGradingCreate {
   grading: number;
   status?: GradingStatus;
   feedback?: string | null;
+  graded_by_course_member?: GradedByCourseMember | null;
 }
 
 /**
@@ -347,6 +356,7 @@ export interface CourseSubmissionGroupGradingGet {
   grading: number;
   status: GradingStatus;
   feedback?: string | null;
+  graded_by_course_member?: GradedByCourseMember | null;
 }
 
 /**
@@ -361,6 +371,7 @@ export interface CourseSubmissionGroupGradingList {
   status: GradingStatus;
   feedback?: string | null;
   created_at: string;
+  graded_by_course_member?: GradedByCourseMember | null;
 }
 
 /**
@@ -438,6 +449,7 @@ export interface SubmissionGroupStudentList {
   grading?: number | null;
   count?: number;
   max_submissions?: number | null;
+  unread_message_count?: number;
 }
 
 export interface ResultStudentList {

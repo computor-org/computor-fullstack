@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for LecturersClient.
  * Endpoint: /lecturers
- * Generated on: 2025-09-18T12:49:52.899630
  */
+
 import type { CourseGet, CourseList } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

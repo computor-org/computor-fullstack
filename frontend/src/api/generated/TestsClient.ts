@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for TestsClient.
  * Endpoint: /tests
- * Generated on: 2025-09-18T12:49:52.899280
  */
+
 import type { TestCreate, TestRunResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

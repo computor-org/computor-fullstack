@@ -31,7 +31,12 @@ from ctutor_backend.scripts.generate_typescript_interfaces import TypeScriptGene
     is_flag=True,
     help='Clean output directory before generating'
 )
-def generate_types(output_dir: Path = None, watch: bool = False, clean: bool = False):
+@click.option(
+    '--include-timestamps/--no-include-timestamps',
+    default=False,
+    help='Include "Generated on" timestamps in file headers'
+)
+def generate_types(output_dir: Path = None, watch: bool = False, clean: bool = False, include_timestamps: bool = False):
     """Generate TypeScript interfaces from Pydantic models."""
     
     # Determine paths
@@ -60,7 +65,7 @@ def generate_types(output_dir: Path = None, watch: bool = False, clean: bool = F
         shutil.rmtree(output_dir)
     
     # Generate interfaces
-    generator = TypeScriptGenerator()
+    generator = TypeScriptGenerator(include_timestamp=include_timestamps)
     
     def run_generation():
         click.echo(f"📂 Scanning directories:")

@@ -1,6 +1,5 @@
 /**
  * Auto-generated barrel file for API clients.
- * Generated on: 2025-09-18T12:49:52.900567
  */
 
 export * from './baseClient';

@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for RoleInterface.
  * Endpoint: /roles
- * Generated on: 2025-09-18T12:49:52.898124
  */
+
 import type { RoleGet, RoleList, RoleQuery } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

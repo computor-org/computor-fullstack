@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for SessionInterface.
  * Endpoint: /sessions
- * Generated on: 2025-09-18T12:49:52.898203
  */
+
 import type { SessionCreate, SessionGet, SessionList, SessionQuery, SessionUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for ExampleRepositoryInterface.
  * Endpoint: /example-repositories
- * Generated on: 2025-09-18T12:49:52.897340
  */
+
 import type { ExampleRepositoryCreate, ExampleRepositoryGet, ExampleRepositoryList, ExampleRepositoryQuery, ExampleRepositoryUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

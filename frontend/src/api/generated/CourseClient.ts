@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseInterface.
  * Endpoint: /courses
- * Generated on: 2025-09-18T12:49:52.896547
  */
+
 import type { CourseCreate, CourseExecutionBackendGet, CourseGet, CourseList, CourseQuery, CourseUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

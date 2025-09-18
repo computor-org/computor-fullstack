@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseFamilyInterface.
  * Endpoint: /course-families
- * Generated on: 2025-09-18T12:49:52.896373
  */
+
 import type { CourseFamilyCreate, CourseFamilyGet, CourseFamilyList, CourseFamilyQuery, CourseFamilyUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

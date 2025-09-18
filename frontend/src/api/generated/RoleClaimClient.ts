@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for RoleClaimInterface.
  * Endpoint: /role-claims
- * Generated on: 2025-09-18T12:49:52.898036
  */
+
 import type { RoleClaimGet, RoleClaimList, RoleClaimQuery } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

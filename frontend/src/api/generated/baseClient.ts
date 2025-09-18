@@ -1,6 +1,5 @@
 /**
  * Auto-generated helper utilities for API endpoint clients.
- * Generated on: 2025-09-18T12:49:52.895240
  */
 
 import { APIClient, apiClient } from 'api/client';

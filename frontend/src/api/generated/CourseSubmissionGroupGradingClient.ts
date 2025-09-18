@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseSubmissionGroupGradingInterface.
  * Endpoint: /submission-group-gradings
- * Generated on: 2025-09-18T12:49:52.896949
  */
+
 import type { CourseSubmissionGroupGradingCreate, CourseSubmissionGroupGradingGet, CourseSubmissionGroupGradingList, CourseSubmissionGroupGradingQuery, CourseSubmissionGroupGradingUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

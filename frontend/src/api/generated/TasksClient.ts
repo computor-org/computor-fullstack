@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for TasksClient.
  * Endpoint: /tasks
- * Generated on: 2025-09-18T12:49:52.899950
  */
+
 import type { TaskInfo, TaskResult, TaskSubmission } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

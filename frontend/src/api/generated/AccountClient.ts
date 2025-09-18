@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for AccountInterface.
  * Endpoint: /accounts
- * Generated on: 2025-09-18T12:49:52.895588
  */
+
 import type { AccountCreate, AccountGet, AccountList, AccountQuery, AccountUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

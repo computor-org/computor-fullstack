@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for MiscClient.
  * Endpoint: /
- * Generated on: 2025-09-18T12:49:52.900451
  */
+
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 

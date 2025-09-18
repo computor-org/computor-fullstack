@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseStudentInterface.
  * Endpoint: /student-courses
- * Generated on: 2025-09-18T12:49:52.896875
  */
+
 import type { CourseStudentList, CourseStudentQuery } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

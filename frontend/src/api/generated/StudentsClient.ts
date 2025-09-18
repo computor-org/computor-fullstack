@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for StudentsClient.
  * Endpoint: /students
- * Generated on: 2025-09-18T12:49:52.899368
  */
+
 import type { CourseContentStudentList, CourseStudentGet, CourseStudentList, SubmitRequest, SubmitResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

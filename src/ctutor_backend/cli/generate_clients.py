@@ -21,10 +21,15 @@ from ctutor_backend.scripts.generate_typescript_clients import main as generate_
     is_flag=True,
     help="Clean output directory before generating",
 )
-def generate_clients(output_dir: Path | None, clean: bool) -> None:
+@click.option(
+    "--include-timestamps/--no-include-timestamps",
+    default=False,
+    help="Include \"Generated on\" timestamps in client headers",
+)
+def generate_clients(output_dir: Path | None, clean: bool, include_timestamps: bool) -> None:
     """Generate TypeScript API clients from backend interfaces."""
 
-    generated = generate_ts_clients(output_dir=output_dir, clean=clean)
+    generated = generate_ts_clients(output_dir=output_dir, clean=clean, include_timestamp=include_timestamps)
 
     click.echo(click.style(f"✅ Generated {len(generated)} client files", fg="green"))
 

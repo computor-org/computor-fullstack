@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for CourseTutorInterface.
  * Endpoint: /tutor-courses
- * Generated on: 2025-09-18T12:49:52.897028
  */
+
 import type { CourseTutorList, CourseTutorQuery } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';

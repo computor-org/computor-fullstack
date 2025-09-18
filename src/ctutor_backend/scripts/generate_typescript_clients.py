@@ -118,9 +118,18 @@ class OperationMethod:
 class TypeScriptClientGenerator:
     """Generate TypeScript API client classes from interface metadata."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, include_timestamp: bool = False):
         self.output_dir = output_dir
         self.generated_files: Set[Path] = set()
+        self.include_timestamp = include_timestamp
+        self._timestamp_value: Optional[str] = None
+
+    def _current_timestamp(self) -> str:
+        if not self.include_timestamp:
+            raise RuntimeError("Timestamp requested but include_timestamp is False")
+        if self._timestamp_value is None:
+            self._timestamp_value = datetime.utcnow().isoformat()
+        return self._timestamp_value
 
     # ------------------------------------------------------------------
     # Discovery helpers
@@ -210,6 +219,9 @@ class TypeScriptClientGenerator:
         if clean:
             self._clean_output_dir()
 
+        if self.include_timestamp:
+            self._timestamp_value = None
+
         interface_clients = self.discover_interfaces()
         custom_clients = self._attach_openapi_operations(interface_clients)
 
@@ -235,50 +247,53 @@ class TypeScriptClientGenerator:
     # File writers
     # ------------------------------------------------------------------
     def _write_base_client(self) -> Path:
-        content = (
-            """/**
- * Auto-generated helper utilities for API endpoint clients.
- * Generated on: __TIMESTAMP__
- */
+        header = [
+            "/**",
+            " * Auto-generated helper utilities for API endpoint clients.",
+        ]
+        if self.include_timestamp:
+            header.append(f" * Generated on: {self._current_timestamp()}")
+        header.append(" */")
+        header.append("")
 
-import { APIClient, apiClient } from 'api/client';
+        body = [
+            "import { APIClient, apiClient } from 'api/client';",
+            "",
+            "export class BaseEndpointClient {",
+            "  protected readonly client: APIClient;",
+            "  protected readonly basePath: string;",
+            "",
+            "  constructor(client: APIClient = apiClient, basePath: string) {",
+            "    this.client = client;",
+            "    if (!basePath) {",
+            "      this.basePath = '/';",
+            "      return;",
+            "    }",
+            "",
+            "    const normalized = basePath.startsWith('/') ? basePath : `/${basePath}`;",
+            "    this.basePath = normalized !== '/' && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;",
+            "  }",
+            "",
+            "  protected buildPath(...segments: (string | number)[]): string {",
+            "    if (!segments.length) {",
+            "      return this.basePath;",
+            "    }",
+            "",
+            "    const encoded = segments.map((segment) => encodeURIComponent(String(segment)));",
+            "    const joined = encoded.join('/');",
+            "    if (this.basePath === '/') {",
+            "      return `/${joined}`;",
+            "    }",
+            "",
+            "    return `${this.basePath}/${joined}`;",
+            "  }",
+            "}",
+        ]
 
-export class BaseEndpointClient {
-  protected readonly client: APIClient;
-  protected readonly basePath: string;
-
-  constructor(client: APIClient = apiClient, basePath: string) {
-    this.client = client;
-    if (!basePath) {
-      this.basePath = '/';
-      return;
-    }
-
-    const normalized = basePath.startsWith('/') ? basePath : `/${basePath}`;
-    this.basePath = normalized !== '/' && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  }
-
-  protected buildPath(...segments: (string | number)[]): string {
-    if (!segments.length) {
-      return this.basePath;
-    }
-
-    const encoded = segments.map((segment) => encodeURIComponent(String(segment)));
-    const joined = encoded.join('/');
-    if (this.basePath === '/') {
-      return `/${joined}`;
-    }
-
-    return `${this.basePath}/${joined}`;
-  }
-}
-"""
-        ).replace("__TIMESTAMP__", datetime.utcnow().isoformat()).strip()
-
+        content = "\n".join(header + body)
         return self._write_file("baseClient.ts", content)
 
     def _write_client(self, meta: InterfaceMetadata) -> Optional[Path]:
-        timestamp = datetime.utcnow().isoformat()
         crud_lines, crud_types = self._generate_crud_methods(meta)
         extra_lines, extra_types = self._generate_extra_methods(meta)
 
@@ -295,12 +310,18 @@ export class BaseEndpointClient {
         imports.append("import { APIClient, apiClient } from 'api/client';")
         imports.append("import { BaseEndpointClient } from './baseClient';")
 
-        body_lines = [
+        header = [
             "/**",
             f" * Auto-generated client for {meta.name}.",
             f" * Endpoint: {meta.base_path}",
-            f" * Generated on: {timestamp}",
-            " */",
+        ]
+        if self.include_timestamp:
+            header.append(f" * Generated on: {self._current_timestamp()}")
+        header.append(" */")
+
+        body_lines = [
+            *header,
+            "",
             *imports,
             "",
             f"export class {meta.client_class_name} extends BaseEndpointClient {{",
@@ -318,15 +339,15 @@ export class BaseEndpointClient {
         return self._write_file(filename, content)
 
     def _write_index(self, interfaces: list[InterfaceMetadata]) -> Path:
-        timestamp = datetime.utcnow().isoformat()
         exports = [
             "/**",
             " * Auto-generated barrel file for API clients.",
-            f" * Generated on: {timestamp}",
-            " */",
-            "",
-            "export * from './baseClient';",
         ]
+        if self.include_timestamp:
+            exports.append(f" * Generated on: {self._current_timestamp()}")
+        exports.append(" */")
+        exports.append("")
+        exports.append("export * from './baseClient';")
 
         for meta in interfaces:
             exports.append(f"export * from './{meta.client_class_name}';")
@@ -1064,11 +1085,11 @@ export class BaseEndpointClient {
                     continue
 
 
-def main(output_dir: Optional[Path] = None, clean: bool = False) -> list[Path]:
+def main(output_dir: Optional[Path] = None, clean: bool = False, include_timestamp: bool = False) -> list[Path]:
     if output_dir is None:
         output_dir = PROJECT_ROOT / "frontend" / "src" / "api" / "generated"
 
-    generator = TypeScriptClientGenerator(output_dir)
+    generator = TypeScriptClientGenerator(output_dir, include_timestamp=include_timestamp)
     return generator.generate(clean=clean)
 
 

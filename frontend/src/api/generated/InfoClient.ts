@@ -1,8 +1,8 @@
 /**
  * Auto-generated client for InfoClient.
  * Endpoint: /info
- * Generated on: 2025-09-18T12:49:52.899875
  */
+
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 

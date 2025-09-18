@@ -207,7 +207,7 @@ class TypeScriptGenerator:
                 'BaseEntityList', 'BaseEntityGet', 'BaseEntityCreate', 'BaseEntityUpdate',
                 'OrganizationConfig', 'CourseFamilyConfig', 'CourseConfig',
                 'HierarchicalOrganizationConfig', 'HierarchicalCourseFamilyConfig',
-                'HierarchicalCourseConfig'
+                'HierarchicalCourseConfig', 'ListQuery'
             }
 
             def process_class(node: ast.ClassDef, parent_chain: List[str]):

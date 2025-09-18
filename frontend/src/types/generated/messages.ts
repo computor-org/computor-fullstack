@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-17T14:46:20.419292
+ * Generated on: 2025-09-18T14:42:27.803304
 
  * Category: Messages
 
@@ -60,6 +60,20 @@ export interface MessageList {
   level: number;
   parent_id?: string | null;
   author_id: string;
+  user_id?: string | null;
+  course_member_id?: string | null;
+  course_submission_group_id?: string | null;
+  course_group_id?: string | null;
+  course_content_id?: string | null;
+  course_id?: string | null;
+}
+
+export interface MessageQuery {
+  skip?: number | null;
+  limit?: number | null;
+  id?: string | null;
+  parent_id?: string | null;
+  author_id?: string | null;
   user_id?: string | null;
   course_member_id?: string | null;
   course_submission_group_id?: string | null;

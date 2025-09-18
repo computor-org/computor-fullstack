@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-17T14:46:20.419003
+ * Generated on: 2025-09-18T14:42:27.803134
 
  * Category: Examples
 
@@ -194,6 +194,15 @@ export interface ExampleVersionList {
 }
 
 /**
+ * Query parameters for listing example versions (filtering).
+ */
+export interface ExampleVersionQuery {
+  skip?: number | null;
+  limit?: number | null;
+  version_tag?: string | null;
+}
+
+/**
  * Create example dependency.
  */
 export interface ExampleDependencyCreate {
@@ -214,6 +223,32 @@ export interface ExampleDependencyGet {
   version_constraint?: string | null;
   created_at: string;
   dependency?: ExampleList | null;
+}
+
+/**
+ * Query parameters for listing examples.
+ */
+export interface ExampleQuery {
+  skip?: number | null;
+  limit?: number | null;
+  repository_id?: string | null;
+  /** Filter by identifier (supports Ltree patterns with *) */
+  identifier?: string | null;
+  title?: string | null;
+  category?: string | null;
+  tags?: string[] | null;
+  search?: string | null;
+}
+
+/**
+ * Query parameters for listing repositories.
+ */
+export interface ExampleRepositoryQuery {
+  skip?: number | null;
+  limit?: number | null;
+  name?: string | null;
+  source_type?: string | null;
+  organization_id?: string | null;
 }
 
 /**

@@ -15,6 +15,13 @@ export interface MessageAuthor {
   family_name?: string | null;
 }
 
+export interface GradingAuthor {
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
 export interface AuthConfig {
 }
 

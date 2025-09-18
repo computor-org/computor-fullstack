@@ -162,15 +162,13 @@ class TestStudentAPIImports:
             SubmissionGroupStudent, 
             SubmissionGroupStudentQuery,
             SubmissionGroupRepository,
-            SubmissionGroupMemberBasic,
-            SubmissionGroupGradingStudent
+            SubmissionGroupMemberBasic
         )
         
         assert SubmissionGroupStudent is not None
         assert SubmissionGroupStudentQuery is not None
         assert SubmissionGroupRepository is not None
         assert SubmissionGroupMemberBasic is not None
-        assert SubmissionGroupGradingStudent is not None
 
 
 @pytest.mark.unit

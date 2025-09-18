@@ -31,15 +31,15 @@ class SubmissionGroupMemberBasic(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
-class SubmissionGroupGradingStudent(BaseModel):
-    """Student's view of grading"""
-    id: str
-    grading: float  # 0.0 to 1.0
-    status: Optional[str] = None  # corrected, correction_necessary, etc.
-    graded_by: Optional[str] = None  # Name of grader
-    created_at: datetime
+# class SubmissionGroupGradingStudent(BaseModel):
+#     """Student's view of grading"""
+#     id: str
+#     grading: float  # 0.0 to 1.0
+#     status: Optional[str] = None  # corrected, correction_necessary, etc.
+#     graded_by: Optional[str] = None  # Name of grader
+#     created_at: datetime
     
-    model_config = ConfigDict(from_attributes=True)
+#     model_config = ConfigDict(from_attributes=True)
 
 class SubmissionGroupStudentList(BaseModel):
     """Enhanced submission group data for course contents"""
@@ -55,6 +55,7 @@ class SubmissionGroupStudentList(BaseModel):
     grading: Optional[float] = None  # Backward compatibility
     count: int = 0  # Backward compatibility - submission count
     max_submissions: Optional[int] = None  # Backward compatibility
+    unread_message_count: int = 0
     
     model_config = ConfigDict(from_attributes=True)
 

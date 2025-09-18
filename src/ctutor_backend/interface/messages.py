@@ -5,6 +5,11 @@ from sqlalchemy.orm import Session
 from ctutor_backend.interface.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 from ctutor_backend.model.message import Message
 
+class MessageAuthor(BaseModel):
+    given_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's given name")
+    family_name: Optional[str] = Field(None, min_length=1, max_length=255, description="Author's family name")
+
+    model_config = ConfigDict(from_attributes=True)
 
 class MessageCreate(BaseModel):
     # author_id is always the current user; set in API
@@ -34,6 +39,7 @@ class MessageGet(BaseEntityGet):
     level: int
     parent_id: Optional[str] = None
     author_id: str
+    author: Optional[MessageAuthor] = Field(None, description="Author details")
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
@@ -52,6 +58,7 @@ class MessageList(BaseEntityList):
     level: int
     parent_id: Optional[str] = None
     author_id: str
+    author: Optional[MessageAuthor] = Field(None, description="Author details")
 
     user_id: Optional[str] = None
     course_member_id: Optional[str] = None
@@ -76,6 +83,9 @@ class MessageQuery(ListQuery):
 
 
 def message_search(db: Session, query, params: Optional[MessageQuery]):
+    from sqlalchemy.orm import selectinload
+
+    query = query.options(selectinload(Message.author))
     if params.id is not None:
         query = query.filter(Message.id == params.id)
     if params.parent_id is not None:

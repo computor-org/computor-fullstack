@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-18T14:42:27.802815
+ * Generated on: 2025-09-18T17:27:35.884978
 
  * Category: Tasks
 
@@ -14,15 +14,6 @@ import type { Repository } from './common';
 
 
 
-/**
- * Response with task ID for async operation.
- */
-export interface TaskResponse {
-  task_id: string;
-  status: string;
-  message: string;
-}
-
 export interface TestJob {
   user_id: string;
   course_member_id: string;
@@ -33,4 +24,13 @@ export interface TestJob {
   reference?: Repository | null;
   test_number?: number;
   submission_number?: number;
+}
+
+/**
+ * Response with task ID for async operation.
+ */
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
 }

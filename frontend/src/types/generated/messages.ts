@@ -2,11 +2,15 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-18T14:42:27.803304
+ * Generated on: 2025-09-18T17:27:35.885987
 
  * Category: Messages
 
  */
+
+
+
+import type { MessageAuthor } from './auth';
 
 
 
@@ -41,6 +45,8 @@ export interface MessageGet {
   level: number;
   parent_id?: string | null;
   author_id: string;
+  /** Author details */
+  author?: MessageAuthor | null;
   user_id?: string | null;
   course_member_id?: string | null;
   course_submission_group_id?: string | null;
@@ -60,6 +66,8 @@ export interface MessageList {
   level: number;
   parent_id?: string | null;
   author_id: string;
+  /** Author details */
+  author?: MessageAuthor | null;
   user_id?: string | null;
   course_member_id?: string | null;
   course_submission_group_id?: string | null;

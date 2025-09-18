@@ -562,6 +562,10 @@ class TypeScriptClientGenerator:
                 body_type, body_deps = self._schema_to_ts(schema)
                 dependencies |= body_deps
 
+        if body_type and method.lower() in {'get', 'head'}:
+            body_type = None
+            body_required = False
+
         response_type: Optional[str] = 'void'
         success_status = 'default'
         responses = operation.get('responses', {})
@@ -886,10 +890,11 @@ class TypeScriptClientGenerator:
 
         has_query = bool(operation.query_params)
         has_body = bool(operation.body_type)
+        include_body = has_body and client_method in {'post', 'put', 'patch', 'delete'}
 
         if client_method != 'request':
             args: List[str] = [url_expr]
-            if has_body:
+            if include_body:
                 args.append('body')
             if has_query:
                 options = '{ params: queryParams }'
@@ -897,7 +902,7 @@ class TypeScriptClientGenerator:
             return f"return this.client.{client_method}<{generic}>({', '.join(args)});"
 
         options_parts = [f"method: '{method.upper()}'"]
-        if has_body:
+        if include_body:
             options_parts.append("body: body")
         if has_query:
             options_parts.append("params: queryParams")

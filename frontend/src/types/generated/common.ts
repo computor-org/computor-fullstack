@@ -8,9 +8,11 @@
 
 
 
-import type { CourseSignupResponse } from './courses';
+import type { CourseExecutionBackendConfig, CourseSignupResponse } from './courses';
 
 import type { ExampleVersionList } from './examples';
+
+import type { TaskStatus } from './tasks';
 
 import type { UserGet } from './users';
 
@@ -392,6 +394,19 @@ export interface ExecutionBackendGet {
   id: string;
 }
 
+export interface ExecutionBackendList {
+  type: string;
+  slug: string;
+  properties?: any | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+}
+
 export interface ExecutionBackendUpdate {
   type?: string | null;
   slug?: string | null;
@@ -425,7 +440,7 @@ export interface GroupCreate {
   /** Group description */
   description?: string | null;
   /** Type of group (fixed or dynamic) */
-  group_type: any;
+  group_type: GroupType;
   /** Additional group properties */
   properties?: any | null;
 }
@@ -444,7 +459,7 @@ export interface GroupGet {
   /** Group description */
   description?: string | null;
   /** Type of group */
-  group_type: any;
+  group_type: GroupType;
   /** Additional properties */
   properties?: any | null;
 }
@@ -461,7 +476,7 @@ export interface GroupList {
   /** Group description */
   description?: string | null;
   /** Type of group */
-  group_type: any;
+  group_type: GroupType;
 }
 
 export interface GroupUpdate {
@@ -470,7 +485,7 @@ export interface GroupUpdate {
   /** Group description */
   description?: string | null;
   /** Type of group */
-  group_type?: any | null;
+  group_type?: GroupType | null;
   /** Additional properties */
   properties?: any | null;
 }
@@ -483,7 +498,7 @@ export interface GroupQuery {
   /** Filter by group name */
   name?: string | null;
   /** Filter by group type */
-  group_type?: any | null;
+  group_type?: GroupType | null;
   /** Filter by archived status */
   archived?: boolean | null;
 }
@@ -511,12 +526,76 @@ export interface BaseEntityGet {
 
 export interface StudentTemplateSettings {
   mr_default_target_self?: boolean;
-  merge_method?: any;
+  merge_method?: MergeMethod;
   only_allow_merge_if_pipeline_succeeds?: boolean;
   only_allow_merge_if_all_discussions_are_resolved?: boolean;
 }
 
 export interface FilterBase {
+}
+
+export interface EqualsFilter {
+  eq: any;
+}
+
+export interface GreaterFilter {
+  gt: any;
+}
+
+export interface LowerFilter {
+  lt: any;
+}
+
+export interface NotEqualsFilter {
+  ne: any;
+}
+
+export interface InFilter {
+  in_: any[];
+}
+
+export interface NotInFilter {
+  not_in: any[];
+}
+
+export interface LikeFilter {
+  like: string;
+}
+
+export interface ILikeFilter {
+  ilike: string;
+}
+
+export interface BetweenFilter {
+  between: any[];
+}
+
+export interface IsNullFilter {
+  is_null: boolean;
+}
+
+export interface NotNullFilter {
+  not_null: boolean;
+}
+
+export interface StartswithFilter {
+  startswith: string;
+}
+
+export interface EndswithFilter {
+  endswith: string;
+}
+
+export interface ContainsFilter {
+  contains: string;
+}
+
+export interface AndFilter {
+  and_: EqualsFilter | GreaterFilter | LowerFilter | NotEqualsFilter | InFilter | NotInFilter | LikeFilter | ILikeFilter | BetweenFilter | IsNullFilter | NotNullFilter | StartswithFilter | EndswithFilter | ContainsFilter | AndFilter | OrFilter[];
+}
+
+export interface OrFilter {
+  or_: EqualsFilter | GreaterFilter | LowerFilter | NotEqualsFilter | InFilter | NotInFilter | LikeFilter | ILikeFilter | BetweenFilter | IsNullFilter | NotNullFilter | StartswithFilter | EndswithFilter | ContainsFilter | AndFilter | OrFilter[];
 }
 
 export interface ResultCreate {
@@ -531,7 +610,7 @@ export interface ResultCreate {
   properties?: any | null;
   version_identifier: string;
   reference_version_identifier?: string | null;
-  status: any;
+  status: TaskStatus;
 }
 
 export interface ResultGet {
@@ -554,7 +633,7 @@ export interface ResultGet {
   properties?: any | null;
   version_identifier: string;
   reference_version_identifier?: string | null;
-  status: any;
+  status: TaskStatus;
   grading_ids?: string[] | null;
 }
 
@@ -570,14 +649,14 @@ export interface ResultList {
   result: number;
   version_identifier: string;
   reference_version_identifier?: string | null;
-  status: any;
+  status: TaskStatus;
 }
 
 export interface ResultUpdate {
   submit?: boolean | null;
   result?: number | null;
   result_json?: any | null;
-  status?: any | null;
+  status?: TaskStatus | null;
   test_system_id?: string | null;
   properties?: any | null;
 }
@@ -595,10 +674,39 @@ export interface ResultQuery {
   execution_backend_id?: string | null;
   test_system_id?: string | null;
   version_identifier?: string | null;
-  status?: any | null;
+  status?: TaskStatus | null;
   latest?: boolean | null;
   result?: number | null;
   result_json?: string | null;
+}
+
+/**
+ * Result with associated grading information.
+ */
+export interface ResultWithGrading {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  submit: boolean;
+  course_member_id: string;
+  course_content_id: string;
+  course_content_type_id: string;
+  course_submission_group_id?: string | null;
+  execution_backend_id: string;
+  test_system_id: string;
+  result: number;
+  result_json?: any | null;
+  properties?: any | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+  grading_ids?: string[] | null;
+  latest_grading?: any | null;
+  grading_count?: number;
 }
 
 /**
@@ -622,7 +730,7 @@ export interface ResultDetailed {
   properties?: any | null;
   version_identifier: string;
   reference_version_identifier?: string | null;
-  status: any;
+  status: TaskStatus;
   gradings?: any[];
   latest_grade?: number | null;
   latest_grading_status?: number | null;
@@ -637,7 +745,7 @@ export interface ResultDetailed {
 export interface GradingStudentView {
   id: string;
   grading: number;
-  status: any;
+  status: GradingStatus;
   feedback?: string | null;
   graded_by_name?: string | null;
   graded_at: string;
@@ -952,6 +1060,76 @@ export interface TestDependency {
 export interface CodeAbilityBase {
 }
 
+/**
+ * Link to external resources.
+ */
+export interface CodeAbilityLink {
+  /** Description of the link */
+  description: string;
+  /** URL of the link */
+  url: string;
+}
+
+/**
+ * Person information for authors/maintainers.
+ */
+export interface CodeAbilityPerson {
+  /** Full name */
+  name?: string | null;
+  /** Email address */
+  email?: string | null;
+  /** Institutional affiliation */
+  affiliation?: string | null;
+}
+
+/**
+ * Properties specific to assignment-level meta.
+ */
+export interface CodeAbilityMetaProperties {
+  /** Files that students must submit */
+  studentSubmissionFiles?: string[] | null;
+  /** Additional files provided to students */
+  additionalFiles?: string[] | null;
+  /** Test files for automated grading */
+  testFiles?: string[] | null;
+  /** Template files for student projects */
+  studentTemplates?: string[] | null;
+  /** List of example dependencies. Can be simple strings (slugs) or objects with slug and version constraints */
+  testDependencies?: string | TestDependency[] | null;
+  /** Execution backend configuration for this assignment */
+  executionBackend?: CourseExecutionBackendConfig | null;
+}
+
+/**
+ * Meta information for assignments/examples.
+ */
+export interface CodeAbilityMeta {
+  /** Version of the meta format */
+  version?: string | null;
+  /** Unique identifier for the assignment */
+  slug?: string | null;
+  /** Human-readable title */
+  title?: string | null;
+  /** Detailed description of the content */
+  description?: string | null;
+  /** Primary language of the content (e.g., 'en', 'de', 'fr', etc.) */
+  language?: string | null;
+  /** License information */
+  license?: string | null;
+  /** Content authors */
+  authors?: CodeAbilityPerson[] | null;
+  /** Content maintainers */
+  maintainers?: CodeAbilityPerson[] | null;
+  /** Related links */
+  links?: CodeAbilityLink[] | null;
+  /** Supporting material links */
+  supportingMaterial?: CodeAbilityLink[] | null;
+  /** Keywords for categorization */
+  keywords?: string[] | null;
+  /** Assignment-specific properties */
+  properties?: CodeAbilityMetaProperties | null;
+}
+
 export interface SubmissionGroupProperties {
   gitlab?: GitLabConfig | null;
 }
@@ -1022,6 +1200,29 @@ export interface SubmissionGroupStudentQuery {
 }
 
 /**
+ * Submission group with latest grading information.
+ */
+export interface SubmissionGroupWithGrading {
+  properties?: SubmissionGroupProperties | null;
+  max_group_size?: number;
+  max_submissions?: number | null;
+  course_content_id: string;
+  status?: string | null;
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  id: string;
+  course_id: string;
+  last_submitted_result_id?: string | null;
+  latest_grading?: any | null;
+  grading_count?: number;
+  last_submitted_at?: string | null;
+}
+
+/**
  * Detailed submission group information including members and gradings.
  */
 export interface SubmissionGroupDetailed {
@@ -1039,7 +1240,7 @@ export interface SubmissionGroupDetailed {
   submission_count?: number;
   test_run_count?: number;
   latest_grade?: number | null;
-  latest_grading_status?: any | null;
+  latest_grading_status?: GradingStatus | null;
   created_at: string;
   updated_at: string;
 }
@@ -1699,11 +1900,6 @@ export interface CourseGroupConfig {
   name: string;
 }
 
-export interface CourseExecutionBackendConfig {
-  slug: string;
-  settings?: any | null;
-}
-
 export interface FileSourceConfig {
   url: string;
   token?: string | null;
@@ -1716,7 +1912,7 @@ export interface CourseSettingsConfig {
 export interface CodeAbilityTestCommon {
   failureMessage?: string | null;
   successMessage?: string | null;
-  qualification?: any | null;
+  qualification?: QualificationEnum | null;
   relativeTolerance?: number | null;
   absoluteTolerance?: number | null;
   allowedOccuranceRange?: number[] | null;
@@ -1724,11 +1920,272 @@ export interface CodeAbilityTestCommon {
   verbosity?: number | null;
 }
 
+export interface CodeAbilityTestCollectionCommon {
+  failureMessage?: string | null;
+  successMessage?: string | null;
+  qualification?: QualificationEnum | null;
+  relativeTolerance?: number | null;
+  absoluteTolerance?: number | null;
+  allowedOccuranceRange?: number[] | null;
+  occuranceType?: string | null;
+  verbosity?: number | null;
+  storeGraphicsArtifacts?: boolean | null;
+  competency?: string | null;
+  timeout?: number | null;
+}
+
+export interface CodeAbilityTest {
+  failureMessage?: string | null;
+  successMessage?: string | null;
+  qualification?: QualificationEnum | null;
+  relativeTolerance?: number | null;
+  absoluteTolerance?: number | null;
+  allowedOccuranceRange?: number[] | null;
+  occuranceType?: string | null;
+  verbosity?: number | null;
+  name: string;
+  value?: any | null;
+  evalString?: string | null;
+  pattern?: string | null;
+  countRequirement?: number | null;
+}
+
+export interface CodeAbilityTestCollection {
+  failureMessage?: string | null;
+  successMessage?: string | null;
+  qualification?: QualificationEnum | null;
+  relativeTolerance?: number | null;
+  absoluteTolerance?: number | null;
+  allowedOccuranceRange?: number[] | null;
+  occuranceType?: string | null;
+  verbosity?: number | null;
+  storeGraphicsArtifacts?: boolean | null;
+  competency?: string | null;
+  timeout?: number | null;
+  type?: TypeEnum | null;
+  name: string;
+  description?: string | null;
+  successDependency?: (string | number | any[]) | null;
+  setUpCodeDependency?: string | null;
+  entryPoint?: string | null;
+  inputAnswers?: (string | string[]) | null;
+  setUpCode?: (string | string[]) | null;
+  tearDownCode?: (string | string[]) | null;
+  id?: string | null;
+  file?: string | null;
+  tests: CodeAbilityTest[];
+}
+
+export interface CodeAbilityTestProperty {
+  failureMessage?: string | null;
+  successMessage?: string | null;
+  qualification?: QualificationEnum | null;
+  relativeTolerance?: number | null;
+  absoluteTolerance?: number | null;
+  allowedOccuranceRange?: number[] | null;
+  occuranceType?: string | null;
+  verbosity?: number | null;
+  storeGraphicsArtifacts?: boolean | null;
+  competency?: string | null;
+  timeout?: number | null;
+  tests?: CodeAbilityTestCollection[];
+}
+
+export interface CodeAbilityTestSuite {
+  type?: string | null;
+  name?: string | null;
+  description?: string | null;
+  version?: string | null;
+  properties?: CodeAbilityTestProperty;
+}
+
+export interface CodeAbilitySpecification {
+  executionDirectory?: string | null;
+  studentDirectory?: string | null;
+  referenceDirectory?: string | null;
+  testDirectory?: string | null;
+  outputDirectory?: string | null;
+  artifactDirectory?: string | null;
+  testVersion?: string | null;
+  storeGraphicsArtifacts?: boolean | null;
+  outputName?: string | null;
+  isLocalUsage?: boolean | null;
+  studentTestCounter?: number | null;
+}
+
+export interface CodeAbilityMetaProperty {
+  studentSubmissionFiles?: string[] | null;
+  additionalFiles?: string[] | null;
+  testFiles?: string[] | null;
+  studentTemplates?: string[] | null;
+  executionBackend?: CourseExecutionBackendConfig | null;
+  maxTestRuns?: number | null;
+  maxSubmissions?: number | null;
+  maxGroupSize?: number | null;
+}
+
+export interface CodeAbilityReportSummary {
+  total?: number;
+  passed?: number;
+  failed?: number;
+  skipped?: number;
+}
+
+export interface CodeAbilityReleaseMeta {
+  version?: string | null;
+  kind?: MetaTypeEnum | null;
+  title?: string | null;
+  description?: string | null;
+  language?: LanguageEnum | null;
+  license?: string | null;
+  authors?: CodeAbilityPerson[] | null;
+  maintainers?: CodeAbilityPerson[] | null;
+  links?: CodeAbilityLink[] | null;
+  supportingMaterial?: CodeAbilityLink[] | null;
+  keywords?: string[] | null;
+  properties?: CodeAbilityMetaProperty | null;
+}
+
+export interface CodeAbilityCourseMeta {
+  version?: string | null;
+  kind?: MetaTypeEnum | null;
+  title?: string | null;
+  description?: string | null;
+  language?: LanguageEnum | null;
+  license?: string | null;
+  authors?: CodeAbilityPerson[] | null;
+  maintainers?: CodeAbilityPerson[] | null;
+  links?: CodeAbilityLink[] | null;
+  supportingMaterial?: CodeAbilityLink[] | null;
+  keywords?: string[] | null;
+  properties?: CodeAbilityMetaProperty | null;
+  contentTypes?: TypeConfig[] | null;
+  executionBackends?: CourseExecutionBackendConfig[] | null;
+}
+
+export interface CodeAbilityUnitMeta {
+  version?: string | null;
+  kind?: MetaTypeEnum | null;
+  title?: string | null;
+  description?: string | null;
+  language?: LanguageEnum | null;
+  license?: string | null;
+  authors?: CodeAbilityPerson[] | null;
+  maintainers?: CodeAbilityPerson[] | null;
+  links?: CodeAbilityLink[] | null;
+  supportingMaterial?: CodeAbilityLink[] | null;
+  keywords?: string[] | null;
+  properties?: CodeAbilityMetaProperty | null;
+  type: string;
+}
+
+export interface CodeAbilityReportProperties {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: CodeAbilityReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+}
+
+export interface CodeAbilityReportSub {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: CodeAbilityReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+}
+
+export interface CodeAbilityReportMain {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: CodeAbilityReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+  tests?: CodeAbilityReportSub[] | null;
+}
+
+export interface CodeAbilityReport {
+  timestamp?: string | null;
+  type?: string | null;
+  version?: string | null;
+  name?: string | null;
+  description?: string | null;
+  status?: StatusEnum | null;
+  result?: ResultEnum | null;
+  summary?: CodeAbilityReportSummary | null;
+  statusMessage?: string | null;
+  resultMessage?: string | null;
+  details?: string | null;
+  setup?: string | null;
+  teardown?: string | null;
+  duration?: number | null;
+  executionDuration?: number | null;
+  environment?: any | null;
+  properties?: any | null;
+  debug?: any | null;
+  tests?: CodeAbilityReportMain[] | null;
+}
+
 export interface VSCExtensionConfig {
   project_id: number;
   gitlab_url: string;
   file_path: string;
   download_link: string;
+}
+
+export interface TestRunResponse {
+  submit: boolean;
+  course_member_id: string;
+  course_content_id: string;
+  course_submission_group_id?: string;
+  execution_backend_id: string;
+  test_system_id: string;
+  result: number;
+  result_json?: any | null;
+  properties?: any | null;
+  version_identifier: string;
+  reference_version_identifier?: string | null;
+  status: TaskStatus;
+  id: string;
 }
 
 export interface GitlabSignup {
@@ -1773,3 +2230,23 @@ export interface SubmitResponse {
   /** The state of the merge request */
   state: string;
 }
+
+
+
+export type GroupType = "fixed" | "dynamic";
+
+export type MergeMethod = "rebase_merge" | "merge" | "ff";
+
+export type GradingStatus = 0 | 1 | 2 | 3;
+
+export type StatusEnum = "SCHEDULED" | "COMPLETED" | "TIMEDOUT" | "CRASHED" | "CANCELLED" | "SKIPPED" | "FAILED";
+
+export type ResultEnum = "PASSED" | "FAILED" | "SKIPPED";
+
+export type QualificationEnum = "verifyEqual" | "matches" | "contains" | "startsWith" | "endsWith" | "count" | "regexp";
+
+export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exist" | "error" | "warning" | "help" | "stdout";
+
+export type LanguageEnum = "de" | "en";
+
+export type MetaTypeEnum = "course" | "unit" | "assignment";

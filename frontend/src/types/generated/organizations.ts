@@ -28,7 +28,7 @@ export interface OrganizationCreate {
   /** Hierarchical path (ltree format) */
   path: string;
   /** Type of organization */
-  organization_type: any;
+  organization_type: OrganizationType;
   /** Associated user ID (for user type organizations) */
   user_id?: string | null;
   /** Additional properties */
@@ -71,7 +71,7 @@ export interface OrganizationGet {
   /** Organization description */
   description?: string | null;
   /** Type of organization */
-  organization_type: any;
+  organization_type: OrganizationType;
   /** Associated user ID */
   user_id?: string | null;
   /** Additional properties */
@@ -110,7 +110,7 @@ export interface OrganizationList {
   /** Organization title */
   title?: string | null;
   /** Type of organization */
-  organization_type: any;
+  organization_type: OrganizationType;
   /** Associated user ID */
   user_id?: string | null;
   /** Contact email */
@@ -121,7 +121,7 @@ export interface OrganizationUpdate {
   title?: string | null;
   description?: string | null;
   path?: string | null;
-  organization_type?: any | null;
+  organization_type?: OrganizationType | null;
   user_id?: string | null;
   properties?: OrganizationProperties | null;
   number?: string | null;
@@ -143,7 +143,7 @@ export interface OrganizationQuery {
   title?: string | null;
   description?: string | null;
   path?: string | null;
-  organization_type?: any | null;
+  organization_type?: OrganizationType | null;
   user_id?: string | null;
   properties?: OrganizationProperties | null;
   number?: string | null;
@@ -166,3 +166,7 @@ export interface OrganizationTaskRequest {
   gitlab: GitLabCredentials;
   parent_group_id: number;
 }
+
+
+
+export type OrganizationType = "user" | "community" | "organization";

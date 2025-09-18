@@ -109,7 +109,7 @@ export interface UserCreate {
   /** User number/identifier */
   number?: string | null;
   /** Type of user account */
-  user_type?: any | null;
+  user_type?: UserTypeEnum | null;
   /** Unique username */
   username?: string | null;
   /** Additional user properties */
@@ -134,7 +134,7 @@ export interface UserGet {
   /** User number/identifier */
   number?: string | null;
   /** Type of user account */
-  user_type?: any | null;
+  user_type?: UserTypeEnum | null;
   /** Unique username */
   username?: string | null;
   /** Additional user properties */
@@ -159,7 +159,7 @@ export interface UserList {
   /** User's email address */
   email?: string | null;
   /** Type of user account */
-  user_type?: any | null;
+  user_type?: UserTypeEnum | null;
   /** Unique username */
   username?: string | null;
   /** Archive timestamp */
@@ -189,7 +189,7 @@ export interface UserQuery {
   family_name?: string | null;
   email?: string | null;
   number?: string | null;
-  user_type?: any | null;
+  user_type?: UserTypeEnum | null;
   properties?: any | null;
   archived?: boolean | null;
   username?: string | null;
@@ -308,3 +308,7 @@ export interface UserRegistrationResponse {
   /** Success message */
   message: string;
 }
+
+
+
+export type UserTypeEnum = "user" | "token";

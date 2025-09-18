@@ -15,6 +15,7 @@ from typing import Dict, List, Set, Any, Optional, Union
 from datetime import datetime
 import json
 import re
+from enum import Enum
 
 # Add parent directories to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # ctutor_backend
@@ -33,6 +34,7 @@ class TypeScriptGenerator:
         self.interfaces: Dict[str, str] = {}
         self.imports: Set[str] = set()
         self.processed_models: Set[str] = set()
+        self.processed_enums: Set[str] = set()
         self.include_timestamp = include_timestamp
         self._timestamp_value: Optional[str] = None
 
@@ -111,13 +113,18 @@ class TypeScriptGenerator:
         # Handle literal types
         if hasattr(py_type, '__name__'):
             type_name = py_type.__name__
-            
-            # Check if it's a Pydantic model
-            if inspect.isclass(py_type) and issubclass(py_type, BaseModel):
-                # Add to imports if not already processed
-                if type_name not in self.processed_models:
+
+            if inspect.isclass(py_type):
+                # Check if it's a Pydantic model
+                if issubclass(py_type, BaseModel):
+                    if type_name not in self.processed_models:
+                        self.imports.add(type_name)
+                    return type_name
+
+                # Handle Enums
+                if issubclass(py_type, Enum):
                     self.imports.add(type_name)
-                return type_name
+                    return type_name
             
             # Map basic Python types
             if type_name in self.type_map:
@@ -144,7 +151,7 @@ class TypeScriptGenerator:
         # Skip if already processed
         if model_name in self.processed_models:
             return ""
-        
+
         self.processed_models.add(model_name)
         
         # Start interface
@@ -179,11 +186,39 @@ class TypeScriptGenerator:
         lines.append("}")
         
         return '\n'.join(lines)
-    
-    def scan_directory(self, directory: Path, pattern: str = "*.py") -> List[type[BaseModel]]:
-        """Scan directory for Pydantic models."""
-        models = []
-        
+
+    def generate_enum(self, enum_class: type[Enum]) -> str:
+        """Generate TypeScript union type from a Python Enum."""
+
+        enum_name = enum_class.__name__
+
+        if enum_name in self.processed_enums:
+            return ""
+
+        self.processed_enums.add(enum_name)
+
+        values: List[str] = []
+        for member in enum_class:
+            value = member.value
+            if isinstance(value, str):
+                values.append(json.dumps(value))
+            else:
+                values.append(json.dumps(value))
+
+        if not values:
+            return f"export type {enum_name} = never;"
+
+        union = ' | '.join(values)
+        return f"export type {enum_name} = {union};"
+
+    def scan_directory(self, directory: Path, pattern: str = "*.py") -> tuple[List[type[BaseModel]], List[type[Enum]]]:
+        """Scan directory for Pydantic models and Enum definitions."""
+
+        models: List[type[BaseModel]] = []
+        enums: List[type[Enum]] = []
+        model_names: Set[str] = set()
+        enum_names: Set[str] = set()
+
         for py_file in directory.rglob(pattern):
             # Skip test files and __pycache__
             if '__pycache__' in str(py_file) or 'test_' in py_file.name:
@@ -223,31 +258,25 @@ class TypeScriptGenerator:
             def process_class(node: ast.ClassDef, parent_chain: List[str]):
                 current_chain = parent_chain + [node.name]
 
-                inherits_base = False
-                for base in node.bases:
-                    base_name = ''
-                    if isinstance(base, ast.Name):
-                        base_name = base.id
-                    elif isinstance(base, ast.Attribute):
-                        base_name = base.attr
-
-                    if base_name in base_class_names:
-                        inherits_base = True
+                attr = module
+                for name in current_chain:
+                    if not hasattr(attr, name):
+                        attr = None
                         break
+                    attr = getattr(attr, name)
 
-                if inherits_base:
+                if attr and inspect.isclass(attr):
                     try:
-                        attr = module
-                        for name in current_chain:
-                            if not hasattr(attr, name):
-                                attr = None
-                                break
-                            attr = getattr(attr, name)
-
-                        if attr and inspect.isclass(attr) and issubclass(attr, BaseModel):
-                            models.append(attr)
-                    except Exception as e:
-                        print(f"Warning: Could not resolve {'.'.join(current_chain)} in {py_file}: {e}")
+                        if issubclass(attr, BaseModel):
+                            if attr.__name__ not in model_names:
+                                models.append(attr)
+                                model_names.add(attr.__name__)
+                        elif issubclass(attr, Enum):
+                            if attr.__name__ not in enum_names:
+                                enums.append(attr)
+                                enum_names.add(attr.__name__)
+                    except TypeError:
+                        pass
 
                 for child in node.body:
                     if isinstance(child, ast.ClassDef):
@@ -257,7 +286,7 @@ class TypeScriptGenerator:
                 if isinstance(node, ast.ClassDef):
                     process_class(node, [])
 
-        return models
+        return models, enums
     
     def generate_index_file(self, models: List[type[BaseModel]], module_name: str) -> str:
         """Generate index.ts file that exports all interfaces."""
@@ -304,17 +333,23 @@ class TypeScriptGenerator:
             'messages': [],
             'common': [],
         }
+
+        enum_categories: Dict[str, List[type[Enum]]] = {
+            key: [] for key in model_categories.keys()
+        }
         
         # Map model names to categories for import resolution
         model_to_category: Dict[str, str] = {}
         
         # Scan for models
         all_models = []
+        all_enums: List[type[Enum]] = []
         for scan_dir in scan_dirs:
             if scan_dir.exists():
-                models = self.scan_directory(scan_dir)
+                models, enums = self.scan_directory(scan_dir)
                 all_models.extend(models)
-        
+                all_enums.extend(enums)
+
         # Categorize models based on module name or class name
         for model in all_models:
             model_name = model.__name__.lower()
@@ -347,18 +382,50 @@ class TypeScriptGenerator:
             
             model_categories[category].append(model)
             model_to_category[model.__name__] = category
-        
+
+        for enum in all_enums:
+            enum_name = enum.__name__.lower()
+            module_name = enum.__module__.lower() if hasattr(enum, '__module__') else ''
+
+            category = 'common'
+            if 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
+                category = 'common'
+            elif 'auth' in module_name or 'auth' in enum_name:
+                category = 'auth'
+            elif 'user' in module_name or 'user' in enum_name:
+                category = 'users'
+            elif 'course' in module_name or 'course' in enum_name:
+                category = 'courses'
+            elif 'organization' in module_name or 'organization' in enum_name:
+                category = 'organizations'
+            elif 'role' in module_name or 'role' in enum_name or 'permission' in enum_name:
+                category = 'roles'
+            elif 'sso' in module_name or 'provider' in enum_name:
+                category = 'sso'
+            elif 'task' in module_name or 'task' in enum_name or 'job' in enum_name:
+                category = 'tasks'
+            elif 'example' in module_name or 'example' in enum_name:
+                category = 'examples'
+            elif 'message' in module_name or 'message' in enum_name:
+                category = 'messages'
+
+            enum_categories[category].append(enum)
+            model_to_category[enum.__name__] = category
+
         # Generate interfaces for each category
         generated_files = []
         
         for category, models in model_categories.items():
-            if not models:
+            enums = enum_categories.get(category, [])
+
+            if not models and not enums:
                 continue
             
             # Reset for each category
             self.interfaces.clear()
             self.imports.clear()
             self.processed_models.clear()
+            self.processed_enums.clear()
             
             # Generate interfaces
             interfaces = []
@@ -366,8 +433,14 @@ class TypeScriptGenerator:
                 interface = self.generate_interface(model)
                 if interface:
                     interfaces.append(interface)
+
+            enum_defs = []
+            for enum in enums:
+                enum_def = self.generate_enum(enum)
+                if enum_def:
+                    enum_defs.append(enum_def)
             
-            if interfaces:
+            if interfaces or enum_defs:
                 # Create category file
                 file_content = []
                 
@@ -411,9 +484,15 @@ class TypeScriptGenerator:
                             file_content.append(f"import type {{ {', '.join(imports)} }} from './{cat}';")
                         file_content.append("")
                 
-                # Add interfaces
-                file_content.extend(interfaces)
-                
+                # Add interfaces and enums
+                if interfaces:
+                    file_content.extend(interfaces)
+
+                if enum_defs:
+                    if interfaces:
+                        file_content.append("")
+                    file_content.extend(enum_defs)
+
                 # Write file
                 output_file = output_dir / f"{category}.ts"
                 with open(output_file, 'w', encoding='utf-8') as f:
@@ -433,7 +512,7 @@ class TypeScriptGenerator:
             index_content.append("")
             
             for category in sorted(model_categories.keys()):
-                if model_categories[category]:
+                if model_categories[category] or enum_categories[category]:
                     index_content.append(f"export * from './{category}';")
             
             index_file = output_dir / "index.ts"
@@ -452,11 +531,12 @@ def main():
     src_dir = backend_dir.parent  # src
     project_root = src_dir.parent  # computor-fullstack
     frontend_dir = project_root / "frontend"
-    
+
     # Directories to scan for models
     scan_dirs = [
         backend_dir / "interface",  # Pydantic DTOs
         backend_dir / "api",        # API models
+        backend_dir / "tasks",      # Task DTOs
     ]
     
     # Output directory

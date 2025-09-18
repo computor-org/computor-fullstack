@@ -32,7 +32,7 @@ const SSOLoginModal: React.FC<SSOLoginModalProps> = ({ open, onClose }) => {
   const [loadingProviders, setLoadingProviders] = useState(true);
 
   // Basic auth form state (fallback)
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   useEffect(() => {
@@ -52,10 +52,10 @@ const SSOLoginModal: React.FC<SSOLoginModalProps> = ({ open, onClose }) => {
 
   const handleBasicLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await login({ email, password });
+    const result = await login({ username, password });
     if (result.success) {
       onClose();
-      setEmail('');
+      setUsername('');
       setPassword('');
     }
   };
@@ -122,18 +122,18 @@ const SSOLoginModal: React.FC<SSOLoginModalProps> = ({ open, onClose }) => {
           {/* Basic Auth Form (Fallback) */}
           <Box component="form" onSubmit={handleBasicLogin}>
             <Typography variant="subtitle2" gutterBottom>
-              Login with Email
+              Login with Username
             </Typography>
             
             <TextField
               autoFocus
               margin="dense"
-              label="Email"
-              type="email"
+              label="Username"
+              type="text"
               fullWidth
               variant="outlined"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               disabled={authState.isLoading}
               sx={{ mb: 2 }}
             />
@@ -161,7 +161,7 @@ const SSOLoginModal: React.FC<SSOLoginModalProps> = ({ open, onClose }) => {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={authState.isLoading || !email || !password}
+                disabled={authState.isLoading || !username || !password}
                 fullWidth
               >
                 {authState.isLoading ? (
@@ -173,18 +173,6 @@ const SSOLoginModal: React.FC<SSOLoginModalProps> = ({ open, onClose }) => {
             </Box>
           </Box>
 
-          {/* Demo Credentials Info */}
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-            <Typography variant="caption" color="text.secondary">
-              Demo SSO Credentials:
-            </Typography>
-            <Typography variant="caption" display="block">
-              • Admin: admin / admin
-            </Typography>
-            <Typography variant="caption" display="block">
-              • Demo User: demo_user / password
-            </Typography>
-          </Box>
         </Box>
       </DialogContent>
     </Dialog>

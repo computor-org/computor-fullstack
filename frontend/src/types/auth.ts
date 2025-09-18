@@ -1,5 +1,5 @@
 export interface LoginCredentials {
-  email: string;
+  username: string;
   password: string;
 }
 
@@ -11,6 +11,7 @@ export interface AuthToken {
 
 export interface AuthUser {
   id: string;
+  username: string;
   email: string;
   givenName: string;
   familyName: string;

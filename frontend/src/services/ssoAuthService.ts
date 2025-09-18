@@ -74,6 +74,7 @@ export class SSOAuthService {
       // Transform backend user data to frontend format
       const user: AuthUser = {
         id: userInfo.user.id,
+        username: userInfo.user.username || userInfo.user.email,
         email: userInfo.user.email,
         givenName: userInfo.user.given_name,
         familyName: userInfo.user.family_name,

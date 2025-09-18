@@ -21,7 +21,7 @@ import { AuthService } from '../services/authService';
 import { LoginCredentials } from '../types/auth';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -43,7 +43,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
   } = useForm<LoginCredentials>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: '',
+      username: '',
       password: '',
     },
   });
@@ -67,7 +67,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
 
   const handleDemoLogin = (role: 'admin' | 'lecturer' | 'student') => {
     const credentials = AuthService.getDemoCredentials()[role];
-    setValue('email', credentials.email);
+    setValue('username', credentials.username);
     setValue('password', credentials.password);
   };
 
@@ -101,20 +101,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ open, onClose }) => {
           )}
 
           <Controller
-            name="email"
+            name="username"
             control={control}
             render={({ field }) => (
               <TextField
                 {...field}
-                label="Email Address"
-                type="email"
+                label="Username"
+                type="text"
                 fullWidth
                 margin="normal"
-                error={!!errors.email}
-                helperText={errors.email?.message}
+                error={!!errors.username}
+                helperText={errors.username?.message}
                 disabled={state.isLoading}
-                autoComplete="email"
-                placeholder="Enter email or use demo buttons below"
+                autoComplete="username"
+                placeholder="Enter username or use demo buttons below"
               />
             )}
           />

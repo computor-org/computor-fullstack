@@ -20,7 +20,7 @@ function TestComponent() {
       <div data-testid="error">{state.error || 'no-error'}</div>
       <button
         data-testid="login-btn"
-        onClick={() => login({ email: 'test@test.com', password: 'password' })}
+        onClick={() => login({ username: 'testuser', password: 'password' })}
       >
         Login
       </button>
@@ -63,6 +63,7 @@ describe('useAuth Hook', () => {
   it('should handle successful login', async () => {
     const mockUser = {
       id: '1',
+      username: 'testuser',
       email: 'test@test.com',
       givenName: 'Test',
       familyName: 'User',
@@ -103,7 +104,7 @@ describe('useAuth Hook', () => {
 
     expect(screen.getByTestId('user-email')).toHaveTextContent('test@test.com');
     expect(mockAuthService.login).toHaveBeenCalledWith({
-      email: 'test@test.com',
+      username: 'testuser',
       password: 'password',
     });
   });
@@ -133,6 +134,7 @@ describe('useAuth Hook', () => {
   it('should handle logout', async () => {
     const mockUser = {
       id: '1',
+      username: 'testuser',
       email: 'test@test.com',
       givenName: 'Test',
       familyName: 'User',
@@ -203,6 +205,7 @@ describe('useAuth Hook', () => {
   it('should restore authentication from stored session', async () => {
     const mockUser = {
       id: '1',
+      username: 'storeduser',
       email: 'stored@test.com',
       givenName: 'Stored',
       familyName: 'User',

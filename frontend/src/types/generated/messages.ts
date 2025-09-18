@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-18T17:27:35.885987
+ * Generated on: 2025-09-18T19:32:54.824079
 
  * Category: Messages
 
@@ -47,6 +47,7 @@ export interface MessageGet {
   author_id: string;
   /** Author details */
   author?: MessageAuthor | null;
+  is_read?: boolean;
   user_id?: string | null;
   course_member_id?: string | null;
   course_submission_group_id?: string | null;
@@ -68,6 +69,7 @@ export interface MessageList {
   author_id: string;
   /** Author details */
   author?: MessageAuthor | null;
+  is_read?: boolean;
   user_id?: string | null;
   course_member_id?: string | null;
   course_submission_group_id?: string | null;

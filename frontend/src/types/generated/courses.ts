@@ -2,7 +2,7 @@
 
  * Auto-generated TypeScript interfaces from Pydantic models
 
- * Generated on: 2025-09-18T17:27:35.883871
+ * Generated on: 2025-09-18T19:32:54.821772
 
  * Category: Courses
 
@@ -469,6 +469,7 @@ export interface CourseContentStudentGet {
   course_content_types: CourseContentTypeGet;
   result_count: number;
   max_test_runs?: number | null;
+  unread_message_count?: number;
 }
 
 export interface CourseContentStudentList {
@@ -488,6 +489,7 @@ export interface CourseContentStudentList {
   color: string;
   result?: ResultStudentList | null;
   submission_group?: SubmissionGroupStudentList | null;
+  unread_message_count?: number;
 }
 
 export interface CourseContentStudentUpdate {

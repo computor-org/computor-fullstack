@@ -25,6 +25,12 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     submitted_count = query[4] if len(query) > 4 else None
     submission_status_int = query[5] if len(query) > 5 else None
     submission_grading = query[6] if len(query) > 6 else None
+    content_unread_count = query[7] if len(query) > 7 else 0
+    submission_group_unread_count = query[8] if len(query) > 8 else 0
+
+    content_unread_count = content_unread_count or 0
+    submission_group_unread_count = submission_group_unread_count or 0
+    unread_message_count = content_unread_count + submission_group_unread_count
     
     # Convert integer status to string for backward compatibility
     submission_status = None
@@ -106,5 +112,6 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
                     max_submissions=course_submission_group.max_submissions if course_submission_group else None,
                     max_group_size=course_submission_group.max_group_size if course_submission_group else None,
                     repository=repository
-                ) if course_submission_group != None else None
+                ) if course_submission_group != None else None,
+            unread_message_count=unread_message_count
         )

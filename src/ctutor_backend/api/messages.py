@@ -52,7 +52,22 @@ async def get_message(
     permissions: Annotated[Principal, Depends(get_current_permissions)],
     db: Session = Depends(get_db),
 ):
-    return await get_id_db(permissions, db, id, MessageInterface)
+    message = await get_id_db(permissions, db, id, MessageInterface)
+
+    reader_user_id = permissions.user_id
+    is_read = False
+    if reader_user_id:
+        exists = (
+            db.query(MessageRead.id)
+            .filter(
+                MessageRead.message_id == id,
+                MessageRead.reader_user_id == reader_user_id,
+            )
+            .first()
+        )
+        is_read = exists is not None
+
+    return message.model_copy(update={"is_read": is_read})
 
 
 @messages_router.get("", response_model=list[MessageList])
@@ -63,6 +78,24 @@ async def list_messages(
     db: Session = Depends(get_db),
 ):
     items, total = await list_db(permissions, db, params, MessageInterface)
+    reader_user_id = permissions.user_id
+
+    if reader_user_id and items:
+        message_ids = [item.id for item in items]
+        read_rows = (
+            db.query(MessageRead.message_id)
+            .filter(
+                MessageRead.reader_user_id == reader_user_id,
+                MessageRead.message_id.in_(message_ids),
+            )
+            .all()
+        )
+        read_ids = {str(row[0]) for row in read_rows}
+    else:
+        read_ids = set()
+
+    items = [item.model_copy(update={"is_read": item.id in read_ids}) for item in items]
+
     response.headers["X-Total-Count"] = str(total)
     return items
 

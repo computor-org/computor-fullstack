@@ -51,9 +51,10 @@ def tutor_get_course_contents(course_content_id: UUID | str, course_member_id: U
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
-    course_contents_result = course_member_course_content_query(course_member_id,course_content_id,db)
+    reader_user_id = permissions.get_user_id_or_throw()
+    course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db, reader_user_id=reader_user_id)
 
-    return course_member_course_content_result_mapper(course_contents_result)
+    return course_member_course_content_result_mapper(course_contents_result, db)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annotated[Principal, Depends(get_current_permissions)], params: CourseContentStudentQuery = Depends(), db: Session = Depends(get_db)):
@@ -61,14 +62,15 @@ def tutor_list_course_contents(course_member_id: UUID | str, permissions: Annota
     if check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first() == None:
         raise ForbiddenException()
 
-    query = course_member_course_content_list_query(course_member_id,db)
+    reader_user_id = permissions.get_user_id_or_throw()
+    query = course_member_course_content_list_query(course_member_id, db, reader_user_id=reader_user_id)
 
     course_contents_results = CourseContentStudentInterface.search(db,query,params).all()
  
     response_list: list[CourseContentStudentList] = []
 
     for course_contents_result in course_contents_results:
-        response_list.append(course_member_course_content_result_mapper(course_contents_result))
+        response_list.append(course_member_course_content_result_mapper(course_contents_result, db))
 
     return response_list
 
@@ -146,7 +148,8 @@ def tutor_update_course_contents(course_content_id: UUID | str, course_member_id
     db.commit()
         
     # 6) Return fresh data using shared mapper and latest grading subquery
-    course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db)
+    reader_user_id = permissions.get_user_id_or_throw()
+    course_contents_result = course_member_course_content_query(course_member_id, course_content_id, db, reader_user_id=reader_user_id)
     return course_member_course_content_result_mapper(course_contents_result, db)
 
 @tutor_router.get("/courses/{course_id}", response_model=CourseTutorGet)
@@ -208,7 +211,8 @@ def tutor_get_course_members(course_member_id: UUID | str, permissions: Annotate
 
     course_member = check_course_permissions(permissions,CourseMember,"_tutor",db).filter(CourseMember.id == course_member_id).first()
 
-    course_contents_results = course_member_course_content_list_query(course_member_id,db).all()
+    reader_user_id = permissions.get_user_id_or_throw()
+    course_contents_results = course_member_course_content_list_query(course_member_id, db, reader_user_id=reader_user_id).all()
 
     response_list: list[TutorCourseMemberCourseContent] = []
 

@@ -219,7 +219,7 @@ CrudRouter(CourseContentTypeInterface).register_routes(app)
 
 course_content_router.register_routes(app)
 
-result_router.register_routes(app)
+app.include_router(result_router)
 
 app.include_router(
     system_router,

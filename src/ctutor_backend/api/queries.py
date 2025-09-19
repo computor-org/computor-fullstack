@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 from sqlalchemy import func, case, select, and_, literal
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from ctutor_backend.api.exceptions import NotFoundException
 from ctutor_backend.model.course import CourseSubmissionGroupMember
 from ctutor_backend.model.result import Result
@@ -220,6 +220,21 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
             CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
         )
 
+    course_contents_query = course_contents_query.options(
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.user),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.course_role),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.members)
+        .joinedload(CourseSubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+    )
+
     course_contents_result = course_contents_query.distinct().first()
         
     if course_contents_result == None:
@@ -315,6 +330,21 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
         )
 
+    query = query.options(
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.user),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.course_role),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.members)
+        .joinedload(CourseSubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+    )
+
     query = query.distinct()
 
     return query
@@ -383,6 +413,21 @@ def course_member_course_content_query(course_member_id: UUID | str, course_cont
             submission_group_unread_sub,
             CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
         )
+
+    course_contents_query = course_contents_query.options(
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.user),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.course_role),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.members)
+        .joinedload(CourseSubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+    )
 
     course_contents_result = course_contents_query.first()
         
@@ -468,6 +513,21 @@ def course_member_course_content_list_query(course_member_id: UUID | str, db: Se
             submission_group_unread_sub,
             CourseSubmissionGroup.id == submission_group_unread_sub.c.course_submission_group_id,
         )
+
+    query = query.options(
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.user),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.gradings)
+        .joinedload(CourseSubmissionGroupGrading.graded_by)
+        .joinedload(CourseMember.course_role),
+        joinedload(CourseContent.course_submission_groups)
+        .joinedload(CourseSubmissionGroup.members)
+        .joinedload(CourseSubmissionGroupMember.course_member)
+        .joinedload(CourseMember.user),
+    )
 
     return query
 

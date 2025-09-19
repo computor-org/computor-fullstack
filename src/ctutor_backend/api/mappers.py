@@ -38,16 +38,17 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
     unread_message_count = content_unread_count + submission_group_unread_count
     
     # Convert integer status to string for backward compatibility
+    status_lookup = {
+        GradingStatus.NOT_REVIEWED.value: "not_reviewed",
+        GradingStatus.CORRECTED.value: "corrected",
+        GradingStatus.CORRECTION_NECESSARY.value: "correction_necessary",
+        GradingStatus.IMPROVEMENT_POSSIBLE.value: "improvement_possible",
+    }
+
     submission_status = None
-    if submission_status_int is not None:
-        status_map = {
-            GradingStatus.NOT_REVIEWED.value: "not_reviewed",
-            GradingStatus.CORRECTED.value: "corrected",
-            GradingStatus.CORRECTION_NECESSARY.value: "correction_necessary",
-            GradingStatus.IMPROVEMENT_POSSIBLE.value: "improvement_possible"
-        }
-        submission_status = status_map.get(submission_status_int, "not_reviewed")
-    
+    latest_status_value = submission_status_int
+    latest_grading_value = submission_grading
+
     # Get directory from deployment's example if available, otherwise from properties
     directory = None
     if hasattr(course_content, 'deployment') and course_content.deployment and db:
@@ -106,6 +107,22 @@ def course_member_course_content_result_mapper(course_member_course_content_resu
         )
         for grading in sorted_gradings:
             gradings_payload.append(CourseSubmissionGroupGradingList.model_validate(grading))
+
+        if gradings_payload:
+            latest_grading_value = gradings_payload[0].grading
+            latest_status = gradings_payload[0].status
+            if isinstance(latest_status, GradingStatus):
+                latest_status_value = latest_status.value
+            elif latest_status is not None:
+                try:
+                    latest_status_value = int(latest_status)
+                except (TypeError, ValueError):
+                    pass
+
+    if latest_status_value is not None:
+        submission_status = status_lookup.get(int(latest_status_value), "not_reviewed")
+
+    submission_grading = latest_grading_value
 
     submission_group_payload = None
     submission_group_detail = None

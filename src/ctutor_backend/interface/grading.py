@@ -37,7 +37,10 @@ class CourseSubmissionGroupGradingCreate(BaseModel):
     status: GradingStatus = GradingStatus.NOT_REVIEWED
     feedback: Optional[str] = None  # Optional feedback/comments
 
-    graded_by_course_member: Optional[GradedByCourseMember] = None
+    graded_by_course_member: Optional[GradedByCourseMember] = Field(
+        default=None,
+        validation_alias="graded_by",
+    )
 
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
@@ -53,8 +56,11 @@ class CourseSubmissionGroupGradingGet(BaseEntityGet):
     feedback: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    graded_by_course_member: Optional[GradedByCourseMember] = None
-    
+    graded_by_course_member: Optional[GradedByCourseMember] = Field(
+        default=None,
+        validation_alias="graded_by",
+    )
+
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
 
@@ -68,8 +74,11 @@ class CourseSubmissionGroupGradingList(BaseModel):
     status: GradingStatus
     feedback: Optional[str] = None
     created_at: datetime
-    graded_by_course_member: Optional[GradedByCourseMember] = None
-    
+    graded_by_course_member: Optional[GradedByCourseMember] = Field(
+        default=None,
+        validation_alias="graded_by",
+    )
+
     model_config = ConfigDict(use_enum_values=True, from_attributes=True)
 
 
